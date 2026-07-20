@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -27,18 +29,95 @@ textarea::placeholder {
   color: #9ca3af;
 }
 
-/* Remove dark mode auto-detection that makes text light */
-@media (prefers-color-scheme: dark) {
-  html {
-    color: var(--foreground);
-  }
-  body {
-    background: var(--background);
-    color: var(--foreground);
-  }
-  input,
-  select,
-  textarea {
-    color: #1f2937;
-  }
+/* Dark mode overrides — automatically adapts common Tailwind classes */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
 }
+
+.dark body {
+  background: #0a0a0a;
+  color: #fafafa;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  color: #e2e8f0;
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b;
+}
+
+/* Auto-adapt common utility classes for dark mode */
+.dark .bg-white { background-color: #1e293b !important; }
+.dark .bg-gray-50 { background-color: #0f172a !important; }
+.dark .bg-gray-100 { background-color: #1e293b !important; }
+.dark .bg-gray-200 { background-color: #334155 !important; }
+
+.dark .text-gray-900 { color: #f1f5f9 !important; }
+.dark .text-gray-700 { color: #cbd5e1 !important; }
+.dark .text-gray-600 { color: #94a3b8 !important; }
+.dark .text-gray-500 { color: #64748b !important; }
+.dark .text-gray-400 { color: #475569 !important; }
+
+.dark .border-gray-200 { border-color: #334155 !important; }
+.dark .border-gray-100 { border-color: #1e293b !important; }
+
+.dark .hover\:bg-gray-50:hover { background-color: #1e293b !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #334155 !important; }
+.dark .hover\:bg-gray-200:hover { background-color: #475569 !important; }
+
+/* Keep colored elements visible in dark mode */
+.dark .bg-indigo-50 { background-color: rgba(49, 46, 129, 0.3) !important; }
+.dark .bg-indigo-100 { background-color: rgba(49, 46, 129, 0.4) !important; }
+.dark .bg-green-50 { background-color: rgba(6, 78, 59, 0.3) !important; }
+.dark .bg-green-100 { background-color: rgba(6, 78, 59, 0.4) !important; }
+.dark .bg-red-50 { background-color: rgba(127, 29, 29, 0.3) !important; }
+.dark .bg-red-100 { background-color: rgba(127, 29, 29, 0.4) !important; }
+.dark .bg-amber-50 { background-color: rgba(120, 53, 15, 0.3) !important; }
+.dark .bg-amber-100 { background-color: rgba(120, 53, 15, 0.4) !important; }
+.dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.3) !important; }
+.dark .bg-blue-100 { background-color: rgba(30, 58, 138, 0.4) !important; }
+.dark .bg-purple-50 { background-color: rgba(76, 29, 149, 0.3) !important; }
+.dark .bg-purple-100 { background-color: rgba(76, 29, 149, 0.4) !important; }
+.dark .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.3) !important; }
+.dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.4) !important; }
+.dark .bg-orange-50 { background-color: rgba(124, 45, 18, 0.3) !important; }
+.dark .bg-orange-100 { background-color: rgba(124, 45, 18, 0.4) !important; }
+
+/* Text colors that should stay visible in dark mode */
+.dark .text-indigo-600 { color: #818cf8 !important; }
+.dark .text-indigo-700 { color: #a5b4fc !important; }
+.dark .text-green-600 { color: #4ade80 !important; }
+.dark .text-green-700 { color: #86efac !important; }
+.dark .text-red-600 { color: #f87171 !important; }
+.dark .text-red-700 { color: #fca5a5 !important; }
+.dark .text-blue-600 { color: #60a5fa !important; }
+.dark .text-blue-700 { color: #93c5fd !important; }
+.dark .text-purple-600 { color: #c084fc !important; }
+.dark .text-purple-700 { color: #d8b4fe !important; }
+.dark .text-emerald-600 { color: #4ade80 !important; }
+.dark .text-emerald-700 { color: #86efac !important; }
+.dark .text-amber-600 { color: #fbbf24 !important; }
+.dark .text-amber-700 { color: #fcd34d !important; }
+.dark .text-orange-600 { color: #fb923c !important; }
+.dark .text-orange-700 { color: #fdba74 !important; }
+
+/* Badge/pill backgrounds in dark mode */
+.dark .text-indigo-700.bg-indigo-100 { color: #a5b4fc !important; }
+.dark .text-green-700.bg-green-100 { color: #86efac !important; }
+.dark .text-red-700.bg-red-100 { color: #fca5a5 !important; }
+.dark .text-amber-700.bg-amber-100 { color: #fcd34d !important; }
+.dark .text-purple-700.bg-purple-100 { color: #d8b4fe !important; }
+.dark .text-emerald-700.bg-emerald-100 { color: #86efac !important; }
+.dark .text-blue-700.bg-blue-100 { color: #93c5fd !important; }
+.dark .text-gray-700.bg-gray-100 { color: #cbd5e1 !important; }
+
+/* Indigo buttons stay the same */
+.dark .bg-indigo-600 { background-color: #4f46e5 !important; }
+.dark .hover\:bg-indigo-700:hover { background-color: #4338ca !important; }
