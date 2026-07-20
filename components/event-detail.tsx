@@ -156,7 +156,7 @@ function OverviewTab({ event }: { event: Event }) {
 
   const dates = [
     { label: isSupport ? 'Start Date' : 'Event Start', value: event.event_start_date },
-    { label: isSupport ? 'Close Date' : 'Event Close', value: event.event_close_date },
+    { label: isSupport ? 'Due Date' : 'Event Close', value: event.event_close_date },
     !isSupport && { label: 'Contract Start', value: event.contract_start_date },
     !isSupport && { label: 'Contract End', value: event.contract_end_date },
     !isSupport && { label: 'Recognition Start', value: event.recognition_start_date },
