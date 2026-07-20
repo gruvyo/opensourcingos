@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     description: 'Track sourcing events, baselines, supplier offers, savings, and realization in one procurement platform.',
     images: [
       {
-        url: '/og-image.svg',
+        url: '/og-image.png',
         width: 1200,
         height: 630,
         alt: 'OpenSourcingOS — Procurement Value Tracker',
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'OpenSourcingOS — Procurement Value Tracker',
     description: 'Track sourcing events, baselines, supplier offers, savings, and realization in one procurement platform.',
-    images: ['/og-image.svg'],
+    images: ['/og-image.png'],
   },
   icons: {
     icon: [
