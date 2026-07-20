@@ -20,7 +20,7 @@ import { ThemeToggle } from './theme-toggle'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Sourcing Events', href: '/events', icon: Briefcase },
+  { label: 'Projects', href: '/events', icon: Briefcase },
   { label: 'Savings Calculations', href: '/savings', icon: Calculator },
   { label: 'Realization', href: '/realization', icon: TrendingUp },
   { label: 'Suppliers', href: '/suppliers', icon: Users },

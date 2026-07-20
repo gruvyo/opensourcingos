@@ -39,9 +39,9 @@ export default async function EventDetailPage({
 
   return (
     <div className="p-8">
-      <Link href="/events" className="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+      <Link href="/events" className="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200">
         <ArrowLeft className="h-4 w-4" />
-        Back to Events
+        Back to Projects
       </Link>
       <EventDetail event={event} scopeLines={scopeLines || []} suppliers={suppliers || []} />
     </div>
