@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Briefcase, LifeBuoy } from 'lucide-react'
+import { Briefcase, LifeBuoy, Plus, X } from 'lucide-react'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string }
 
@@ -46,7 +46,7 @@ export function EventForm({
   categories,
   businessUnits,
   costCenters,
-  suppliers,
+  suppliers: initialSuppliers,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -57,6 +57,12 @@ export function EventForm({
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Suppliers state — allows adding new ones inline
+  const [suppliers, setSuppliers] = useState<Option[]>(initialSuppliers)
+  const [showAddSupplier, setShowAddSupplier] = useState(false)
+  const [newSupplierName, setNewSupplierName] = useState('')
+  const [addingSupplier, setAddingSupplier] = useState(false)
 
   const [projectType, setProjectType] = useState<'Sourcing' | 'Support'>('Sourcing')
 
@@ -87,13 +93,61 @@ export function EventForm({
 
   const handleProjectTypeChange = (type: 'Sourcing' | 'Support') => {
     setProjectType(type)
-    // Reset status to appropriate default
     setForm(prev => ({
       ...prev,
       event_status: type === 'Sourcing' ? 'Pipeline' : 'Not Started',
       event_type: '',
       sourcing_method: '',
     }))
+  }
+
+  const handleAddSupplier = async () => {
+    const name = newSupplierName.trim()
+    if (!name) return
+
+    setAddingSupplier(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setError('You must be logged in')
+      setAddingSupplier(false)
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', user!.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      setError('No organization found')
+      setAddingSupplier(false)
+      return
+    }
+
+    const { data, error: insertError } = await supabase
+      .from('suppliers')
+      .insert({
+        supplier_name: name,
+        organization_id: profile.organization_id,
+        created_by: user.id,
+      })
+      .select('id, supplier_name')
+      .single()
+
+    if (insertError) {
+      setError(insertError.message)
+      setAddingSupplier(false)
+      return
+    }
+
+    // Add to local list and select it
+    setSuppliers(prev => [...prev, { id: data.id, supplier_name: data.supplier_name }])
+    setForm(prev => ({ ...prev, incumbent_supplier_id: data.id }))
+    setNewSupplierName('')
+    setShowAddSupplier(false)
+    setAddingSupplier(false)
+    setError(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -350,16 +404,48 @@ export function EventForm({
           </div>
           <div>
             <label className={labelClass}>Incumbent Supplier</label>
-            <select
-              value={form.incumbent_supplier_id}
-              onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Select supplier...</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.supplier_name}</option>
-              ))}
-            </select>
+            <div className="mt-1 flex gap-2">
+              <select
+                value={form.incumbent_supplier_id}
+                onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)}
+                className={`${inputClass} flex-1`}
+              >
+                <option value="">Select supplier...</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.supplier_name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowAddSupplier(!showAddSupplier)}
+                className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Add new supplier"
+              >
+                {showAddSupplier ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {showAddSupplier ? 'Cancel' : 'New'}
+              </button>
+            </div>
+            {showAddSupplier && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={newSupplierName}
+                  onChange={(e) => setNewSupplierName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSupplier() } }}
+                  className={`${inputClass} flex-1`}
+                  placeholder="Enter supplier name..."
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleAddSupplier}
+                  disabled={addingSupplier || !newSupplierName.trim()}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {addingSupplier ? 'Adding...' : 'Add'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -378,7 +464,7 @@ export function EventForm({
             />
           </div>
           <div>
-            <label className={labelClass}>{projectType === 'Sourcing' ? 'Event Close Date' : 'Close Date'}</label>
+            <label className={labelClass}>{projectType === 'Sourcing' ? 'Event Close Date' : 'Due Date'}</label>
             <input
               type="date"
               value={form.event_close_date}
