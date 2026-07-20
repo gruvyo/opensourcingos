@@ -55,7 +55,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
 
     const lineNumber = scopeLines.length + 1

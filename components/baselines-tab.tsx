@@ -379,7 +379,7 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
 
     const { error: insertError } = await supabase
@@ -511,7 +511,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
 
     const lineNumber = lines.length + 1
