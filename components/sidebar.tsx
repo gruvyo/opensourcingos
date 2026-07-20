@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { createClient } from '@/lib/supabase/client'
+import { ThemeToggle } from './theme-toggle'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -49,12 +50,12 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
-      <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold">
+    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6 dark:border-gray-800">
+        <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">OpenSourcing</span>
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-sm text-white font-bold">
           OS
         </div>
-        <span className="text-lg font-semibold text-gray-900">OpenSourcingOS</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -70,8 +71,8 @@ export function Sidebar() {
                   className={clsx(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -83,20 +84,21 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-gray-200 p-4 dark:border-gray-800">
         {userEmail && (
-          <div className="mb-2 truncate text-xs text-gray-500">
+          <div className="mb-2 truncate text-xs text-gray-500 dark:text-gray-400">
             {userEmail}
           </div>
         )}
+        <ThemeToggle />
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+          className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
         >
           <LogOut className="h-4 w-4" />
           Sign Out
         </button>
-        <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+        <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
           MVP • Beta Version
         </div>
       </div>
