@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Update globals.css with proper base text colors
+cat > app/globals.css << 'EOF'
 @import "tailwindcss";
 
 :root {
@@ -42,3 +46,9 @@ textarea::placeholder {
     color: #1f2937;
   }
 }
+EOF
+
+# Clear build cache
+rm -rf .next
+
+echo "DONE"
