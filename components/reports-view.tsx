@@ -8,10 +8,10 @@ type EventRow = {
   event_name: string
   event_type: string
   event_status: string
-  category: { category_name: string } | null
-  business_unit: { business_unit_name: string } | null
-  incumbent_supplier: { supplier_name: string } | null
-  awarded_supplier: { supplier_name: string } | null
+  category: any
+  business_unit: any
+  incumbent_supplier: any
+  awarded_supplier: any
   contract_start_date: string | null
   contract_end_date: string | null
 }
@@ -25,9 +25,16 @@ type SavingsRow = {
   calculation_status: string
   finance_validated: boolean
   current_year_recognized_amount: number
-  event: { event_name: string } | null
-  baseline: { baseline_name: string } | null
-  award: { award_name: string } | null
+  event: any
+  baseline: any
+  award: any
+}
+
+// Helper to get first element from array-or-object join
+function getFirst(obj: any): any {
+  if (!obj) return null
+  if (Array.isArray(obj)) return obj[0] || null
+  return obj
 }
 
 function downloadCSV(filename: string, rows: string[][]) {
@@ -46,8 +53,10 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
     const headers = ['Event Name', 'Type', 'Status', 'Category', 'Business Unit', 'Incumbent Supplier', 'Awarded Supplier', 'Contract Start', 'Contract End']
     const rows = [headers, ...events.map(e => [
       e.event_name, e.event_type, e.event_status,
-      e.category?.category_name || '', e.business_unit?.business_unit_name || '',
-      e.incumbent_supplier?.supplier_name || '', e.awarded_supplier?.supplier_name || '',
+      getFirst(e.category)?.category_name || '',
+      getFirst(e.business_unit)?.business_unit_name || '',
+      getFirst(e.incumbent_supplier)?.supplier_name || '',
+      getFirst(e.awarded_supplier)?.supplier_name || '',
       e.contract_start_date || '', e.contract_end_date || '',
     ])]
     downloadCSV('sourcing_events.csv', rows)
@@ -56,8 +65,8 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
   const exportSavings = () => {
     const headers = ['Event', 'Calculation Name', 'Savings Type', 'Baseline', 'Award', 'Gross Savings', 'Savings %', 'Status', 'Finance Validated', 'Current-Year Recognized']
     const rows = [headers, ...savingsCalcs.map(c => [
-      c.event?.event_name || '', c.calculation_name, c.savings_type,
-      c.baseline?.baseline_name || '', c.award?.award_name || '',
+      getFirst(c.event)?.event_name || '', c.calculation_name, c.savings_type,
+      getFirst(c.baseline)?.baseline_name || '', getFirst(c.award)?.award_name || '',
       c.gross_savings_amount?.toString() || '', c.savings_percentage?.toFixed(2) || '',
       c.calculation_status, c.finance_validated ? 'Yes' : 'No',
       c.current_year_recognized_amount?.toString() || '',
@@ -71,7 +80,6 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
 
   return (
     <div className="mt-6 space-y-6">
-      {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-gray-500">Total Gross Savings</p>
@@ -87,7 +95,6 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
         </div>
       </div>
 
-      {/* Export Buttons */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-4">
@@ -128,7 +135,6 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
         </div>
       </div>
 
-      {/* Recent Savings Table */}
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-200 px-6 py-4">
           <h3 className="text-sm font-semibold text-gray-900">Savings Calculations</h3>
@@ -156,7 +162,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
               ) : (
                 savingsCalcs.map((calc) => (
                   <tr key={calc.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">{calc.event?.event_name || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{getFirst(calc.event)?.event_name || '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{calc.calculation_name}</td>
                     <td className="px-4 py-3">
                       <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">

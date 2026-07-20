@@ -386,7 +386,7 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
 
     const baseline = baselines.find(b => b.id === form.baseline_id)

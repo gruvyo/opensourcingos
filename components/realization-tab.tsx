@@ -106,7 +106,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
 
     const baseline = parseFloat(form.baseline_amount) || 0

@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > app/dashboard/page.tsx << 'EOF'
 import { createClient } from '@/lib/supabase/server'
 import { DashboardStats } from '@/components/dashboard-stats'
 import { SavingsByCategoryChart, EventsByStatusChart, SavingsByTypeChart, SavingsTrendChart } from '@/components/dashboard-charts'
@@ -120,3 +123,6 @@ export default async function DashboardPage() {
     </div>
   )
 }
+EOF
+
+echo "DONE"

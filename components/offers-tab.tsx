@@ -133,7 +133,7 @@ export function OffersTab({
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user?.id)
+      .eq('id', user!.id)
       .single()
 
     const awardName = `Award - ${offer.supplier?.supplier_name || 'Supplier'}`
@@ -384,7 +384,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
 
     const { error: insertError } = await supabase
@@ -518,7 +518,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', user!.id)
       .single()
 
     const lineNumber = lines.length + 1

@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat > components/dashboard-charts.tsx << 'EOF'
 'use client'
 
 import {
@@ -116,3 +119,6 @@ function EmptyChart({ message }: { message: string }) {
     </div>
   )
 }
+EOF
+
+echo "DONE"

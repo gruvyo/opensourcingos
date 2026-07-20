@@ -13,10 +13,16 @@ type EventRow = {
   event_close_date: string | null
   contract_start_date: string | null
   contract_end_date: string | null
-  category: { category_name: string } | null
-  business_unit: { business_unit_name: string } | null
-  incumbent_supplier: { supplier_name: string } | null
-  awarded_supplier: { supplier_name: string } | null
+  category: any
+  business_unit: any
+  incumbent_supplier: any
+  awarded_supplier: any
+}
+
+function getFirst(obj: any): any {
+  if (!obj) return null
+  if (Array.isArray(obj)) return obj[0] || null
+  return obj
 }
 
 const EVENT_STATUSES = [
@@ -50,7 +56,6 @@ export function EventsList({ events }: { events: EventRow[] }) {
 
   return (
     <div className="mt-6">
-      {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -84,7 +89,6 @@ export function EventsList({ events }: { events: EventRow[] }) {
         </select>
       </div>
 
-      {/* Table */}
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <table className="w-full">
           <thead>
@@ -116,13 +120,13 @@ export function EventsList({ events }: { events: EventRow[] }) {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{event.event_type}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {event.category?.category_name || '—'}
+                    {getFirst(event.category)?.category_name || '—'}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {event.business_unit?.business_unit_name || '—'}
+                    {getFirst(event.business_unit)?.business_unit_name || '—'}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {event.awarded_supplier?.supplier_name || event.incumbent_supplier?.supplier_name || '—'}
+                    {getFirst(event.awarded_supplier)?.supplier_name || getFirst(event.incumbent_supplier)?.supplier_name || '—'}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(event.event_status)}`}>
@@ -139,7 +143,6 @@ export function EventsList({ events }: { events: EventRow[] }) {
         </table>
       </div>
 
-      {/* Count */}
       <p className="mt-4 text-sm text-gray-500">
         Showing {filteredEvents.length} of {events.length} events
       </p>

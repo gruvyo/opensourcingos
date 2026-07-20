@@ -13,6 +13,12 @@ import { OffersTab } from './offers-tab'
 import { CalculationsTab } from './calculations-tab'
 import { RealizationTab } from './realization-tab'
 
+function getFirst(obj: any): any {
+  if (!obj) return null
+  if (Array.isArray(obj)) return obj[0] || null
+  return obj
+}
+
 type Event = {
   id: string
   event_name: string
@@ -28,11 +34,11 @@ type Event = {
   recognition_end_date: string | null
   official_reporting_basis: string | null
   currency_code: string
-  category: { category_name: string } | null
-  business_unit: { business_unit_name: string } | null
-  cost_center: { cost_center_name: string } | null
-  incumbent_supplier: { supplier_name: string } | null
-  awarded_supplier: { supplier_name: string } | null
+  category: any
+  business_unit: any
+  cost_center: any
+  incumbent_supplier: any
+  awarded_supplier: any
 }
 
 const TABS = [
@@ -110,11 +116,11 @@ export function EventDetail({
 
 function OverviewTab({ event }: { event: Event }) {
   const details = [
-    { label: 'Category', value: event.category?.category_name },
-    { label: 'Business Unit', value: event.business_unit?.business_unit_name },
-    { label: 'Cost Center', value: event.cost_center?.cost_center_name },
-    { label: 'Incumbent Supplier', value: event.incumbent_supplier?.supplier_name },
-    { label: 'Awarded Supplier', value: event.awarded_supplier?.supplier_name },
+    { label: 'Category', value: getFirst(event.category)?.category_name },
+    { label: 'Business Unit', value: getFirst(event.business_unit)?.business_unit_name },
+    { label: 'Cost Center', value: getFirst(event.cost_center)?.cost_center_name },
+    { label: 'Incumbent Supplier', value: getFirst(event.incumbent_supplier)?.supplier_name },
+    { label: 'Awarded Supplier', value: getFirst(event.awarded_supplier)?.supplier_name },
     { label: 'Currency', value: event.currency_code },
     { label: 'Reporting Basis', value: event.official_reporting_basis },
   ]
