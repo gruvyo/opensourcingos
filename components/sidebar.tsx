@@ -6,9 +6,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   Calculator,
-  TrendingUp,
   Users,
-  FileText,
   BarChart3,
   Settings,
   Briefcase,
@@ -21,10 +19,8 @@ import { ThemeToggle } from './theme-toggle'
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Projects', href: '/events', icon: Briefcase },
-  { label: 'Savings Calculations', href: '/savings', icon: Calculator },
-  { label: 'Realization', href: '/realization', icon: TrendingUp },
+  { label: 'Savings', href: '/savings', icon: Calculator },
   { label: 'Suppliers', href: '/suppliers', icon: Users },
-  { label: 'Contracts', href: '/contracts', icon: FileText },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]

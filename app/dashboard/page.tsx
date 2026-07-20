@@ -1,7 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { DashboardStats } from '@/components/dashboard-stats'
-import { SavingsByCategoryChart, EventsByStatusChart, SavingsByTypeChart, SavingsTrendChart } from '@/components/dashboard-charts'
+import { SavingsByCategoryChart, EventsByStatusChart, SavingsByTypeChart } from '@/components/dashboard-charts'
 import Link from 'next/link'
+
+function getFirst(obj: any): any {
+  if (!obj) return null
+  if (Array.isArray(obj)) return obj[0] || null
+  return obj
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -9,22 +15,17 @@ export default async function DashboardPage() {
   const [
     { data: events },
     { data: savingsCalcs },
-    { data: realizationPeriods },
   ] = await Promise.all([
     supabase.from('sourcing_events').select(`
-      id, event_name, event_status,
-      category:categories!sourcing_events_category_id_fkey(category_name)
+      id, event_name, event_status, project_type, contract_start_date,
+      category:categories!sourcing_events_category_id_fkey(category_name),
+      business_unit:business_units(business_unit_name)
     `),
-    supabase.from('savings_calculations').select('id, savings_type, gross_savings_amount, finance_validated, current_year_recognized_amount, event_id'),
-    supabase.from('realization_periods').select('id, projected_savings, realized_savings, leakage_amount, period_name'),
+    supabase.from('savings_calculations').select(`
+      id, savings_type, gross_savings_amount, finance_validated,
+      cost_reduction_amount, cost_avoidance_amount, event_id
+    `),
   ])
-
-  const totalSavings = (savingsCalcs || []).reduce((sum, c) => sum + (c.gross_savings_amount || 0), 0)
-  const activeEvents = (events || []).filter((e: any) => !['Closed', 'Cancelled', 'Rejected'].includes(e.event_status)).length
-  const realizedSavings = (realizationPeriods || []).reduce((sum, p) => sum + (p.realized_savings || 0), 0)
-  const leakage = (realizationPeriods || []).reduce((sum, p) => sum + (p.leakage_amount || 0), 0)
-  const financeValidated = (savingsCalcs || []).filter((c: any) => c.finance_validated).reduce((sum: number, c: any) => sum + (c.gross_savings_amount || 0), 0)
-  const pipelineSavings = (savingsCalcs || []).reduce((sum: number, c: any) => sum + ((c.gross_savings_amount || 0) - (c.current_year_recognized_amount || 0)), 0)
 
   // Helper to get category name from Supabase join (returns array)
   const getCategoryName = (event: any): string => {
@@ -34,6 +35,33 @@ export default async function DashboardPage() {
     }
     return event.category.category_name || 'Uncategorized'
   }
+
+  // Savings totals
+  const totalSavings = (savingsCalcs || []).reduce((sum, c) => sum + (c.gross_savings_amount || 0), 0)
+  const totalCostReduction = (savingsCalcs || []).reduce((sum, c) => sum + (c.cost_reduction_amount || 0), 0)
+  const totalCostAvoidance = (savingsCalcs || []).reduce((sum, c) => sum + (c.cost_avoidance_amount || 0), 0)
+
+  // Active events (not closed/cancelled/rejected/complete)
+  const activeEvents = (events || []).filter((e: any) => !['Closed', 'Cancelled', 'Rejected', 'Complete'].includes(e.event_status)).length
+
+  // Realized vs Accrued (date-based, from contract_start_date on the event)
+  const now = new Date()
+  let realizedSavings = 0
+  let accruedSavings = 0
+  for (const calc of savingsCalcs || []) {
+    const event = events?.find((e: any) => e.id === calc.event_id)
+    if (!event || !event.contract_start_date) {
+      accruedSavings += (calc.gross_savings_amount || 0)
+      continue
+    }
+    if (new Date(event.contract_start_date) <= now) {
+      realizedSavings += (calc.gross_savings_amount || 0)
+    } else {
+      accruedSavings += (calc.gross_savings_amount || 0)
+    }
+  }
+
+  const financeValidated = (savingsCalcs || []).filter((c: any) => c.finance_validated).reduce((sum: number, c: any) => sum + (c.gross_savings_amount || 0), 0)
 
   // Savings by Category
   const savingsByCategoryMap = new Map<string, number>()
@@ -61,23 +89,12 @@ export default async function DashboardPage() {
   }
   const savingsByType = Array.from(typeMap.entries()).map(([name, value]) => ({ name, value }))
 
-  // Savings Trend by Quarter
-  const trendMap = new Map<string, { projected: number; realized: number }>()
-  for (const period of realizationPeriods || []) {
-    const existing = trendMap.get(period.period_name) || { projected: 0, realized: 0 }
-    trendMap.set(period.period_name, {
-      projected: existing.projected + (period.projected_savings || 0),
-      realized: existing.realized + (period.realized_savings || 0),
-    })
-  }
-  const savingsTrend = Array.from(trendMap.entries()).map(([name, values]) => ({ name, ...values }))
-
   return (
     <div className="p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Procurement value overview — savings, pipeline, and realization
+          Procurement value overview — savings, pipeline, and project activity
         </p>
       </div>
 
@@ -85,34 +102,34 @@ export default async function DashboardPage() {
         totalSavings,
         activeEvents,
         realizedSavings,
-        pipelineSavings,
-        leakage,
+        accruedSavings,
         financeValidated,
+        totalCostReduction,
+        totalCostAvoidance,
       }} />
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <SavingsByCategoryChart data={savingsByCategory} />
         <EventsByStatusChart data={eventsByStatus} />
         <SavingsByTypeChart data={savingsByType} />
-        <SavingsTrendChart data={savingsTrend} />
       </div>
 
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Recent Events</h3>
-          <Link href="/events" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Recent Projects</h3>
+          <Link href="/events" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
             View all →
           </Link>
         </div>
         <div className="space-y-2">
           {(events || []).slice(0, 5).map((event: any) => (
             <Link key={event.id} href={`/events/${event.id}`}
-              className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3 hover:bg-gray-50">
+              className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50">
               <div>
-                <p className="text-sm font-medium text-gray-900">{event.event_name}</p>
-                <p className="text-xs text-gray-500">{getCategoryName(event)}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{event.event_name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{getCategoryName(event)}</p>
               </div>
-              <span className="text-xs text-gray-500">{event.event_status}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{event.event_status}</span>
             </Link>
           ))}
         </div>

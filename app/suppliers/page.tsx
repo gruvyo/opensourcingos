@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Users, Plus, Building2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { SuppliersView } from '@/components/suppliers-view'
 
 export default async function SuppliersPage() {
   const supabase = await createClient()
@@ -42,38 +43,7 @@ export default async function SuppliersPage() {
         </Link>
       </div>
 
-      {suppliersWithCounts.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <Users className="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No suppliers yet</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Suppliers are added automatically when you create a project and select "New" next to the supplier field.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {suppliersWithCounts.map((supplier: any) => (
-            <div
-              key={supplier.id}
-              className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
-                  <Building2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {supplier.supplier_name}
-                  </h3>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {supplier.event_count} project{supplier.event_count !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <SuppliersView suppliers={suppliersWithCounts} />
     </div>
   )
 }
