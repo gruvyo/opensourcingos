@@ -34,10 +34,10 @@ type ScopeLine = {
 
 const OFFER_TYPES = ['Initial', 'Revised', 'Best and Final (BAFO)', 'Counter', 'Final']
 const COMPLIANCE_STATUS_COLORS: Record<string, string> = {
-  'Compliant': 'bg-green-100 text-green-700',
-  'Non-Compliant': 'bg-red-100 text-red-700',
-  'Conditional': 'bg-amber-100 text-amber-700',
-  'Pending Review': 'bg-gray-100 text-gray-700',
+  'Compliant': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+  'Non-Compliant': 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+  'Conditional': 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
+  'Pending Review': 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
 }
 
 export function OffersTab({
@@ -189,7 +189,7 @@ export function OffersTab({
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-gray-500">Loading offers...</div>
+    return <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Loading offers...</div>
   }
 
   return (
@@ -197,14 +197,14 @@ export function OffersTab({
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Supplier Offers</h3>
-          <p className="text-sm text-gray-600">Capture and compare supplier pricing</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Supplier Offers</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500">Capture and compare supplier pricing</p>
         </div>
         <div className="flex gap-2">
           {offers.length >= 2 && (
             <button
               onClick={() => setShowCompare(!showCompare)}
-              className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+              className="flex items-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 px-4 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
             >
               <GitCompare className="h-4 w-4" />
               {showCompare ? 'Hide Comparison' : 'Compare Offers'}
@@ -238,10 +238,10 @@ export function OffersTab({
 
       {/* Offers List */}
       {offers.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-12 text-center shadow-sm">
           <Users className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-          <h3 className="text-sm font-medium text-gray-900">No offers yet</h3>
-          <p className="mt-1 text-sm text-gray-500">Click "Add Offer" to capture supplier pricing.</p>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">No offers yet</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Click "Add Offer" to capture supplier pricing.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -251,30 +251,30 @@ export function OffersTab({
             const isLowest = offers.length > 1 && offer.offer_total_amount === Math.min(...offers.map(o => o.offer_total_amount))
 
             return (
-              <div key={offer.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+              <div key={offer.id} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
                 {/* Offer Header */}
                 <div className="flex items-center gap-4 p-4">
-                  <button onClick={() => toggleExpand(offer.id)} className="text-gray-400 hover:text-gray-600">
+                  <button onClick={() => toggleExpand(offer.id)} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:text-gray-500">
                     {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                   </button>
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-gray-900">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         {offer.supplier?.supplier_name || 'Unknown Supplier'}
                       </h4>
                       {isLowest && (
-                        <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                        <span className="rounded bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-300">
                           Lowest Bid
                         </span>
                       )}
                       {offer.selected_for_award_flag && (
-                        <span className="flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        <span className="flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
                           <Award className="h-3 w-3" /> Selected for Award
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">
                       {offer.offer_type} • Round {offer.offer_round}
                       {offer.offer_date && ` • ${formatDate(offer.offer_date)}`}
                       {offer.offer_valid_until && ` • Valid until ${formatDate(offer.offer_valid_until)}`}
@@ -283,8 +283,8 @@ export function OffersTab({
 
                   {/* Total */}
                   <div className="text-right">
-                    <p className="text-xs text-gray-500">Total Offer</p>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(offer.offer_total_amount)}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Total Offer</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(offer.offer_total_amount)}</p>
                   </div>
 
                   {/* Compliance Badge */}
@@ -293,8 +293,8 @@ export function OffersTab({
                     className={clsx(
                       'flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
                       offer.compliant_bid_flag
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
                     )}
                   >
                     {offer.compliant_bid_flag ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
@@ -302,23 +302,23 @@ export function OffersTab({
                   </button>
 
                   {/* Delete */}
-                  <button onClick={() => handleDelete(offer.id)} className="text-gray-400 hover:text-red-600">
+                  <button onClick={() => handleDelete(offer.id)} className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:text-red-400">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
 
                 {/* Expanded View */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200 bg-gray-50">
+                  <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                     {/* Actions */}
-                    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
                       <button
                         onClick={() => selectForAward(offer)}
                         className={clsx(
                           'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
                           offer.selected_for_award_flag
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-200'
                         )}
                       >
                         <Award className="h-3 w-3" />
@@ -326,7 +326,7 @@ export function OffersTab({
                       </button>
                       <button
                         onClick={() => createAward(offer)}
-                        className="flex items-center gap-1 rounded bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                        className="flex items-center gap-1 rounded bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
                       >
                         <FileText className="h-3 w-3" /> Create Award from Offer
                       </button>
@@ -409,13 +409,13 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
     onSaved()
   }
 
-  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
-  const labelClass = 'block text-xs font-medium text-gray-600'
+  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-indigo-500 dark:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+  const labelClass = 'block text-xs font-medium text-gray-600 dark:text-gray-400 dark:text-gray-500'
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6">
-      <h4 className="mb-4 font-medium text-gray-900">New Supplier Offer</h4>
-      {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+    <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
+      <h4 className="mb-4 font-medium text-gray-900 dark:text-gray-100">New Supplier Offer</h4>
+      {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className={labelClass}>Supplier *</label>
@@ -463,7 +463,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button type="button" onClick={onCancel}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          className="rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900/50">
           Cancel
         </button>
         <button type="submit" disabled={loading}
@@ -570,8 +570,8 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
   }
 
-  const inputClass = 'block w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none'
-  const labelClass = 'block text-xs font-medium text-gray-500 mb-1'
+  const inputClass = 'block w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs focus:border-indigo-500 dark:border-indigo-600 focus:outline-none'
+  const labelClass = 'block text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 mb-1'
 
   const totalExtended = lines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
   const totalAnnualized = lines.reduce((sum, l) => sum + (l.annualized_offer_amount || 0), 0)
@@ -579,15 +579,15 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
   return (
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h5 className="text-sm font-medium text-gray-700">Offer Lines</h5>
+        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300">Offer Lines</h5>
         <button onClick={() => setShowAddLine(!showAddLine)}
-          className="flex items-center gap-1 rounded bg-white px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50">
+          className="flex items-center gap-1 rounded bg-white dark:bg-gray-800 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
           <Plus className="h-3 w-3" /> Add Line
         </button>
       </div>
 
       {showAddLine && (
-        <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 bg-white p-4">
+        <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 p-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="md:col-span-3">
               <label className={labelClass}>Scope Line</label>
@@ -622,7 +622,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
             </div>
             <div>
               <label className={labelClass}>Extended (auto)</label>
-              <div className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+              <div className="rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-2 py-1 text-xs text-gray-700 dark:text-gray-300">
                 {formatCurrency(calcExtended(
                   parseFloat(newLine.offer_unit_price) || 0,
                   parseFloat(newLine.offer_quantity) || 0
@@ -649,7 +649,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
           </div>
           <div className="mt-3 flex justify-end gap-2">
             <button type="button" onClick={() => setShowAddLine(false)}
-              className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
+              className="rounded border border-gray-300 dark:border-gray-600 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900/50">
               Cancel
             </button>
             <button type="submit"
@@ -661,14 +661,14 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
       )}
 
       {lines.length === 0 ? (
-        <p className="py-6 text-center text-xs text-gray-500">
+        <p className="py-6 text-center text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">
           No offer lines yet. Click "Add Line" to add pricing.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500">
+              <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs uppercase text-gray-500 dark:text-gray-400 dark:text-gray-500">
                 <th className="px-2 py-2">#</th>
                 <th className="px-2 py-2">Scope Line</th>
                 <th className="px-2 py-2 text-right">Unit Price</th>
@@ -681,40 +681,40 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
                 <th className="px-2 py-2"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {lines.map((line) => (
-                <tr key={line.id} className="hover:bg-gray-50">
-                  <td className="px-2 py-2 text-xs text-gray-500">{line.line_number}</td>
+                <tr key={line.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900/50">
+                  <td className="px-2 py-2 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{line.line_number}</td>
                   <td className="px-2 py-2 text-xs">
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
                       {line.scope_line?.item_service_name || '—'}
                     </div>
-                    {line.scope_line?.uom && <div className="text-gray-500">{line.scope_line.uom}</div>}
+                    {line.scope_line?.uom && <div className="text-gray-500 dark:text-gray-400 dark:text-gray-500">{line.scope_line.uom}</div>}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
                     {line.offer_unit_price ? formatCurrency(line.offer_unit_price) : '—'}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">{line.offer_quantity ?? '—'}</td>
-                  <td className="px-2 py-2 text-right text-xs font-medium text-gray-900">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{line.offer_quantity ?? '—'}</td>
+                  <td className="px-2 py-2 text-right text-xs font-medium text-gray-900 dark:text-gray-100">
                     {formatCurrency(line.offer_extended_amount)}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
                     {formatCurrency(line.offer_one_time_amount)}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">{line.offer_term_months ?? '—'}</td>
-                  <td className="px-2 py-2 text-right text-xs font-medium text-indigo-700">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{line.offer_term_months ?? '—'}</td>
+                  <td className="px-2 py-2 text-right text-xs font-medium text-indigo-700 dark:text-indigo-300">
                     {formatCurrency(line.annualized_offer_amount)}
                   </td>
                   <td className="px-2 py-2 text-center">
                     <span className={clsx('rounded px-2 py-0.5 text-xs font-medium',
-                      COMPLIANCE_STATUS_COLORS[line.compliance_status] || 'bg-gray-100 text-gray-700'
+                      COMPLIANCE_STATUS_COLORS[line.compliance_status] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                     )}>
                       {line.compliance_status}
                     </span>
                   </td>
                   <td className="px-2 py-2 text-right">
                     <button onClick={() => handleDeleteLine(line.id)}
-                      className="text-gray-400 hover:text-red-600">
+                      className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:text-red-400">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </td>
@@ -722,11 +722,11 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-medium">
-                <td colSpan={4} className="px-2 py-2 text-right text-xs text-gray-600">Totals:</td>
-                <td className="px-2 py-2 text-right text-xs font-bold text-gray-900">{formatCurrency(totalExtended)}</td>
+              <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 font-medium">
+                <td colSpan={4} className="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400 dark:text-gray-500">Totals:</td>
+                <td className="px-2 py-2 text-right text-xs font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalExtended)}</td>
                 <td colSpan={2} className="px-2 py-2"></td>
-                <td className="px-2 py-2 text-right text-xs font-bold text-indigo-700">{formatCurrency(totalAnnualized)}</td>
+                <td className="px-2 py-2 text-right text-xs font-bold text-indigo-700 dark:text-indigo-300">{formatCurrency(totalAnnualized)}</td>
                 <td colSpan={2} className="px-2 py-2"></td>
               </tr>
             </tfoot>
@@ -806,58 +806,58 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   }
 
   return (
-    <div className="mb-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
-        <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+    <div className="mb-6 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+      <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-4 py-3">
+        <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
           <GitCompare className="h-4 w-4" />
           Side-by-Side Offer Comparison
         </h4>
-        <p className="mt-1 text-xs text-gray-500">Compare all supplier offers line by line</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Compare all supplier offers line by line</p>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-200 bg-white">
-              <th className="sticky left-0 bg-white px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+            <tr className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <th className="sticky left-0 bg-white dark:bg-gray-800 px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 dark:text-gray-500">
                 Scope Line
               </th>
               {baselines[0] && (
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">
-                  <div className="text-gray-700">Baseline</div>
-                  <div className="text-xs font-normal text-gray-400">{baselines[0].baseline_name}</div>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 dark:text-gray-500">
+                  <div className="text-gray-700 dark:text-gray-300">Baseline</div>
+                  <div className="text-xs font-normal text-gray-400 dark:text-gray-500">{baselines[0].baseline_name}</div>
                 </th>
               )}
               {offers.map((offer) => {
                 const isLowest = offer.offer_total_amount === Math.min(...offers.map(o => o.offer_total_amount))
                 return (
-                  <th key={offer.id} className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">
+                  <th key={offer.id} className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 dark:text-gray-500">
                     <div className="flex items-center justify-end gap-1">
                       {offer.supplier?.supplier_name}
-                      {isLowest && <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">Lowest</span>}
+                      {isLowest && <span className="rounded bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-xs text-green-700 dark:text-green-300">Lowest</span>}
                     </div>
-                    <div className="text-xs font-normal text-gray-400">{offer.offer_type} • Round {offer.offer_round}</div>
+                    <div className="text-xs font-normal text-gray-400 dark:text-gray-500">{offer.offer_type} • Round {offer.offer_round}</div>
                   </th>
                 )
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {/* Line items */}
             {scopeLineNames.length === 0 ? (
               <tr>
-                <td colSpan={2 + offers.length} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={2 + offers.length} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">
                   No scope lines linked to offers. Expand each offer to add line-level pricing linked to scope lines.
                 </td>
               </tr>
             ) : (
               scopeLineNames.map(([scopeLineId, name]) => (
-                <tr key={scopeLineId} className="hover:bg-gray-50">
-                  <td className="sticky left-0 bg-white px-4 py-3 text-sm font-medium text-gray-900">
+                <tr key={scopeLineId} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900/50">
+                  <td className="sticky left-0 bg-white dark:bg-gray-800 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                     {name}
                   </td>
                   {baselines[0] && (
-                    <td className="px-4 py-3 text-right text-sm text-gray-700">
+                    <td className="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
                       {getBaselineLineAmount(scopeLineId) !== null ? formatCurrency(getBaselineLineAmount(scopeLineId)) : '—'}
                     </td>
                   )}
@@ -870,17 +870,17 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                       <td key={offer.id} className="px-4 py-3 text-right text-sm">
                         {amount !== null ? (
                           <div>
-                            <div className="font-medium text-gray-900">{formatCurrency(amount)}</div>
-                            <div className="text-xs text-gray-500">@ {formatCurrency(unitPrice || 0)}</div>
+                            <div className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(amount)}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">@ {formatCurrency(unitPrice || 0)}</div>
                             {savings !== null && savings > 0 && (
-                              <div className="text-xs font-medium text-green-600">↓ {formatCurrency(savings)}</div>
+                              <div className="text-xs font-medium text-green-600 dark:text-green-400">↓ {formatCurrency(savings)}</div>
                             )}
                             {savings !== null && savings < 0 && (
-                              <div className="text-xs font-medium text-red-600">↑ {formatCurrency(Math.abs(savings))}</div>
+                              <div className="text-xs font-medium text-red-600 dark:text-red-400">↑ {formatCurrency(Math.abs(savings))}</div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-gray-400 dark:text-gray-500">—</span>
                         )}
                       </td>
                     )
@@ -890,10 +890,10 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
             )}
 
             {/* Total row */}
-            <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-              <td className="sticky left-0 bg-gray-50 px-4 py-3 text-sm text-gray-900">Total</td>
+            <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 font-semibold">
+              <td className="sticky left-0 bg-gray-50 dark:bg-gray-900/50 px-4 py-3 text-sm text-gray-900 dark:text-gray-100">Total</td>
               {baselines[0] && (
-                <td className="px-4 py-3 text-right text-sm text-gray-900">
+                <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
                   {formatCurrency(baselineTotal)}
                 </td>
               )}
@@ -902,14 +902,14 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                 const savingsPct = baselineTotal ? (savings! / baselineTotal) * 100 : null
                 return (
                   <td key={offer.id} className="px-4 py-3 text-right text-sm">
-                    <div className="text-gray-900">{formatCurrency(offer.offer_total_amount)}</div>
+                    <div className="text-gray-900 dark:text-gray-100">{formatCurrency(offer.offer_total_amount)}</div>
                     {savings !== null && savings > 0 && (
-                      <div className="text-xs font-medium text-green-600">
+                      <div className="text-xs font-medium text-green-600 dark:text-green-400">
                         ↓ {formatCurrency(savings)} ({savingsPct?.toFixed(1)}%)
                       </div>
                     )}
                     {savings !== null && savings < 0 && (
-                      <div className="text-xs font-medium text-red-600">
+                      <div className="text-xs font-medium text-red-600 dark:text-red-400">
                         ↑ {formatCurrency(Math.abs(savings))} ({Math.abs(savingsPct!).toFixed(1)}%)
                       </div>
                     )}

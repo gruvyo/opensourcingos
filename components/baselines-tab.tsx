@@ -55,11 +55,11 @@ const BASELINE_TYPE_DEFENSIBILITY: Record<string, string> = {
 }
 
 const LOCK_STATUS_COLORS: Record<string, string> = {
-  'Draft': 'bg-gray-100 text-gray-700',
-  'Locked': 'bg-blue-100 text-blue-700',
-  'Submitted': 'bg-amber-100 text-amber-700',
-  'Approved': 'bg-green-100 text-green-700',
-  'Rejected': 'bg-red-100 text-red-700',
+  'Draft': 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+  'Locked': 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  'Submitted': 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
+  'Approved': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+  'Rejected': 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
 }
 
 export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLines: ScopeLine[] }) {
@@ -145,7 +145,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-gray-500">Loading baselines...</div>
+    return <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Loading baselines...</div>
   }
 
   return (
@@ -153,8 +153,8 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Baselines</h3>
-          <p className="text-sm text-gray-600">Establish what the company would have paid without procurement action</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Baselines</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500">Establish what the company would have paid without procurement action</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -166,12 +166,12 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       </div>
 
       {/* Baseline Hierarchy Info */}
-      <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+      <div className="mb-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 p-4">
         <div className="flex items-start gap-3">
-          <Shield className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+          <Shield className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
           <div>
-            <h4 className="text-sm font-semibold text-blue-900">Baseline Defensibility Hierarchy</h4>
-            <p className="mt-1 text-xs text-blue-700">
+            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Baseline Defensibility Hierarchy</h4>
+            <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
               Most defensible → Least defensible: Current Contract → Prior 12-Month Actual → Approved Budget → Supplier Renewal Quote → Competitive Bid → Market Index → Should-Cost Model → Initial Supplier Quote
             </p>
           </div>
@@ -190,10 +190,10 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 
       {/* Baselines List */}
       {baselines.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-12 text-center shadow-sm">
           <Calculator className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-          <h3 className="text-sm font-medium text-gray-900">No baselines yet</h3>
-          <p className="mt-1 text-sm text-gray-500">Click "Add Baseline" to establish the baseline for this event.</p>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">No baselines yet</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Click "Add Baseline" to establish the baseline for this event.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -203,32 +203,32 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
             const lines = baselineLines[baseline.id] || []
 
             return (
-              <div key={baseline.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+              <div key={baseline.id} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
                 {/* Baseline Header Row */}
                 <div className="flex items-center gap-4 p-4">
-                  <button onClick={() => toggleExpand(baseline.id)} className="text-gray-400 hover:text-gray-600">
+                  <button onClick={() => toggleExpand(baseline.id)} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:text-gray-500">
                     {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                   </button>
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-gray-900">{baseline.baseline_name}</h4>
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{baseline.baseline_name}</h4>
+                      <span className="rounded bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-600 dark:text-gray-400 dark:text-gray-500">
                         {baseline.baseline_type}
                       </span>
-                      <span className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
+                      <span className="rounded bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400">
                         {defensibility} defensibility
                       </span>
                     </div>
                     {baseline.baseline_source && (
-                      <p className="mt-1 text-xs text-gray-500">{baseline.baseline_source}</p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{baseline.baseline_source}</p>
                     )}
                   </div>
 
                   {/* Total Amount */}
                   <div className="text-right">
-                    <p className="text-xs text-gray-500">Total Baseline</p>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(baseline.baseline_total_amount)}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">Total Baseline</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(baseline.baseline_total_amount)}</p>
                   </div>
 
                   {/* Lock Status Badge */}
@@ -239,7 +239,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                   {/* Official badges */}
                   <div className="flex gap-1">
                     {baseline.official_for_hard_savings && (
-                      <span className="flex items-center gap-1 rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700" title="Official for Hard Savings">
+                      <span className="flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300" title="Official for Hard Savings">
                         <Star className="h-3 w-3 fill-current" /> Hard $
                       </span>
                     )}
@@ -249,7 +249,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                       </span>
                     )}
                     {baseline.official_for_demand_reduction && (
-                      <span className="flex items-center gap-1 rounded bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700" title="Official for Demand Reduction">
+                      <span className="flex items-center gap-1 rounded bg-orange-100 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-300" title="Official for Demand Reduction">
                         <Star className="h-3 w-3 fill-current" /> Demand
                       </span>
                     )}
@@ -258,43 +258,43 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 
                 {/* Expanded View */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200 bg-gray-50">
+                  <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                     {/* Actions Bar */}
-                    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-3">
-                      <span className="text-xs font-medium text-gray-500">Workflow:</span>
+                    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500">Workflow:</span>
                       {baseline.baseline_lock_status === 'Draft' && (
                         <button onClick={() => updateLockStatus(baseline.id, 'Locked')}
-                          className="flex items-center gap-1 rounded bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100">
+                          className="flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30">
                           <Lock className="h-3 w-3" /> Lock Baseline
                         </button>
                       )}
                       {baseline.baseline_lock_status === 'Locked' && (
                         <button onClick={() => updateLockStatus(baseline.id, 'Submitted')}
-                          className="flex items-center gap-1 rounded bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100">
+                          className="flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:bg-amber-900/30">
                           <FileCheck className="h-3 w-3" /> Submit for Approval
                         </button>
                       )}
                       {baseline.baseline_lock_status === 'Submitted' && (
                         <>
                           <button onClick={() => updateLockStatus(baseline.id, 'Approved')}
-                            className="flex items-center gap-1 rounded bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100">
+                            className="flex items-center gap-1 rounded bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:bg-green-900/30">
                             <FileCheck className="h-3 w-3" /> Approve
                           </button>
                           <button onClick={() => updateLockStatus(baseline.id, 'Rejected')}
-                            className="flex items-center gap-1 rounded bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100">
+                            className="flex items-center gap-1 rounded bg-red-50 dark:bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:bg-red-900/30">
                             Reject
                           </button>
                         </>
                       )}
                       {baseline.baseline_lock_status === 'Approved' && (
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-medium text-gray-500">Mark Official:</span>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500">Mark Official:</span>
                           <button onClick={() => toggleOfficial(baseline, 'official_for_hard_savings')}
                             className={clsx(
                               'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
                               baseline.official_for_hard_savings
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-200'
                             )}>
                             <Star className="h-3 w-3" /> Hard Savings
                           </button>
@@ -303,7 +303,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                               'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
                               baseline.official_for_cost_avoidance
                                 ? 'bg-purple-100 text-purple-700'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-200'
                             )}>
                             <Star className="h-3 w-3" /> Cost Avoidance
                           </button>
@@ -311,8 +311,8 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                             className={clsx(
                               'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
                               baseline.official_for_demand_reduction
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-200'
                             )}>
                             <Star className="h-3 w-3" /> Demand Reduction
                           </button>
@@ -321,7 +321,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                       <div className="ml-auto">
                         {baseline.baseline_lock_status === 'Draft' && (
                           <button onClick={() => handleDelete(baseline.id)}
-                            className="text-gray-400 hover:text-red-600">
+                            className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:text-red-400">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -404,13 +404,13 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
     onSaved()
   }
 
-  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
-  const labelClass = 'block text-xs font-medium text-gray-600'
+  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-indigo-500 dark:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+  const labelClass = 'block text-xs font-medium text-gray-600 dark:text-gray-400 dark:text-gray-500'
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6">
-      <h4 className="mb-4 font-medium text-gray-900">New Baseline</h4>
-      {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+    <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
+      <h4 className="mb-4 font-medium text-gray-900 dark:text-gray-100">New Baseline</h4>
+      {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className={labelClass}>Baseline Name *</label>
@@ -450,7 +450,7 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button type="button" onClick={onCancel}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          className="rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900/50">
           Cancel
         </button>
         <button type="submit" disabled={loading}
@@ -566,8 +566,8 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
   }
 
-  const inputClass = 'block w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none'
-  const labelClass = 'block text-xs font-medium text-gray-500 mb-1'
+  const inputClass = 'block w-full rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs focus:border-indigo-500 dark:border-indigo-600 focus:outline-none'
+  const labelClass = 'block text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 mb-1'
 
   const totalExtended = lines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
   const totalAnnualized = lines.reduce((sum, l) => sum + (l.annualized_baseline_amount || 0), 0)
@@ -575,10 +575,10 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   return (
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h5 className="text-sm font-medium text-gray-700">Baseline Lines</h5>
+        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300">Baseline Lines</h5>
         {!isLocked && (
           <button onClick={() => setShowAddLine(!showAddLine)}
-            className="flex items-center gap-1 rounded bg-white px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50">
+            className="flex items-center gap-1 rounded bg-white dark:bg-gray-800 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
             <Plus className="h-3 w-3" /> Add Line
           </button>
         )}
@@ -586,7 +586,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
 
       {/* Add Line Form */}
       {showAddLine && !isLocked && (
-        <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 bg-white p-4">
+        <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 p-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div className="md:col-span-4">
               <label className={labelClass}>Scope Line (optional — link to existing scope)</label>
@@ -621,7 +621,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
             </div>
             <div>
               <label className={labelClass}>Extended (auto)</label>
-              <div className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+              <div className="rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-2 py-1 text-xs text-gray-700 dark:text-gray-300">
                 {formatCurrency(calcExtended(
                   parseFloat(newLine.baseline_unit_price) || 0,
                   parseFloat(newLine.baseline_quantity) || 0
@@ -637,7 +637,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
           </div>
           <div className="mt-3 flex justify-end gap-2">
             <button type="button" onClick={() => setShowAddLine(false)}
-              className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
+              className="rounded border border-gray-300 dark:border-gray-600 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900/50">
               Cancel
             </button>
             <button type="submit"
@@ -650,14 +650,14 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
 
       {/* Lines Table */}
       {lines.length === 0 ? (
-        <p className="py-6 text-center text-xs text-gray-500">
+        <p className="py-6 text-center text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">
           No baseline lines yet. {!isLocked && 'Click "Add Line" to add pricing.'}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500">
+              <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs uppercase text-gray-500 dark:text-gray-400 dark:text-gray-500">
                 <th className="px-2 py-2">#</th>
                 <th className="px-2 py-2">Scope Line</th>
                 <th className="px-2 py-2 text-right">Unit Price</th>
@@ -670,39 +670,39 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
                 {!isLocked && <th className="px-2 py-2"></th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {lines.map((line) => (
-                <tr key={line.id} className="hover:bg-gray-50">
-                  <td className="px-2 py-2 text-xs text-gray-500">{line.line_number}</td>
+                <tr key={line.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:bg-gray-900/50">
+                  <td className="px-2 py-2 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{line.line_number}</td>
                   <td className="px-2 py-2 text-xs">
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
                       {line.scope_line?.item_service_name || '—'}
                     </div>
                     {line.scope_line?.uom && (
-                      <div className="text-gray-500">{line.scope_line.uom}</div>
+                      <div className="text-gray-500 dark:text-gray-400 dark:text-gray-500">{line.scope_line.uom}</div>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
                     {line.baseline_unit_price ? formatCurrency(line.baseline_unit_price) : '—'}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">{line.baseline_quantity ?? '—'}</td>
-                  <td className="px-2 py-2 text-right text-xs font-medium text-gray-900">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{line.baseline_quantity ?? '—'}</td>
+                  <td className="px-2 py-2 text-right text-xs font-medium text-gray-900 dark:text-gray-100">
                     {formatCurrency(line.baseline_extended_amount)}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
                     {formatCurrency(line.baseline_recurring_amount)}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
                     {formatCurrency(line.baseline_one_time_amount)}
                   </td>
-                  <td className="px-2 py-2 text-right text-xs text-gray-700">{line.baseline_term_months ?? '—'}</td>
-                  <td className="px-2 py-2 text-right text-xs font-medium text-indigo-700">
+                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{line.baseline_term_months ?? '—'}</td>
+                  <td className="px-2 py-2 text-right text-xs font-medium text-indigo-700 dark:text-indigo-300">
                     {formatCurrency(line.annualized_baseline_amount)}
                   </td>
                   {!isLocked && (
                     <td className="px-2 py-2 text-right">
                       <button onClick={() => handleDeleteLine(line.id)}
-                        className="text-gray-400 hover:text-red-600">
+                        className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:text-red-400">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </td>
@@ -711,12 +711,12 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50 font-medium">
-                <td colSpan={4} className="px-2 py-2 text-right text-xs text-gray-600">Totals:</td>
-                <td className="px-2 py-2 text-right text-xs font-bold text-gray-900">{formatCurrency(totalExtended)}</td>
+              <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 font-medium">
+                <td colSpan={4} className="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400 dark:text-gray-500">Totals:</td>
+                <td className="px-2 py-2 text-right text-xs font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalExtended)}</td>
                 <td colSpan={2} className="px-2 py-2"></td>
-                <td className="px-2 py-2 text-right text-xs text-gray-600">Annual:</td>
-                <td className="px-2 py-2 text-right text-xs font-bold text-indigo-700">{formatCurrency(totalAnnualized)}</td>
+                <td className="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400 dark:text-gray-500">Annual:</td>
+                <td className="px-2 py-2 text-right text-xs font-bold text-indigo-700 dark:text-indigo-300">{formatCurrency(totalAnnualized)}</td>
                 {!isLocked && <td className="px-2 py-2"></td>}
               </tr>
             </tfoot>
