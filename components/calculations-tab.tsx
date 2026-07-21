@@ -15,13 +15,10 @@ const SAVINGS_TYPES = [
 ]
 
 const CALC_STATUS_COLORS: Record<string, string> = {
-  'identified': 'bg-gray-100 text-gray-700',
-  'negotiated': 'bg-amber-100 text-amber-700',
-  'contracted': 'bg-indigo-100 text-indigo-700',
-  'realized': 'bg-green-100 text-green-700',
-  'Approved': 'bg-green-100 text-green-700',
-  'Draft': 'bg-gray-100 text-gray-700',
-  'Submitted': 'bg-amber-100 text-amber-700',
+  'identified': 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  'negotiated': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  'contracted': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  'realized': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
 }
 
 export function CalculationsTab({ eventId }: { eventId: string }) {
