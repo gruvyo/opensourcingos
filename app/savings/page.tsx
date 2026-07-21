@@ -91,35 +91,6 @@ export default async function SavingsPage() {
         </div>
       </div>
 
-      {/* Realized vs Accrued */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/30">
-              <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Realized Savings</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(realizedSavings)}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Savings already in effect — contract start date has passed</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/30">
-              <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Accrued Savings</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(accruedSavings)}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Savings not yet in effect — contract starts in the future</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Savings by type */}
       {byType.size > 0 && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Savings by Type</h3>

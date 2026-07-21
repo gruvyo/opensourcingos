@@ -161,58 +161,6 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
 
   return (
     <div className="mt-6 space-y-6">
-      {/* Executive Summary */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className={sectionClass}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={labelClass}>Total Savings</p>
-              <p className={`${valueClass} text-gray-900 dark:text-gray-100`}>{formatCurrency(totalSavings)}</p>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + cost avoidance across all projects</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-50 dark:bg-green-900/30">
-              <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-        </div>
-        <div className={sectionClass}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={labelClass}>Sourcing Projects</p>
-              <p className={`${valueClass} text-gray-900 dark:text-gray-100`}>{sourcingEvents.length}</p>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Active and completed sourcing initiatives</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
-              <Briefcase className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            </div>
-          </div>
-        </div>
-        <div className={sectionClass}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={labelClass}>Realized</p>
-              <p className={`${valueClass} text-emerald-600 dark:text-emerald-400`}>{formatCurrency(realizedSavings)}</p>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Savings already in effect — contract start date has passed</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/30">
-              <TrendingUp className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-          </div>
-        </div>
-        <div className={sectionClass}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={labelClass}>Accrued</p>
-              <p className={`${valueClass} text-blue-600 dark:text-blue-400`}>{formatCurrency(accruedSavings)}</p>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Savings not yet in effect — contract starts in the future</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/30">
-              <DollarSign className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Savings breakdown */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className={sectionClass}>
