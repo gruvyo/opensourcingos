@@ -148,19 +148,13 @@ function OverviewTab({ event }: { event: Event }) {
     { label: 'Business Unit', value: getFirst(event.business_unit)?.business_unit_name },
     { label: 'Cost Center', value: getFirst(event.cost_center)?.cost_center_name },
     { label: 'Incumbent Supplier', value: getFirst(event.incumbent_supplier)?.supplier_name },
-    !isSupport && { label: 'Awarded Supplier', value: getFirst(event.awarded_supplier)?.supplier_name },
     { label: 'Currency', value: event.currency_code },
-    !isSupport && { label: 'Reporting Basis', value: event.official_reporting_basis },
   ].filter(Boolean) as { label: string; value: any }[]
 
   const dates = [
-    { label: isSupport ? 'Start Date' : 'Event Start', value: event.event_start_date },
-    { label: isSupport ? 'Due Date' : 'Event Close', value: event.event_close_date },
-    !isSupport && { label: 'Contract Start', value: event.contract_start_date },
-    !isSupport && { label: 'Contract End', value: event.contract_end_date },
-    !isSupport && { label: 'Recognition Start', value: event.recognition_start_date },
-    !isSupport && { label: 'Recognition End', value: event.recognition_end_date },
-  ].filter(Boolean) as { label: string; value: string | null }[]
+    { label: isSupport ? 'Start Date' : 'Project Start', value: event.event_start_date },
+    { label: isSupport ? 'Due Date' : 'Project Close', value: event.event_close_date },
+  ] as { label: string; value: string | null }[]
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
