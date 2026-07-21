@@ -96,6 +96,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
   }
 
   const handleDelete = async (id: string) => {
+    if (!confirm('Delete this scope line? This cannot be undone.')) return
     const { error } = await supabase.from('event_scope_lines').delete().eq('id', id)
     if (!error) {
       setScopeLines(scopeLines.filter(l => l.id !== id))

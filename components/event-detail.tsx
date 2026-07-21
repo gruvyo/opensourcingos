@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   FileText, List, BarChart2, Users, FileCheck,
-  Calculator, Clock, StickyNote,
+  Calculator, Clock, StickyNote, Pencil,
   Briefcase, LifeBuoy,
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -12,6 +12,7 @@ import { ScopeLinesTab } from './scope-lines-tab'
 import { BaselinesTab } from './baselines-tab'
 import { OffersTab } from './offers-tab'
 import { CalculationsTab } from './calculations-tab'
+import { EditProjectModal } from './edit-project-modal'
 
 
 function getFirst(obj: any): any {
@@ -64,12 +65,19 @@ export function EventDetail({
   event,
   scopeLines,
   suppliers,
+  categories,
+  businessUnits,
+  costCenters,
 }: {
   event: Event
   scopeLines: any[]
   suppliers: any[]
+  categories: any[]
+  businessUnits: any[]
+  costCenters: any[]
 }) {
   const [activeTab, setActiveTab] = useState('overview')
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const isSupport = event.project_type === 'Support'
   const TABS = isSupport ? SUPPORT_TABS : SOURCING_TABS
@@ -98,6 +106,13 @@ export function EventDetail({
           <span className={clsx('inline-flex rounded-full px-3 py-1 text-sm font-medium', statusColor(event.event_status))}>
             {event.event_status}
           </span>
+          <button
+            onClick={() => setShowEditModal(true)}
+            className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </button>
         </div>
         {event.event_description && (
           <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">{event.event_description}</p>
@@ -134,6 +149,18 @@ export function EventDetail({
         {!isSupport && activeTab === 'calculations' && <CalculationsTab eventId={event.id} />}
 
       </div>
+
+      {showEditModal && (
+        <EditProjectModal
+          project={event}
+          categories={categories}
+          businessUnits={businessUnits}
+          costCenters={costCenters}
+          suppliers={suppliers}
+          onClose={() => setShowEditModal(false)}
+          onSaved={() => { setShowEditModal(false); window.location.reload(); }}
+        />
+      )}
     </div>
   )
 }

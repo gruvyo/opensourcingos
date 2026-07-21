@@ -27,7 +27,13 @@ export default async function EventDetailPage({
 
   if (!event) notFound()
 
-  const [{ data: scopeLines }, { data: suppliers }] = await Promise.all([
+  const [
+    { data: scopeLines },
+    { data: suppliers },
+    { data: categories },
+    { data: businessUnits },
+    { data: costCenters },
+  ] = await Promise.all([
     supabase.from('event_scope_lines')
       .select('id, line_number, item_service_name, uom')
       .eq('event_id', eventId)
@@ -35,6 +41,15 @@ export default async function EventDetailPage({
     supabase.from('suppliers')
       .select('id, supplier_name')
       .order('supplier_name'),
+    supabase.from('categories')
+      .select('id, category_name')
+      .order('category_name'),
+    supabase.from('business_units')
+      .select('id, business_unit_name')
+      .order('business_unit_name'),
+    supabase.from('cost_centers')
+      .select('id, cost_center_name')
+      .order('cost_center_name'),
   ])
 
   return (
@@ -43,7 +58,14 @@ export default async function EventDetailPage({
         <ArrowLeft className="h-4 w-4" />
         Back to Projects
       </Link>
-      <EventDetail event={event} scopeLines={scopeLines || []} suppliers={suppliers || []} />
+      <EventDetail
+        event={event}
+        scopeLines={scopeLines || []}
+        suppliers={suppliers || []}
+        categories={categories || []}
+        businessUnits={businessUnits || []}
+        costCenters={costCenters || []}
+      />
     </div>
   )
 }

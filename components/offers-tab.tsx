@@ -559,6 +559,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
   }
 
   const handleDeleteLine = async (lineId: string) => {
+    if (!confirm('Delete this offer line? This cannot be undone.')) return
     await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
     setLines(lines.filter(l => l.id !== lineId))
     onLinesChanged()
