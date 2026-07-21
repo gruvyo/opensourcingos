@@ -555,6 +555,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   }
 
   const handleDeleteLine = async (lineId: string) => {
+    if (!confirm('Delete this baseline line? This cannot be undone.')) return
     await supabase.from('baseline_lines').delete().eq('id', lineId)
     setLines(lines.filter(l => l.id !== lineId))
     onLinesChanged()
