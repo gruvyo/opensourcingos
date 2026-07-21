@@ -4,26 +4,24 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Calculator, Plus, Trash2, ChevronDown, ChevronRight,
-  CheckCircle, FileCheck, TrendingDown,
+  FileCheck, TrendingDown,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { clsx } from 'clsx'
 
-// Updated list of savings types – matches the enum enforced in the DB.
 const SAVINGS_TYPES = [
-  'Cost Reduction',
-  'Cost Avoidance',
-  'Demand Reduction',
-  'TCO Improvement',
-  'Working Capital',
+  'Cost Reduction', 'Cost Avoidance', 'Demand Reduction',
+  'TCO Improvement', 'Working Capital',
 ]
 
-// New status lifecycle that aligns with the spec (identified → negotiated → contracted → realized)
 const CALC_STATUS_COLORS: Record<string, string> = {
   'identified': 'bg-gray-100 text-gray-700',
   'negotiated': 'bg-amber-100 text-amber-700',
   'contracted': 'bg-indigo-100 text-indigo-700',
   'realized': 'bg-green-100 text-green-700',
+  'Approved': 'bg-green-100 text-green-700',
+  'Draft': 'bg-gray-100 text-gray-700',
+  'Submitted': 'bg-amber-100 text-amber-700',
 }
 
 export function CalculationsTab({ eventId }: { eventId: string }) {
@@ -48,7 +46,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
 
   const fetchBaselinesAndAwards = useCallback(async () => {
     const [{ data: baseData }, { data: awardData }] = await Promise.all([
-      supabase.from('baselines').select('id, baseline_name, baseline_total_amount, official_for_hard_savings, official_for_cost_avoidance, official_for_demand_reduction, baseline_lock_status').eq('event_id', eventId),
+      supabase.from('baselines').select('id, baseline_name, baseline_total_amount, official_for_hard_savings, official_for_cost_avoidance, baseline_lock_status').eq('event_id', eventId),
       supabase.from('awards').select('id, award_name, award_total_amount, award_status, contract_start_date, contract_end_date').eq('event_id', eventId),
     ])
     setBaselines(baseData || [])
@@ -91,7 +89,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-gray-500">Loading calculations...</div>
+    return <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">Loading calculations...</div>
   }
 
   return (
@@ -139,7 +137,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
         <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <Calculator className="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" />
           <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">No savings calculations yet</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Click \"Add Calculation\" to calculate savings.</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Click &quot;Add Calculation&quot; to calculate savings.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -161,7 +159,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                       <span className={clsx('rounded px-2 py-0.5 text-xs font-medium',
                         calc.savings_type === 'Cost Reduction' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                         calc.savings_type === 'Cost Avoidance' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
-                        calc.savings_type === 'Demand Reduction' ? 'bg-orange-101 text-orange-701 dark:bg-orange-901/30 dark:text-orange-301' :
+                        calc.savings_type === 'Demand Reduction' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
                         'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                       )}>
                         {calc.savings_type}
@@ -213,7 +211,21 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
-                      {/* Actions would go here */}
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Workflow:</span>
+                      <select
+                        value={calc.calculation_status || 'identified'}
+                        onChange={(e) => updateStatus(calc.id, e.target.value)}
+                        className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      >
+                        <option value="identified">Identified</option>
+                        <option value="negotiated">Negotiated</option>
+                        <option value="contracted">Contracted</option>
+                        <option value="realized">Realized</option>
+                      </select>
+                      <button onClick={() => handleDelete(calc.id)}
+                        className="ml-auto text-gray-400 hover:text-red-600 dark:text-gray-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
 
                     <div className="p-4">
@@ -244,26 +256,14 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                                   <td className="px-2 py-2 text-xs font-medium text-gray-900 dark:text-gray-100">
                                     {line.scope_line?.item_service_name || '—'}
                                   </td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
-                                    {formatCurrency(line.baseline_unit_price)}
-                                  </td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
-                                    {formatCurrency(line.baseline_extended_amount)}
-                                  </td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
-                                    {formatCurrency(line.awarded_unit_price)}
-                                  </td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
-                                    {formatCurrency(line.awarded_extended_amount)}
-                                  </td>
+                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.baseline_unit_price)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.baseline_extended_amount)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.awarded_unit_price)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.awarded_extended_amount)}</td>
                                   <td className={clsx('px-2 py-2 text-right text-xs font-medium',
                                     line.savings_amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                                  )}>
-                                    {formatCurrency(line.savings_amount)}
-                                  </td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
-                                    {line.savings_percentage?.toFixed(1)}%
-                                  </td>
+                                  )}>{formatCurrency(line.savings_amount)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{line.savings_percentage?.toFixed(1)}%</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -271,13 +271,9 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                               <tr className="border-t-2 border-gray-200 bg-gray-50 font-medium dark:border-gray-700 dark:bg-gray-900">
                                 <td colSpan={6} className="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400">Total Savings:</td>
                                 <td className={clsx('px-2 py-2 text-right text-xs font-bold',
-                                  calc.gross_savings_amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                                )}>
-                                  {formatCurrency(calc.gross_savings_amount)}
-                                </td>
-                                <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">
-                                  {calc.savings_percentage?.toFixed(1)}%
-                                </td>
+                                  isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                                )}>{formatCurrency(calc.gross_savings_amount)}</td>
+                                <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{calc.savings_percentage?.toFixed(1)}%</td>
                               </tr>
                             </tfoot>
                           </table>
@@ -295,4 +291,202 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   )
 }
 
-// The AddCalculationForm component remains unchanged – it uses the SAVINGS_TYPES constant above.
+// ============================================
+// Add Calculation Form
+// ============================================
+function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
+  eventId: string
+  baselines: any[]
+  awards: any[]
+  onSaved: () => void
+  onCancel: () => void
+}) {
+  const supabase = createClient()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    calculation_name: '',
+    savings_type: 'Cost Reduction',
+    baseline_id: '',
+    award_id: '',
+    cost_reduction_amount: '',
+    cost_avoidance_amount: '',
+    savings_start_date: '',
+    savings_end_date: '',
+  })
+
+  const selectedBaseline = baselines.find(b => b.id === form.baseline_id)
+  const selectedAward = awards.find(a => a.id === form.award_id)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setError('Not logged in'); setLoading(false); return }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', user!.id)
+      .single()
+
+    const baseline = baselines.find(b => b.id === form.baseline_id)
+    const award = awards.find(a => a.id === form.award_id)
+    const baselineAmount = baseline?.baseline_total_amount || 0
+    const awardAmount = award?.award_total_amount || 0
+    const grossSavings = baselineAmount - awardAmount
+    const savingsPct = baselineAmount > 0 ? (grossSavings / baselineAmount) * 100 : 0
+
+    // Use manually entered amounts, or fall back to gross savings
+    const costReduction = form.cost_reduction_amount ? parseFloat(form.cost_reduction_amount) : (form.savings_type === 'Cost Reduction' ? grossSavings : 0)
+    const costAvoidance = form.cost_avoidance_amount ? parseFloat(form.cost_avoidance_amount) : (form.savings_type === 'Cost Avoidance' ? grossSavings : 0)
+
+    // If award has contract dates, use them as defaults for savings period
+    const savingsStart = form.savings_start_date || award?.contract_start_date || null
+    const savingsEnd = form.savings_end_date || award?.contract_end_date || null
+
+    const { error: insertError } = await supabase
+      .from('savings_calculations')
+      .insert({
+        organization_id: profile?.organization_id,
+        event_id: eventId,
+        baseline_id: form.baseline_id || null,
+        award_id: form.award_id || null,
+        calculation_name: form.calculation_name,
+        savings_type: form.savings_type,
+        baseline_total_amount: baselineAmount,
+        award_total_amount: awardAmount,
+        gross_savings_amount: grossSavings,
+        savings_percentage: Math.round(savingsPct * 100) / 100,
+        net_savings_amount: grossSavings,
+        cost_reduction_amount: costReduction,
+        cost_avoidance_amount: costAvoidance,
+        savings_start_date: savingsStart,
+        savings_end_date: savingsEnd,
+        calculation_status: 'identified',
+        created_by: user.id,
+      })
+
+    if (insertError) {
+      setError(insertError.message)
+      setLoading(false)
+      return
+    }
+    onSaved()
+  }
+
+  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
+  const labelClass = 'block text-xs font-medium text-gray-600 dark:text-gray-400'
+
+  return (
+    <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-800 dark:bg-indigo-900/20">
+      <h4 className="mb-4 font-medium text-gray-900 dark:text-gray-100">New Savings Calculation</h4>
+      {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <label className={labelClass}>Calculation Name *</label>
+          <input type="text" required value={form.calculation_name}
+            onChange={(e) => setForm({ ...form, calculation_name: e.target.value })}
+            className={inputClass} placeholder="e.g. Cost Reduction — Unit Price Negotiation" />
+        </div>
+        <div>
+          <label className={labelClass}>Savings Type</label>
+          <select value={form.savings_type}
+            onChange={(e) => setForm({ ...form, savings_type: e.target.value })}
+            className={inputClass}>
+            {SAVINGS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Official Baseline *</label>
+          <select required value={form.baseline_id}
+            onChange={(e) => setForm({ ...form, baseline_id: e.target.value })}
+            className={inputClass}>
+            <option value="">Select baseline...</option>
+            {baselines.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.baseline_name} ({formatCurrency(b.baseline_total_amount)})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Award</label>
+          <select value={form.award_id}
+            onChange={(e) => setForm({ ...form, award_id: e.target.value })}
+            className={inputClass}>
+            <option value="">Select award...</option>
+            {awards.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.award_name} ({formatCurrency(a.award_total_amount)})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Cost Reduction Amount ($)</label>
+          <input type="number" step="0.01" value={form.cost_reduction_amount}
+            onChange={(e) => setForm({ ...form, cost_reduction_amount: e.target.value })}
+            className={inputClass} placeholder="Auto-calculated if empty" />
+        </div>
+        <div>
+          <label className={labelClass}>Cost Avoidance Amount ($)</label>
+          <input type="number" step="0.01" value={form.cost_avoidance_amount}
+            onChange={(e) => setForm({ ...form, cost_avoidance_amount: e.target.value })}
+            className={inputClass} placeholder="Auto-calculated if empty" />
+        </div>
+        <div>
+          <label className={labelClass}>Savings Start Date</label>
+          <input type="date" value={form.savings_start_date}
+            onChange={(e) => setForm({ ...form, savings_start_date: e.target.value })}
+            className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Savings End Date</label>
+          <input type="date" value={form.savings_end_date}
+            onChange={(e) => setForm({ ...form, savings_end_date: e.target.value })}
+            className={inputClass} />
+        </div>
+        {form.baseline_id && form.award_id && (
+          <div className="md:col-span-2 rounded-lg bg-white p-4 dark:bg-gray-800">
+            <div className="flex items-center justify-around text-center">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Baseline</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(selectedBaseline?.baseline_total_amount || 0)}</p>
+              </div>
+              <TrendingDown className="h-6 w-6 text-gray-400" />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Award</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(selectedAward?.award_total_amount || 0)}
+                </p>
+              </div>
+              <div className="text-2xl font-bold text-gray-400">=</div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Gross Savings</p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                  {formatCurrency(
+                    (selectedBaseline?.baseline_total_amount || 0) -
+                    (selectedAward?.award_total_amount || 0)
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" onClick={onCancel}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+          Cancel
+        </button>
+        <button type="submit" disabled={loading}
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+          {loading ? 'Creating...' : 'Create Calculation'}
+        </button>
+      </div>
+    </form>
+  )
+}

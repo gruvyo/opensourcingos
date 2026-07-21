@@ -1,12 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ReportsView } from '@/components/reports-view'
 
-function getFirst(obj: any): any {
-  if (!obj) return null
-  if (Array.isArray(obj)) return obj[0] || null
-  return obj
-}
-
 export default async function ReportsPage() {
   const supabase = await createClient()
 
@@ -24,25 +18,13 @@ export default async function ReportsPage() {
     `).order('created_at', { ascending: false }),
     supabase.from('savings_calculations').select(`
       id, calculation_name, savings_type, gross_savings_amount, savings_percentage,
-      calculation_status, finance_validated, current_year_recognized_amount,
-      cost_reduction_amount, cost_avoidance_amount, net_savings_amount, event_id,
+      calculation_status, cost_reduction_amount, cost_avoidance_amount, net_savings_amount,
+      savings_start_date, savings_end_date, event_id,
       event:sourcing_events(event_name, contract_start_date),
       baseline:baselines(baseline_name),
       award:awards(award_name)
     `).order('created_at', { ascending: false }),
   ])
-
-  // Build event map for savings lookups
-  const eventMap = new Map<string, any>()
-  for (const e of events || []) {
-    eventMap.set(e.id, e)
-  }
-
-  // Enrich savings calcs with contract_start_date from event
-  const enrichedCalcs = (savingsCalcs || []).map((c: any) => {
-    const event = eventMap.get(c.event_id)
-    return { ...c, contract_start_date: event?.contract_start_date || null }
-  })
 
   return (
     <div className="p-8">
@@ -50,7 +32,7 @@ export default async function ReportsPage() {
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
         Procurement activity report — pipeline, savings, and project throughput
       </p>
-      <ReportsView events={events || []} savingsCalcs={enrichedCalcs} />
+      <ReportsView events={events || []} savingsCalcs={savingsCalcs || []} />
     </div>
   )
 }
