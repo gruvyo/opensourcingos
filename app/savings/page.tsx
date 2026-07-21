@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Calculator, ArrowRight, ArrowDownRight, ArrowUpRight, Clock, CheckCircle } from 'lucide-react'
+import { Calculator, ArrowRight, CheckCircle, Clock } from 'lucide-react'
 
 function getFirst(obj: any): any {
   if (!obj) return null
@@ -18,7 +18,7 @@ export default async function SavingsPage() {
   ] = await Promise.all([
     supabase.from('savings_calculations').select(`
       id, calculation_name, savings_type, gross_savings_amount, savings_percentage,
-      calculation_status, net_savings_amount,
+      calculation_status,
       cost_reduction_amount, cost_avoidance_amount,
       savings_start_date, savings_end_date,
       created_at, event_id,
@@ -33,10 +33,9 @@ export default async function SavingsPage() {
   const now = new Date()
 
   // Totals
-  const totalGross = calcs.reduce((sum: number, c: any) => sum + (c.gross_savings_amount || 0), 0)
+  const totalSavings = calcs.reduce((sum: number, c: any) => sum + (c.gross_savings_amount || 0), 0)
   const totalCostReduction = calcs.reduce((sum: number, c: any) => sum + (c.cost_reduction_amount || 0), 0)
   const totalCostAvoidance = calcs.reduce((sum: number, c: any) => sum + (c.cost_avoidance_amount || 0), 0)
-  const totalNet = calcs.reduce((sum: number, c: any) => sum + (c.net_savings_amount || 0), 0)
 
   // Realized vs Accrued (date-based, using savings_start_date with fallback to contract_start_date)
   let realizedSavings = 0
@@ -73,27 +72,22 @@ export default async function SavingsPage() {
         </p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/* Summary cards — 3 cards only */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Savings</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalGross)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + avoidance</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalSavings)}</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + cost avoidance</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Cost Reduction</p>
           <p className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalCostReduction)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Actual bottom-line reduction</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Actual bottom-line reduction — price went down from what we were paying</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Cost Avoidance</p>
           <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(totalCostAvoidance)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Value not paid</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Net Savings</p>
-          <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalNet)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">After implementation costs</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Value not paid — negotiated below what supplier proposed</p>
         </div>
       </div>
 
@@ -107,7 +101,7 @@ export default async function SavingsPage() {
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Realized Savings</p>
               <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(realizedSavings)}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Savings start date ≤ today</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Savings already in effect — contract start date has passed</p>
             </div>
           </div>
         </div>
@@ -119,7 +113,7 @@ export default async function SavingsPage() {
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Accrued Savings</p>
               <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(accruedSavings)}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Savings start date &gt; today</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Savings not yet in effect — contract starts in the future</p>
             </div>
           </div>
         </div>

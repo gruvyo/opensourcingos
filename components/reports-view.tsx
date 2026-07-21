@@ -168,6 +168,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             <div>
               <p className={labelClass}>Total Savings</p>
               <p className={`${valueClass} text-gray-900 dark:text-gray-100`}>{formatCurrency(totalSavings)}</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + cost avoidance across all projects</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-50 dark:bg-green-900/30">
               <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -179,6 +180,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             <div>
               <p className={labelClass}>Sourcing Projects</p>
               <p className={`${valueClass} text-gray-900 dark:text-gray-100`}>{sourcingEvents.length}</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Active and completed sourcing initiatives</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
               <Briefcase className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
@@ -190,6 +192,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             <div>
               <p className={labelClass}>Realized</p>
               <p className={`${valueClass} text-emerald-600 dark:text-emerald-400`}>{formatCurrency(realizedSavings)}</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Savings already in effect — contract start date has passed</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/30">
               <TrendingUp className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
@@ -201,6 +204,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             <div>
               <p className={labelClass}>Accrued</p>
               <p className={`${valueClass} text-blue-600 dark:text-blue-400`}>{formatCurrency(accruedSavings)}</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Savings not yet in effect — contract starts in the future</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/30">
               <DollarSign className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -214,17 +218,17 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
         <div className={sectionClass}>
           <p className={labelClass}>Cost Reduction</p>
           <p className={`${valueClass} text-red-600 dark:text-red-400`}>{formatCurrency(totalCostReduction)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Actual bottom-line reduction</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Actual bottom-line reduction — price went down from what we were paying</p>
         </div>
         <div className={sectionClass}>
           <p className={labelClass}>Cost Avoidance</p>
           <p className={`${valueClass} text-amber-600 dark:text-amber-400`}>{formatCurrency(totalCostAvoidance)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Value not paid</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Value not paid — negotiated below what supplier proposed</p>
         </div>
         <div className={sectionClass}>
           <p className={labelClass}>Total Savings</p>
           <p className={`${valueClass} text-green-600 dark:text-green-400`}>{formatCurrency(totalSavings)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + avoidance</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + cost avoidance combined</p>
         </div>
       </div>
 
