@@ -1,12 +1,51 @@
 import { createClient } from '@/lib/supabase/server'
 import { DashboardStats } from '@/components/dashboard-stats'
-import { SavingsByCategoryChart, EventsByStatusChart, SavingsByTypeChart } from '@/components/dashboard-charts'
+import { SavingsByCategoryChart, EventsByStatusChart, SavingsByTypeChart, SavingsByYearChart } from '@/components/dashboard-charts'
 import Link from 'next/link'
 
 function getFirst(obj: any): any {
   if (!obj) return null
   if (Array.isArray(obj)) return obj[0] || null
   return obj
+}
+
+// Prorate annualized savings across calendar years based on savings_start_date and savings_end_date
+function prorateSavingsByYear(calcs: any[]): { year: string; costReduction: number; costAvoidance: number; total: number }[] {
+  const years = [2026, 2027, 2028, 2029, 2030]
+  const result = years.map(y => ({ year: String(y), costReduction: 0, costAvoidance: 0, total: 0 }))
+
+  for (const calc of calcs) {
+    const startDate = calc.savings_start_date
+    const endDate = calc.savings_end_date
+    if (!startDate || !endDate) continue
+
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const annualizedAmount = calc.gross_savings_amount || 0
+    const costReductionAmount = calc.cost_reduction_amount || 0
+    const costAvoidanceAmount = calc.cost_avoidance_amount || 0
+
+    // Total days in the savings period
+    const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+
+    for (const yearEntry of result) {
+      const y = parseInt(yearEntry.year)
+      const yearStart = new Date(y, 0, 1)
+      const yearEnd = new Date(y, 11, 31)
+      const overlapStart = start > yearStart ? start : yearStart
+      const overlapEnd = end < yearEnd ? end : yearEnd
+      if (overlapStart > overlapEnd) continue
+
+      const overlapDays = Math.max(0, Math.round((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+      const fraction = overlapDays / totalDays
+
+      yearEntry.costReduction += Math.round(costReductionAmount * fraction)
+      yearEntry.costAvoidance += Math.round(costAvoidanceAmount * fraction)
+      yearEntry.total += Math.round(annualizedAmount * fraction)
+    }
+  }
+
+  return result
 }
 
 export default async function DashboardPage() {
@@ -93,6 +132,9 @@ export default async function DashboardPage() {
   }
   const savingsByType = Array.from(typeMap.entries()).map(([name, value]) => ({ name, value }))
 
+  // Prorated savings by year (2026-2030)
+  const savingsByYear = prorateSavingsByYear(savingsCalcs || [])
+
   return (
     <div className="p-8">
       <div className="mb-6">
@@ -110,6 +152,11 @@ export default async function DashboardPage() {
         totalCostReduction,
         totalCostAvoidance,
       }} />
+
+      {/* Savings by Year — full width */}
+      <div className="mt-6">
+        <SavingsByYearChart data={savingsByYear} />
+      </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <SavingsByCategoryChart data={savingsByCategory} />
