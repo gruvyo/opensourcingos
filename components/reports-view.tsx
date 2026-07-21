@@ -28,12 +28,11 @@ type SavingsRow = {
   gross_savings_amount: number
   savings_percentage: number
   calculation_status: string
-  finance_validated: boolean
-  current_year_recognized_amount: number
   cost_reduction_amount: number
   cost_avoidance_amount: number
   net_savings_amount: number
-  contract_start_date: string | null
+  savings_start_date: string | null
+  savings_end_date: string | null
   event: any
   baseline: any
   award: any
@@ -87,17 +86,16 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
   const totalSavings = savingsCalcs.reduce((sum, c) => sum + (c.gross_savings_amount || 0), 0)
   const totalCostReduction = savingsCalcs.reduce((sum, c) => sum + (c.cost_reduction_amount || 0), 0)
   const totalCostAvoidance = savingsCalcs.reduce((sum, c) => sum + (c.cost_avoidance_amount || 0), 0)
-  const validatedSavings = savingsCalcs.filter(c => c.finance_validated).reduce((sum, c) => sum + (c.gross_savings_amount || 0), 0)
 
   // Realized vs Accrued
   const now = new Date()
   const realizedSavings = savingsCalcs.filter(c => {
-    if (!c.contract_start_date) return false
-    return new Date(c.contract_start_date) <= now
+    if (c.savings_start_date) return new Date(c.savings_start_date) <= now
+    return false
   }).reduce((sum, c) => sum + (c.gross_savings_amount || 0), 0)
   const accruedSavings = savingsCalcs.filter(c => {
-    if (!c.contract_start_date) return true
-    return new Date(c.contract_start_date) > now
+    if (!c.savings_start_date) return true
+    return new Date(c.savings_start_date) > now
   }).reduce((sum, c) => sum + (c.gross_savings_amount || 0), 0)
 
   // By status
@@ -142,15 +140,16 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
   }
 
   const exportSavings = () => {
-    const headers = ['Event', 'Calculation', 'Type', 'Cost Reduction', 'Cost Avoidance', 'Total Savings', 'Savings %', 'Status', 'Finance Validated', 'Realized/Accrued']
+    const headers = ['Event', 'Calculation', 'Type', 'Cost Reduction', 'Cost Avoidance', 'Total Savings', 'Savings %', 'Status', 'Savings Start', 'Savings End', 'Classification']
     const rows = [headers, ...savingsCalcs.map(c => {
-      const isRealized = c.contract_start_date && new Date(c.contract_start_date) <= now
+      const isRealized = c.savings_start_date && new Date(c.savings_start_date) <= now
       return [
         getFirst(c.event)?.event_name || '', c.calculation_name, c.savings_type,
         (c.cost_reduction_amount || 0).toString(), (c.cost_avoidance_amount || 0).toString(),
         (c.gross_savings_amount || 0).toString(), c.savings_percentage?.toFixed(2) || '',
-        c.calculation_status, c.finance_validated ? 'Yes' : 'No',
-        c.contract_start_date ? (isRealized ? 'Realized' : 'Accrued') : 'Accrued',
+        c.calculation_status,
+        c.savings_start_date || '', c.savings_end_date || '',
+        c.savings_start_date ? (isRealized ? 'Realized' : 'Accrued') : 'Accrued',
       ]
     })]
     downloadCSV('savings_report.csv', rows)
@@ -223,8 +222,9 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Value not paid</p>
         </div>
         <div className={sectionClass}>
-          <p className={labelClass}>Finance Validated</p>
-          <p className={`${valueClass} text-purple-600 dark:text-purple-400`}>{formatCurrency(validatedSavings)}</p>
+          <p className={labelClass}>Total Savings</p>
+          <p className={`${valueClass} text-green-600 dark:text-green-400`}>{formatCurrency(totalSavings)}</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + avoidance</p>
         </div>
       </div>
 
@@ -383,8 +383,8 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
               <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Cost Reduction</th>
               <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Cost Avoidance</th>
               <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Period</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Classification</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Finance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -392,7 +392,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No savings calculations yet</td></tr>
             ) : (
               savingsCalcs.map((c) => {
-                const isRealized = c.contract_start_date && new Date(c.contract_start_date) <= now
+                const isRealized = c.savings_start_date && new Date(c.savings_start_date) <= now
                 return (
                   <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{getFirst(c.event)?.event_name || '—'}</td>
@@ -402,17 +402,13 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
                     <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{formatCurrency(c.cost_reduction_amount)}</td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-amber-600 dark:text-amber-400">{formatCurrency(c.cost_avoidance_amount)}</td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(c.gross_savings_amount)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                      {c.savings_start_date ? `${formatDate(c.savings_start_date)} → ${formatDate(c.savings_end_date)}` : '—'}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`rounded px-2 py-0.5 text-xs font-medium ${isRealized ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
                         {isRealized ? 'Realized' : 'Accrued'}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {c.finance_validated ? (
-                        <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Validated</span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
                     </td>
                   </tr>
                 )

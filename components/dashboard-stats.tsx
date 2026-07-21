@@ -9,24 +9,22 @@ type Stats = {
   activeEvents: number
   realizedSavings: number
   accruedSavings: number
-  financeValidated: number
   totalCostReduction: number
   totalCostAvoidance: number
 }
 
 export function DashboardStats({ stats }: { stats: Stats }) {
   const cards = [
-    { label: 'Total Savings', value: formatCurrency(stats.totalSavings), icon: DollarSign, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30' },
+    { label: 'Total Savings', value: formatCurrency(stats.totalSavings), icon: DollarSign, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30', sub: 'Cost reduction + avoidance' },
     { label: 'Active Projects', value: stats.activeEvents.toString(), icon: Briefcase, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/30' },
     { label: 'Realized Savings', value: formatCurrency(stats.realizedSavings), icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30', sub: 'Contract start ≤ today' },
     { label: 'Accrued Savings', value: formatCurrency(stats.accruedSavings), icon: Clock, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30', sub: 'Contract start > today' },
-    { label: 'Finance Validated', value: formatCurrency(stats.financeValidated), icon: TrendingUp, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30' },
     { label: 'Cost Reduction', value: formatCurrency(stats.totalCostReduction), icon: ArrowDownRight, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30', sub: 'Actual bottom-line reduction' },
     { label: 'Cost Avoidance', value: formatCurrency(stats.totalCostAvoidance), icon: ArrowUpRight, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30', sub: 'Value not paid' },
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
       {cards.map((card) => {
         const Icon = card.icon
         return (

@@ -30,64 +30,103 @@ ALTER TABLE savings_calculations ADD CONSTRAINT savings_calculations_savings_typ
 -- ============================================
 
 -- Savings calculations
-CREATE POLICY IF NOT EXISTS "Authenticated can select savings_calculations" ON savings_calculations FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert savings_calculations" ON savings_calculations FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update savings_calculations" ON savings_calculations FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete savings_calculations" ON savings_calculations FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select savings_calculations" ON savings_calculations;
+CREATE POLICY "Authenticated can select savings_calculations" ON savings_calculations FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert savings_calculations" ON savings_calculations;
+CREATE POLICY "Authenticated can insert savings_calculations" ON savings_calculations FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update savings_calculations" ON savings_calculations;
+CREATE POLICY "Authenticated can update savings_calculations" ON savings_calculations FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete savings_calculations" ON savings_calculations;
+CREATE POLICY "Authenticated can delete savings_calculations" ON savings_calculations FOR DELETE TO authenticated USING (true);
 
 -- Savings calculation lines
-CREATE POLICY IF NOT EXISTS "Authenticated can select savings_calculation_lines" ON savings_calculation_lines FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert savings_calculation_lines" ON savings_calculation_lines FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update savings_calculation_lines" ON savings_calculation_lines FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete savings_calculation_lines" ON savings_calculation_lines FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select savings_calculation_lines" ON savings_calculation_lines;
+CREATE POLICY "Authenticated can select savings_calculation_lines" ON savings_calculation_lines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert savings_calculation_lines" ON savings_calculation_lines;
+CREATE POLICY "Authenticated can insert savings_calculation_lines" ON savings_calculation_lines FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update savings_calculation_lines" ON savings_calculation_lines;
+CREATE POLICY "Authenticated can update savings_calculation_lines" ON savings_calculation_lines FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete savings_calculation_lines" ON savings_calculation_lines;
+CREATE POLICY "Authenticated can delete savings_calculation_lines" ON savings_calculation_lines FOR DELETE TO authenticated USING (true);
 
 -- Baselines
-CREATE POLICY IF NOT EXISTS "Authenticated can select baselines" ON baselines FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert baselines" ON baselines FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update baselines" ON baselines FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete baselines" ON baselines FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select baselines" ON baselines;
+CREATE POLICY "Authenticated can select baselines" ON baselines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert baselines" ON baselines;
+CREATE POLICY "Authenticated can insert baselines" ON baselines FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update baselines" ON baselines;
+CREATE POLICY "Authenticated can update baselines" ON baselines FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete baselines" ON baselines;
+CREATE POLICY "Authenticated can delete baselines" ON baselines FOR DELETE TO authenticated USING (true);
 
 -- Baseline lines
-CREATE POLICY IF NOT EXISTS "Authenticated can select baseline_lines" ON baseline_lines FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert baseline_lines" ON baseline_lines FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update baseline_lines" ON baseline_lines FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete baseline_lines" ON baseline_lines FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select baseline_lines" ON baseline_lines;
+CREATE POLICY "Authenticated can select baseline_lines" ON baseline_lines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert baseline_lines" ON baseline_lines;
+CREATE POLICY "Authenticated can insert baseline_lines" ON baseline_lines FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update baseline_lines" ON baseline_lines;
+CREATE POLICY "Authenticated can update baseline_lines" ON baseline_lines FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete baseline_lines" ON baseline_lines;
+CREATE POLICY "Authenticated can delete baseline_lines" ON baseline_lines FOR DELETE TO authenticated USING (true);
 
 -- Supplier offers
-CREATE POLICY IF NOT EXISTS "Authenticated can select supplier_offers" ON supplier_offers FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert supplier_offers" ON supplier_offers FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update supplier_offers" ON supplier_offers FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete supplier_offers" ON supplier_offers FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select supplier_offers" ON supplier_offers;
+CREATE POLICY "Authenticated can select supplier_offers" ON supplier_offers FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert supplier_offers" ON supplier_offers;
+CREATE POLICY "Authenticated can insert supplier_offers" ON supplier_offers FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update supplier_offers" ON supplier_offers;
+CREATE POLICY "Authenticated can update supplier_offers" ON supplier_offers FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete supplier_offers" ON supplier_offers;
+CREATE POLICY "Authenticated can delete supplier_offers" ON supplier_offers FOR DELETE TO authenticated USING (true);
 
 -- Supplier offer lines
-CREATE POLICY IF NOT EXISTS "Authenticated can select supplier_offer_lines" ON supplier_offer_lines FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert supplier_offer_lines" ON supplier_offer_lines FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update supplier_offer_lines" ON supplier_offer_lines FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete supplier_offer_lines" ON supplier_offer_lines FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select supplier_offer_lines" ON supplier_offer_lines;
+CREATE POLICY "Authenticated can select supplier_offer_lines" ON supplier_offer_lines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert supplier_offer_lines" ON supplier_offer_lines;
+CREATE POLICY "Authenticated can insert supplier_offer_lines" ON supplier_offer_lines FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update supplier_offer_lines" ON supplier_offer_lines;
+CREATE POLICY "Authenticated can update supplier_offer_lines" ON supplier_offer_lines FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete supplier_offer_lines" ON supplier_offer_lines;
+CREATE POLICY "Authenticated can delete supplier_offer_lines" ON supplier_offer_lines FOR DELETE TO authenticated USING (true);
 
 -- Awards
-CREATE POLICY IF NOT EXISTS "Authenticated can select awards" ON awards FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert awards" ON awards FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update awards" ON awards FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete awards" ON awards FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select awards" ON awards;
+CREATE POLICY "Authenticated can select awards" ON awards FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert awards" ON awards;
+CREATE POLICY "Authenticated can insert awards" ON awards FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update awards" ON awards;
+CREATE POLICY "Authenticated can update awards" ON awards FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete awards" ON awards;
+CREATE POLICY "Authenticated can delete awards" ON awards FOR DELETE TO authenticated USING (true);
 
 -- Award lines
-CREATE POLICY IF NOT EXISTS "Authenticated can select award_lines" ON award_lines FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert award_lines" ON award_lines FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update award_lines" ON award_lines FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete award_lines" ON award_lines FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select award_lines" ON award_lines;
+CREATE POLICY "Authenticated can select award_lines" ON award_lines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert award_lines" ON award_lines;
+CREATE POLICY "Authenticated can insert award_lines" ON award_lines FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update award_lines" ON award_lines;
+CREATE POLICY "Authenticated can update award_lines" ON award_lines FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete award_lines" ON award_lines;
+CREATE POLICY "Authenticated can delete award_lines" ON award_lines FOR DELETE TO authenticated USING (true);
 
 -- Event scope lines
-CREATE POLICY IF NOT EXISTS "Authenticated can select event_scope_lines" ON event_scope_lines FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can insert event_scope_lines" ON event_scope_lines FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update event_scope_lines" ON event_scope_lines FOR UPDATE TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can delete event_scope_lines" ON event_scope_lines FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select event_scope_lines" ON event_scope_lines;
+CREATE POLICY "Authenticated can select event_scope_lines" ON event_scope_lines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can insert event_scope_lines" ON event_scope_lines;
+CREATE POLICY "Authenticated can insert event_scope_lines" ON event_scope_lines FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated can update event_scope_lines" ON event_scope_lines;
+CREATE POLICY "Authenticated can update event_scope_lines" ON event_scope_lines FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can delete event_scope_lines" ON event_scope_lines;
+CREATE POLICY "Authenticated can delete event_scope_lines" ON event_scope_lines FOR DELETE TO authenticated USING (true);
 
 -- Organizations
-CREATE POLICY IF NOT EXISTS "Authenticated can select organizations" ON organizations FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select organizations" ON organizations;
+CREATE POLICY "Authenticated can select organizations" ON organizations FOR SELECT TO authenticated USING (true);
 -- Profiles
-CREATE POLICY IF NOT EXISTS "Authenticated can select profiles" ON profiles FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "Authenticated can update profiles" ON profiles FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can select profiles" ON profiles;
+CREATE POLICY "Authenticated can select profiles" ON profiles FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated can update profiles" ON profiles;
+CREATE POLICY "Authenticated can update profiles" ON profiles FOR UPDATE TO authenticated USING (true);
 
 -- ============================================
 -- STEP 3: Seed lookup data (if empty)
