@@ -38,10 +38,6 @@ const SUPPORT_TYPES = [
   'Other'
 ]
 
-const REPORTING_BASIS = [
-  'Current-Year Realized', 'Annualized', 'Contract Term', 'One-Time'
-]
-
 export function EventForm({
   categories,
   businessUnits,
@@ -78,11 +74,6 @@ export function EventForm({
     event_status: 'Pipeline',
     event_start_date: '',
     event_close_date: '',
-    contract_start_date: '',
-    contract_end_date: '',
-    recognition_start_date: '',
-    recognition_end_date: '',
-    official_reporting_basis: 'Current-Year Realized',
     buyer_name: '',
     notes: '',
   })
@@ -198,14 +189,9 @@ export function EventForm({
       incumbent_supplier_id: form.incumbent_supplier_id || null,
     }
 
-    // Sourcing-only fields
+    // Sourcing-only field: sourcing method
     if (!isSupport) {
       eventData.sourcing_method = form.sourcing_method || null
-      eventData.contract_start_date = form.contract_start_date || null
-      eventData.contract_end_date = form.contract_end_date || null
-      eventData.recognition_start_date = form.recognition_start_date || null
-      eventData.recognition_end_date = form.recognition_end_date || null
-      eventData.official_reporting_basis = form.official_reporting_basis
     }
 
     const { data, error: insertError } = await supabase
@@ -450,81 +436,36 @@ export function EventForm({
         </div>
       </div>
 
-      {/* Dates */}
+      {/* Dates — simplified: only project dates, no contract/recognition/reporting basis */}
       <div className={sectionClass}>
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Dates</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className={labelClass}>{projectType === 'Sourcing' ? 'Event Start Date' : 'Start Date'}</label>
+            <label className={labelClass}>{projectType === 'Sourcing' ? 'Project Start Date' : 'Start Date'}</label>
             <input
               type="date"
               value={form.event_start_date}
               onChange={(e) => handleChange('event_start_date', e.target.value)}
               className={inputClass}
             />
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">When the sourcing project kicked off</p>
           </div>
           <div>
-            <label className={labelClass}>{projectType === 'Sourcing' ? 'Event Close Date' : 'Due Date'}</label>
+            <label className={labelClass}>{projectType === 'Sourcing' ? 'Project Close Date' : 'Due Date'}</label>
             <input
               type="date"
               value={form.event_close_date}
               onChange={(e) => handleChange('event_close_date', e.target.value)}
               className={inputClass}
             />
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{projectType === 'Sourcing' ? 'When the project is expected to wrap up' : 'When the support issue should be resolved'}</p>
           </div>
-          {projectType === 'Sourcing' && (
-            <>
-              <div>
-                <label className={labelClass}>Contract Start Date</label>
-                <input
-                  type="date"
-                  value={form.contract_start_date}
-                  onChange={(e) => handleChange('contract_start_date', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Contract End Date</label>
-                <input
-                  type="date"
-                  value={form.contract_end_date}
-                  onChange={(e) => handleChange('contract_end_date', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Recognition Start Date</label>
-                <input
-                  type="date"
-                  value={form.recognition_start_date}
-                  onChange={(e) => handleChange('recognition_start_date', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Recognition End Date</label>
-                <input
-                  type="date"
-                  value={form.recognition_end_date}
-                  onChange={(e) => handleChange('recognition_end_date', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Reporting Basis</label>
-                <select
-                  value={form.official_reporting_basis}
-                  onChange={(e) => handleChange('official_reporting_basis', e.target.value)}
-                  className={inputClass}
-                >
-                  {REPORTING_BASIS.map((basis) => (
-                    <option key={basis} value={basis}>{basis}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
         </div>
+        {projectType === 'Sourcing' && (
+          <p className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-700/50 dark:text-gray-400">
+            Savings period dates (start and end) are set on each savings calculation in the Calculations tab — those drive all financial reporting.
+          </p>
+        )}
       </div>
 
       {/* Notes */}
