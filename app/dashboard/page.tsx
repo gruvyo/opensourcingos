@@ -84,27 +84,6 @@ export default async function DashboardPage() {
   // Active events (not closed/cancelled/rejected/complete)
   const activeEvents = (events || []).filter((e: any) => !['Closed', 'Cancelled', 'Rejected', 'Complete'].includes(e.event_status)).length
 
-  // Realized vs Accrued (date-based, from savings_start_date on the calculation, fallback to contract_start_date)
-  const now = new Date()
-  let realizedSavings = 0
-  let accruedSavings = 0
-  for (const calc of savingsCalcs || []) {
-    const startDate = calc.savings_start_date
-    if (!startDate) {
-      // Fallback to event contract_start_date
-      const event = events?.find((e: any) => e.id === calc.event_id)
-      const contractStart = event?.contract_start_date
-      if (contractStart && new Date(contractStart) <= now) {
-        realizedSavings += (calc.gross_savings_amount || 0)
-      } else {
-        accruedSavings += (calc.gross_savings_amount || 0)
-      }
-    } else if (new Date(startDate) <= now) {
-      realizedSavings += (calc.gross_savings_amount || 0)
-    } else {
-      accruedSavings += (calc.gross_savings_amount || 0)
-    }
-  }
 
   // Savings by Category
   const savingsByCategoryMap = new Map<string, number>()
@@ -147,8 +126,6 @@ export default async function DashboardPage() {
       <DashboardStats stats={{
         totalSavings,
         activeEvents,
-        realizedSavings,
-        accruedSavings,
         totalCostReduction,
         totalCostAvoidance,
       }} />
