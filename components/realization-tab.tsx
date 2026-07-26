@@ -48,7 +48,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
     const fetchCalcs = async () => {
       const { data } = await supabase
         .from('savings_calculations')
-        .select('id, calculation_name, savings_type, gross_savings_amount')
+        .select('id, calculation_name, savings_type, gross_savings_amount, baseline_total_amount')
         .eq('event_id', eventId)
       setCalculations(data || [])
     }
@@ -349,13 +349,25 @@ function AddPeriodForm({ calculations, onSaved, onCancel }: {
         <div>
           <label className={labelClass}>Linked Calculation</label>
           <Select value={form.savings_calculation_id}
-            onChange={(e) => setForm({ ...form, savings_calculation_id: e.target.value })}
+            onChange={(e) => {
+              const id = e.target.value
+              const calc = calculations.find((c) => c.id === id)
+              // Auto-fill baseline + projected from the linked calculation
+              // (still editable afterward).
+              setForm((prev) => ({
+                ...prev,
+                savings_calculation_id: id,
+                baseline_amount: calc?.baseline_total_amount != null ? String(calc.baseline_total_amount) : prev.baseline_amount,
+                projected_savings: calc?.gross_savings_amount != null ? String(calc.gross_savings_amount) : prev.projected_savings,
+              }))
+            }}
             className="mt-1">
             <option value="">None</option>
             {calculations.map((c) => (
               <option key={c.id} value={c.id}>{c.calculation_name}</option>
             ))}
           </Select>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Linking a calculation fills in baseline &amp; projected below.</p>
         </div>
         <div></div>
         <div>

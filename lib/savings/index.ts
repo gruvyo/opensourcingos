@@ -314,3 +314,40 @@ export function prorateByYear(calcs: SavingsCalcRow[]): { byYear: YearBucket[]; 
   const byYear = Array.from(buckets.values()).sort((a, b) => Number(a.year) - Number(b.year))
   return { byYear, unscheduled }
 }
+
+// ---- Realization (negotiated → realized lifecycle) --------------------
+
+export interface RealizationPeriodRow {
+  projected_savings?: number | null
+  realized_savings?: number | null
+  leakage_amount?: number | null
+  actual_amount?: number | null
+  realization_status?: string | null
+  event_id?: string | null
+}
+
+export interface RealizationRollup {
+  totalProjected: number
+  totalRealized: number
+  totalLeakage: number
+  /** realized ÷ projected, as a percentage (0 when nothing projected). */
+  realizationRate: number
+  periodCount: number
+}
+
+/**
+ * Roll up realization periods into the negotiated-vs-realized story.
+ * Same math as the per-event Realization tab, so the portfolio view agrees.
+ */
+export function realizationRollup(periods: RealizationPeriodRow[]): RealizationRollup {
+  let totalProjected = 0
+  let totalRealized = 0
+  let totalLeakage = 0
+  for (const p of periods) {
+    totalProjected += num(p.projected_savings)
+    totalRealized += num(p.realized_savings)
+    totalLeakage += num(p.leakage_amount)
+  }
+  const realizationRate = totalProjected > 0 ? (totalRealized / totalProjected) * 100 : 0
+  return { totalProjected, totalRealized, totalLeakage, realizationRate, periodCount: periods.length }
+}

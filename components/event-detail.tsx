@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   FileText, List, BarChart2, Users, FileCheck,
   Calculator, Clock, StickyNote, Pencil,
-  Briefcase, LifeBuoy,
+  Briefcase, LifeBuoy, TrendingUp,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatDate, statusColor } from '@/lib/utils'
@@ -14,6 +14,7 @@ import { ScopeLinesTab } from './scope-lines-tab'
 import { BaselinesTab } from './baselines-tab'
 import { OffersTab } from './offers-tab'
 import { CalculationsTab } from './calculations-tab'
+import { RealizationTab } from './realization-tab'
 import { EditProjectModal } from './edit-project-modal'
 
 
@@ -55,6 +56,7 @@ const SOURCING_TABS = [
   { id: 'offers', label: 'Supplier Offers', icon: Users },
   { id: 'awards', label: 'Awards', icon: FileCheck },
   { id: 'calculations', label: 'Calculations', icon: Calculator },
+  { id: 'realization', label: 'Realization', icon: TrendingUp },
   { id: 'notes', label: 'Notes', icon: StickyNote },
 ]
 
@@ -146,6 +148,7 @@ export function EventDetail({
         {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} />}
         {!isSupport && activeTab === 'awards' && <AwardsTab eventId={event.id} />}
         {!isSupport && activeTab === 'calculations' && <CalculationsTab eventId={event.id} />}
+        {!isSupport && activeTab === 'realization' && <RealizationTab eventId={event.id} />}
 
       </div>
 
