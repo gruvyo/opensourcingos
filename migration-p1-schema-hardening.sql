@@ -4,6 +4,16 @@
 -- Adds the database-level guarantees the app currently only enforces in the
 -- UI (see ASSESSMENT.md §4, "Data model & schema governance").
 --
+-- ✅ APPLIED to production 2026-07-26. Because a live pre-flight showed the data
+--    was already clean (0 nonconforming rows, no duplicate official/selected
+--    rows), the CHECK constraints below were applied FULLY VALIDATED (the
+--    `not valid` qualifier was dropped), and an extra chk_compliance_status was
+--    added on supplier_offer_lines. award_status and calculation_status were
+--    intentionally left unconstrained: award_status had only 2 values present
+--    (unsure of full set), and calculation_status holds INCONSISTENT values
+--    ('Approved | contracted | Draft | realized | Submitted' — mixed case / two
+--    vocabularies) that need a data-cleanup pass before a constraint makes sense.
+--
 -- ⚠️  BEFORE APPLYING:
 --   1. Authored from a *reconstructed* schema. Diff table/column names against
 --      `supabase db pull` (or the live DB) first; fix any mismatch.
