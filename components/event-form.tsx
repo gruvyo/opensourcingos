@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Briefcase, LifeBuoy, Plus, X } from 'lucide-react'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input, Select } from '@/components/ui/input'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string }
 
@@ -210,9 +213,8 @@ export function EventForm({
     router.refresh()
   }
 
-  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600'
-  const labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-300'
-  const sectionClass = 'rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800'
+  const textareaClass = 'mt-1 block w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] transition-colors focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30'
+  const labelClass = 'block text-sm font-medium text-[var(--text-2)]'
 
   const currentTypes = projectType === 'Sourcing' ? EVENT_TYPES : SUPPORT_TYPES
   const currentStatuses = projectType === 'Sourcing' ? SOURCING_STATUSES : SUPPORT_STATUSES
@@ -220,28 +222,28 @@ export function EventForm({
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-6">
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">
           {error}
         </div>
       )}
 
       {/* Project Type Toggle */}
-      <div className={sectionClass}>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Project Type</h2>
+      <Card className="p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">Project Type</h2>
         <div className="flex gap-3">
           <button
             type="button"
             onClick={() => handleProjectTypeChange('Sourcing')}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
               projectType === 'Sourcing'
-                ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-300'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-600 dark:text-gray-400'
+                ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand-ink)]'
+                : 'border-[var(--border)] text-[var(--text-2)] hover:border-[var(--border-strong)]'
             }`}
           >
             <Briefcase className="h-5 w-5" />
             <div className="text-left">
               <div>Sourcing Project</div>
-              <div className={`text-xs font-normal ${projectType === 'Sourcing' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400'}`}>
+              <div className={`text-xs font-normal ${projectType === 'Sourcing' ? 'text-[var(--brand-ink)]' : 'text-[var(--text-3)]'}`}>
                 Commercial pipeline with savings
               </div>
             </div>
@@ -251,33 +253,33 @@ export function EventForm({
             onClick={() => handleProjectTypeChange('Support')}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
               projectType === 'Support'
-                ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-300'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-600 dark:text-gray-400'
+                ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand-ink)]'
+                : 'border-[var(--border)] text-[var(--text-2)] hover:border-[var(--border-strong)]'
             }`}
           >
             <LifeBuoy className="h-5 w-5" />
             <div className="text-left">
               <div>Support / Non-Commercial</div>
-              <div className={`text-xs font-normal ${projectType === 'Support' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400'}`}>
+              <div className={`text-xs font-normal ${projectType === 'Support' ? 'text-[var(--brand-ink)]' : 'text-[var(--text-3)]'}`}>
                 Vendor issues, tickets, $0 savings
               </div>
             </div>
           </button>
         </div>
-      </div>
+      </Card>
 
       {/* Basic Info */}
-      <div className={sectionClass}>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Basic Information</h2>
+      <Card className="p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">Basic Information</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Event' : 'Project'} Name *</label>
-            <input
+            <Input
               type="text"
               required
               value={form.event_name}
               onChange={(e) => handleChange('event_name', e.target.value)}
-              className={inputClass}
+              className="mt-1"
               placeholder={projectType === 'Sourcing' ? "e.g. CRM Software Renewal" : "e.g. Vendor billing dispute — Salesforce"}
             />
           </div>
@@ -286,216 +288,216 @@ export function EventForm({
             <textarea
               value={form.event_description}
               onChange={(e) => handleChange('event_description', e.target.value)}
-              className={inputClass}
+              className={textareaClass}
               rows={3}
               placeholder="Brief description"
             />
           </div>
           <div>
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Event Type' : 'Support Type'} *</label>
-            <select
+            <Select
               required
               value={form.event_type}
               onChange={(e) => handleChange('event_type', e.target.value)}
-              className={inputClass}
+              className="mt-1"
             >
               <option value="">Select type...</option>
               {currentTypes.map((type) => (
                 <option key={type} value={type}>{type}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelClass}>Status</label>
-            <select
+            <Select
               value={form.event_status}
               onChange={(e) => handleChange('event_status', e.target.value)}
-              className={inputClass}
+              className="mt-1"
             >
               {currentStatuses.map((status) => (
                 <option key={status} value={status}>{status}</option>
               ))}
-            </select>
+            </Select>
           </div>
           {projectType === 'Sourcing' && (
             <div>
               <label className={labelClass}>Sourcing Method</label>
-              <select
+              <Select
                 value={form.sourcing_method}
                 onChange={(e) => handleChange('sourcing_method', e.target.value)}
-                className={inputClass}
+                className="mt-1"
               >
                 <option value="">Select method...</option>
                 {SOURCING_METHODS.map((method) => (
                   <option key={method} value={method}>{method}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
           <div>
             <label className={labelClass}>IP Owner / Buyer</label>
-            <input
+            <Input
               type="text"
               value={form.buyer_name}
               onChange={(e) => handleChange('buyer_name', e.target.value)}
-              className={inputClass}
+              className="mt-1"
               placeholder="e.g. Jane Smith"
             />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Classification */}
-      <div className={sectionClass}>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Classification</h2>
+      <Card className="p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">Classification</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelClass}>Category</label>
-            <select
+            <Select
               value={form.category_id}
               onChange={(e) => handleChange('category_id', e.target.value)}
-              className={inputClass}
+              className="mt-1"
             >
               <option value="">Select category...</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.category_name}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelClass}>Business Unit</label>
-            <select
+            <Select
               value={form.business_unit_id}
               onChange={(e) => handleChange('business_unit_id', e.target.value)}
-              className={inputClass}
+              className="mt-1"
             >
               <option value="">Select business unit...</option>
               {businessUnits.map((b) => (
                 <option key={b.id} value={b.id}>{b.business_unit_name}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelClass}>Cost Center</label>
-            <select
+            <Select
               value={form.cost_center_id}
               onChange={(e) => handleChange('cost_center_id', e.target.value)}
-              className={inputClass}
+              className="mt-1"
             >
               <option value="">Select cost center...</option>
               {costCenters.map((c) => (
                 <option key={c.id} value={c.id}>{c.cost_center_name}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelClass}>Incumbent Supplier</label>
             <div className="mt-1 flex gap-2">
-              <select
+              <Select
                 value={form.incumbent_supplier_id}
                 onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)}
-                className={`${inputClass} flex-1`}
+                className="flex-1"
               >
                 <option value="">Select supplier...</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>{s.supplier_name}</option>
                 ))}
-              </select>
-              <button
+              </Select>
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => setShowAddSupplier(!showAddSupplier)}
-                className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="gap-1"
                 title="Add new supplier"
               >
                 {showAddSupplier ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                 {showAddSupplier ? 'Cancel' : 'New'}
-              </button>
+              </Button>
             </div>
             {showAddSupplier && (
               <div className="mt-2 flex gap-2">
-                <input
+                <Input
                   type="text"
                   value={newSupplierName}
                   onChange={(e) => setNewSupplierName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSupplier() } }}
-                  className={`${inputClass} flex-1`}
+                  className="flex-1"
                   placeholder="Enter supplier name..."
                   autoFocus
                 />
-                <button
+                <Button
                   type="button"
                   onClick={handleAddSupplier}
                   disabled={addingSupplier || !newSupplierName.trim()}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {addingSupplier ? 'Adding...' : 'Add'}
-                </button>
+                </Button>
               </div>
             )}
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Dates — simplified: only project dates, no contract/recognition/reporting basis */}
-      <div className={sectionClass}>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Dates</h2>
+      <Card className="p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">Dates</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Project Start Date' : 'Start Date'}</label>
-            <input
+            <Input
               type="date"
               value={form.event_start_date}
               onChange={(e) => handleChange('event_start_date', e.target.value)}
-              className={inputClass}
+              className="mt-1"
             />
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">When the sourcing project kicked off</p>
+            <p className="mt-1 text-xs text-[var(--text-3)]">When the sourcing project kicked off</p>
           </div>
           <div>
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Project Close Date' : 'Due Date'}</label>
-            <input
+            <Input
               type="date"
               value={form.event_close_date}
               onChange={(e) => handleChange('event_close_date', e.target.value)}
-              className={inputClass}
+              className="mt-1"
             />
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{projectType === 'Sourcing' ? 'When the project is expected to wrap up' : 'When the support issue should be resolved'}</p>
+            <p className="mt-1 text-xs text-[var(--text-3)]">{projectType === 'Sourcing' ? 'When the project is expected to wrap up' : 'When the support issue should be resolved'}</p>
           </div>
         </div>
         {projectType === 'Sourcing' && (
-          <p className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-700/50 dark:text-gray-400">
+          <p className="mt-3 rounded-lg bg-[var(--surface-2)] p-3 text-xs text-[var(--text-3)]">
             Savings period dates (start and end) are set on each savings calculation in the Calculations tab — those drive all financial reporting.
           </p>
         )}
-      </div>
+      </Card>
 
       {/* Notes */}
-      <div className={sectionClass}>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Notes</h2>
+      <Card className="p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">Notes</h2>
         <textarea
           value={form.notes}
           onChange={(e) => handleChange('notes', e.target.value)}
-          className={inputClass}
+          className={textareaClass}
           rows={4}
           placeholder="Add any notes, context, or updates about this project..."
         />
-      </div>
+      </Card>
 
       {/* Submit */}
       <div className="flex justify-end gap-3">
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => router.push('/events')}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
         >
           {loading ? 'Creating...' : `Create ${projectType === 'Sourcing' ? 'Event' : 'Project'}`}
-        </button>
+        </Button>
       </div>
     </form>
   )

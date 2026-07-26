@@ -5,6 +5,28 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* ---- Design system tokens (light). One cool-slate neutral scale. ---- */
+  --bg:            #f5f7fb;
+  --surface:       #ffffff;
+  --surface-2:     #f1f5f9;
+  --border:        #e4e9f1;
+  --border-strong: #cdd5e1;
+
+  --text:   #0f1729;
+  --text-2: #4a566b;
+  --text-3: #8592a6;
+
+  --brand:       #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-ink:   #4338ca;
+  --brand-soft:  #eef2ff;
+  --on-brand:    #ffffff;
+
+  --success: #047857; --success-soft: #e7f6ef;
+  --warning: #b45309; --warning-soft: #fbf1e2;
+  --danger:  #be123c; --danger-soft:  #fdeef1;
+  --info:    #1d4ed8; --info-soft:    #eaf0fe;
 }
 
 html {
@@ -33,6 +55,28 @@ textarea::placeholder {
 .dark {
   --background: #0a0a0a;
   --foreground: #fafafa;
+
+  /* ---- Design system tokens (dark) ---- */
+  --bg:            #0a0e17;
+  --surface:       #121826;
+  --surface-2:     #1a2231;
+  --border:        #242e40;
+  --border-strong: #35435c;
+
+  --text:   #e7ecf5;
+  --text-2: #9aa7bd;
+  --text-3: #66738a;
+
+  --brand:       #6366f1;
+  --brand-hover: #4f46e5;
+  --brand-ink:   #a5b4fc;
+  --brand-soft:  rgba(99,102,241,.16);
+  --on-brand:    #ffffff;
+
+  --success: #34d399; --success-soft: rgba(16,185,129,.15);
+  --warning: #fbbf24; --warning-soft: rgba(217,119,6,.17);
+  --danger:  #fb7185; --danger-soft:  rgba(225,29,72,.17);
+  --info:    #60a5fa; --info-soft:    rgba(37,99,235,.18);
 }
 
 .dark body {

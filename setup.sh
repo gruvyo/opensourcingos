@@ -2,8 +2,10 @@
 
 # Create .env.local
 cat > .env.local << 'EOF'
-NEXT_PUBLIC_SUPABASE_URL=https://qjtactdcfeuseuqaxfaa.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=***REMOVED***
+# Fill these from your Supabase project's API settings.
+# NEVER commit real values — .env.local is gitignored; keep it that way.
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 EOF
 
 # Create lib/supabase

@@ -7,7 +7,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
       {/* Mobile backdrop overlay */}
       {sidebarOpen && (
         <div
@@ -20,10 +20,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <div className="flex h-14 items-center gap-3 border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 lg:hidden">
+        <div className="flex h-14 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="rounded-lg p-1.5 text-[var(--text-2)] transition-colors hover:bg-[var(--surface-2)]"
             aria-label="Open menu"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -33,15 +33,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </svg>
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-base font-semibold text-gray-900 dark:text-gray-100">OpenSourcing</span>
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-600 text-xs text-white font-bold">
+            <span className="text-base font-semibold text-[var(--text)]">OpenSourcing</span>
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--brand)] text-xs text-white font-bold">
               OS
             </div>
           </div>
         </div>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950">
+        <main className="flex-1 overflow-y-auto bg-[var(--bg)]">
           {children}
         </main>
       </div>

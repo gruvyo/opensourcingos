@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User, Building, Settings as SettingsIcon, Shield } from 'lucide-react'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 export default function SettingsPage() {
   const supabase = createClient()
@@ -42,32 +44,32 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+        <p className="text-sm text-[var(--text-3)]">Loading...</p>
       </div>
     )
   }
 
-  const sectionClass = 'rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800'
-  const labelClass = 'text-sm font-medium text-gray-500 dark:text-gray-400'
-  const valueClass = 'mt-1 text-sm text-gray-900 dark:text-gray-100'
+  const sectionClass = 'p-6'
+  const labelClass = 'text-sm font-medium text-[var(--text-3)]'
+  const valueClass = 'mt-1 text-sm text-[var(--text)]'
 
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        <h1 className="text-2xl font-bold text-[var(--text)]">Settings</h1>
+        <p className="mt-1 text-sm text-[var(--text-2)]">
           Account and organization settings
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Profile */}
-        <div className={sectionClass}>
+        <Card className={sectionClass}>
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
               <User className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Your Profile</h3>
+            <h3 className="text-sm font-semibold text-[var(--text)]">Your Profile</h3>
           </div>
           <dl className="space-y-3">
             <div>
@@ -87,15 +89,15 @@ export default function SettingsPage() {
               <dd className={valueClass}>{profile?.full_name || 'Not set'}</dd>
             </div>
           </dl>
-        </div>
+        </Card>
 
         {/* Organization */}
-        <div className={sectionClass}>
+        <Card className={sectionClass}>
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-900/30">
               <Building className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Organization</h3>
+            <h3 className="text-sm font-semibold text-[var(--text)]">Organization</h3>
           </div>
           <dl className="space-y-3">
             <div>
@@ -113,21 +115,19 @@ export default function SettingsPage() {
             <div>
               <dt className={labelClass}>Plan</dt>
               <dd className={valueClass}>
-                <span className="rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                  MVP Beta
-                </span>
+                <Badge tone="brand">MVP Beta</Badge>
               </dd>
             </div>
           </dl>
-        </div>
+        </Card>
 
         {/* Preferences */}
-        <div className={sectionClass}>
+        <Card className={sectionClass}>
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 dark:bg-green-900/30">
               <SettingsIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Preferences</h3>
+            <h3 className="text-sm font-semibold text-[var(--text)]">Preferences</h3>
           </div>
           <dl className="space-y-3">
             <div>
@@ -143,15 +143,15 @@ export default function SettingsPage() {
               <dd className={valueClass}>US ($1,234)</dd>
             </div>
           </dl>
-        </div>
+        </Card>
 
         {/* System Info */}
-        <div className={sectionClass}>
+        <Card className={sectionClass}>
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-900/30">
               <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">System</h3>
+            <h3 className="text-sm font-semibold text-[var(--text)]">System</h3>
           </div>
           <dl className="space-y-3">
             <div>
@@ -171,7 +171,7 @@ export default function SettingsPage() {
               <dd className={valueClass}>Supabase Auth (Email)</dd>
             </div>
           </dl>
-        </div>
+        </Card>
       </div>
     </div>
   )

@@ -1,8 +1,10 @@
 'use client'
 
 import { formatCurrency } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 import { DollarSign, Briefcase, ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { clsx } from 'clsx'
+import type { ComponentType } from 'react'
 
 type Stats = {
   totalSavings: number
@@ -11,14 +13,41 @@ type Stats = {
   totalCostAvoidance: number
 }
 
+type CardDef = {
+  label: string
+  value: string
+  icon: ComponentType<{ className?: string }>
+  color: string
+  bg: string
+  sub?: string
+}
+
+function StatCard({ card }: { card: CardDef }) {
+  const Icon = card.icon
+  return (
+    <Card className="p-6">
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[var(--text-2)]">{card.label}</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--text)]">{card.value}</p>
+          {card.sub && <p className="mt-1 text-xs text-[var(--text-3)]">{card.sub}</p>}
+        </div>
+        <div className={clsx('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg', card.bg)}>
+          <Icon className={clsx('h-6 w-6', card.color)} />
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export function DashboardStats({ stats }: { stats: Stats }) {
-  const savingsCards = [
+  const savingsCards: CardDef[] = [
     { label: 'Total Savings', value: formatCurrency(stats.totalSavings), icon: DollarSign, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30', sub: 'Cost reduction + cost avoidance' },
     { label: 'Cost Reduction', value: formatCurrency(stats.totalCostReduction), icon: ArrowDownRight, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30', sub: 'Actual bottom-line reduction — price went down' },
     { label: 'Cost Avoidance', value: formatCurrency(stats.totalCostAvoidance), icon: ArrowUpRight, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30', sub: 'Value not paid — negotiated below supplier proposal' },
   ]
 
-  const projectCards = [
+  const projectCards: CardDef[] = [
     { label: 'Active Projects', value: stats.activeEvents.toString(), icon: Briefcase, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/30', sub: 'Sourcing + support projects in progress' },
   ]
 
@@ -26,48 +55,12 @@ export function DashboardStats({ stats }: { stats: Stats }) {
     <div className="space-y-4">
       {/* Savings cards — grouped together */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {savingsCards.map((card) => {
-          const Icon = card.icon
-          return (
-            <div key={card.label} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
-                  <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">{card.value}</p>
-                  {card.sub && (
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{card.sub}</p>
-                  )}
-                </div>
-                <div className={clsx('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg', card.bg)}>
-                  <Icon className={clsx('h-6 w-6', card.color)} />
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {savingsCards.map((card) => <StatCard key={card.label} card={card} />)}
       </div>
 
       {/* Project cards — separate row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {projectCards.map((card) => {
-          const Icon = card.icon
-          return (
-            <div key={card.label} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
-                  <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">{card.value}</p>
-                  {card.sub && (
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{card.sub}</p>
-                  )}
-                </div>
-                <div className={clsx('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg', card.bg)}>
-                  <Icon className={clsx('h-6 w-6', card.color)} />
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {projectCards.map((card) => <StatCard key={card.label} card={card} />)}
       </div>
     </div>
   )

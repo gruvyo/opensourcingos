@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatDate, statusColor } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { ScopeLinesTab } from './scope-lines-tab'
 import { BaselinesTab } from './baselines-tab'
 import { OffersTab } from './offers-tab'
@@ -85,41 +87,38 @@ export function EventDetail({
   return (
     <div>
       <div className="mb-6">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{event.event_name}</h1>
+              <h1 className="text-2xl font-bold text-[var(--text)]">{event.event_name}</h1>
               <span className={clsx(
                 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
                 isSupport
-                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                  : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300'
+                  : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
               )}>
                 {isSupport ? <LifeBuoy className="h-3 w-3" /> : <Briefcase className="h-3 w-3" />}
                 {isSupport ? 'Support' : 'Sourcing'}
               </span>
             </div>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-1 text-sm text-[var(--text-2)]">
               {event.event_type} • {isSupport ? (event.event_status || '—') : (event.sourcing_method || '—')}
             </p>
           </div>
-          <span className={clsx('inline-flex rounded-full px-3 py-1 text-sm font-medium', statusColor(event.event_status))}>
+          <span className={clsx('inline-flex shrink-0 rounded-full px-3 py-1 text-sm font-medium', statusColor(event.event_status))}>
             {event.event_status}
           </span>
-          <button
-            onClick={() => setShowEditModal(true)}
-            className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
+          <Button variant="secondary" size="sm" onClick={() => setShowEditModal(true)}>
             <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
+          </Button>
         </div>
         {event.event_description && (
-          <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">{event.event_description}</p>
+          <p className="mt-3 text-sm text-[var(--text-2)]">{event.event_description}</p>
         )}
       </div>
 
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-[var(--border)]">
         <nav className="flex gap-1 overflow-x-auto">
           {TABS.map((tab) => {
             const Icon = tab.icon
@@ -128,8 +127,8 @@ export function EventDetail({
                 className={clsx(
                   'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap',
                   activeTab === tab.id
-                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    ? 'border-[var(--brand)] text-[var(--brand-ink)]'
+                    : 'border-transparent text-[var(--text-3)] hover:text-[var(--text)]'
                 )}>
                 <Icon className="h-4 w-4" />
                 {tab.label}
@@ -185,56 +184,56 @@ function OverviewTab({ event }: { event: Event }) {
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Project Details</h3>
+      <Card className="p-6">
+        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Project Details</h3>
         <dl className="space-y-3">
           {details.map((d) => (
             <div key={d.label} className="flex justify-between">
-              <dt className="text-sm text-gray-600 dark:text-gray-400">{d.label}</dt>
-              <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{d.value || '—'}</dd>
+              <dt className="text-sm text-[var(--text-2)]">{d.label}</dt>
+              <dd className="text-sm font-medium text-[var(--text)]">{d.value || '—'}</dd>
             </div>
           ))}
         </dl>
-      </div>
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Key Dates</h3>
+      </Card>
+      <Card className="p-6">
+        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Key Dates</h3>
         <dl className="space-y-3">
           {dates.map((d) => (
             <div key={d.label} className="flex justify-between">
-              <dt className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <dt className="flex items-center gap-2 text-sm text-[var(--text-2)]">
                 <Clock className="h-3 w-3" />
                 {d.label}
               </dt>
-              <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(d.value)}</dd>
+              <dd className="text-sm font-medium text-[var(--text)]">{formatDate(d.value)}</dd>
             </div>
           ))}
         </dl>
-      </div>
+      </Card>
     </div>
   )
 }
 
 function NotesTab({ notes }: { notes: string | null }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Notes</h3>
+    <Card className="p-6">
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Notes</h3>
       {notes ? (
-        <div className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{notes}</div>
+        <div className="whitespace-pre-wrap text-sm text-[var(--text-2)]">{notes}</div>
       ) : (
-        <p className="text-sm text-gray-400 dark:text-gray-500">No notes have been added for this project.</p>
+        <p className="text-sm text-[var(--text-3)]">No notes have been added for this project.</p>
       )}
-    </div>
+    </Card>
   )
 }
 
 function AwardsTab({ eventId }: { eventId: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <FileCheck className="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" />
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Awards</h3>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+    <Card className="p-12 text-center">
+      <FileCheck className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
+      <h3 className="text-lg font-medium text-[var(--text)]">Awards</h3>
+      <p className="mt-1 text-sm text-[var(--text-3)]">
         Create awards from the Supplier Offers tab by expanding an offer and clicking &quot;Create Award from Offer.&quot;
       </p>
-    </div>
+    </Card>
   )
 }

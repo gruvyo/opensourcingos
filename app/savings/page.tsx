@@ -1,13 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Calculator, ArrowRight, CheckCircle, Clock } from 'lucide-react'
-
-function getFirst(obj: any): any {
-  if (!obj) return null
-  if (Array.isArray(obj)) return obj[0] || null
-  return obj
-}
+import { portfolioRollup, reportedSavings, classifyRealization, getFirst } from '@/lib/savings'
+import { Calculator, ArrowRight } from 'lucide-react'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 export default async function SavingsPage() {
   const supabase = await createClient()
@@ -30,132 +27,108 @@ export default async function SavingsPage() {
   ])
 
   const calcs = savingsCalcs || []
+  const eventList = events || []
   const now = new Date()
 
-  // Totals
-  const totalSavings = calcs.reduce((sum: number, c: any) => sum + (c.gross_savings_amount || 0), 0)
-  const totalCostReduction = calcs.reduce((sum: number, c: any) => sum + (c.cost_reduction_amount || 0), 0)
-  const totalCostAvoidance = calcs.reduce((sum: number, c: any) => sum + (c.cost_avoidance_amount || 0), 0)
+  // Single source of truth for every headline/breakdown number.
+  const rollup = portfolioRollup(calcs, eventList as any, { now })
 
-  // Realized vs Accrued (date-based, using savings_start_date with fallback to contract_start_date)
-  let realizedSavings = 0
-  let accruedSavings = 0
-  for (const calc of calcs) {
-    const startDate = calc.savings_start_date
-    if (!startDate) {
-      const event = events?.find((e: any) => e.id === calc.event_id)
-      const contractStart = event?.contract_start_date
-      if (contractStart && new Date(contractStart) <= now) {
-        realizedSavings += (calc.gross_savings_amount || 0)
-      } else {
-        accruedSavings += (calc.gross_savings_amount || 0)
-      }
-    } else if (new Date(startDate) <= now) {
-      realizedSavings += (calc.gross_savings_amount || 0)
-    } else {
-      accruedSavings += (calc.gross_savings_amount || 0)
-    }
-  }
-
-  // Group by savings type
-  const byType = new Map<string, number>()
-  for (const c of calcs) {
-    byType.set(c.savings_type, (byType.get(c.savings_type) || 0) + (c.gross_savings_amount || 0))
-  }
+  // For per-row realized/accrued badges, use the SAME canonical rule.
+  const contractStartByEventId = new Map<string, string | null>()
+  for (const e of eventList) contractStartByEventId.set((e as any).id, (e as any).contract_start_date ?? null)
 
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Savings</h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        <h1 className="text-2xl font-bold text-[var(--text)]">Savings</h1>
+        <p className="mt-1 text-sm text-[var(--text-2)]">
           All savings across sourcing projects — cost reduction, cost avoidance, and total savings
         </p>
       </div>
 
       {/* Summary cards — 3 cards only */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Savings</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalSavings)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Cost reduction + cost avoidance</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Cost Reduction</p>
-          <p className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalCostReduction)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Actual bottom-line reduction — price went down from what we were paying</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Cost Avoidance</p>
-          <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(totalCostAvoidance)}</p>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Value not paid — negotiated below what supplier proposed</p>
-        </div>
+        <Card className="p-6">
+          <p className="text-sm font-medium text-[var(--text-3)]">Total Savings</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--text)]">{formatCurrency(rollup.totalSavings)}</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Gross savings across all calculations</p>
+        </Card>
+        <Card className="p-6">
+          <p className="text-sm font-medium text-[var(--text-3)]">Cost Reduction</p>
+          <p className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(rollup.totalCostReduction)}</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Actual bottom-line reduction — price went down from what we were paying</p>
+        </Card>
+        <Card className="p-6">
+          <p className="text-sm font-medium text-[var(--text-3)]">Cost Avoidance</p>
+          <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(rollup.totalCostAvoidance)}</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Value not paid — negotiated below what supplier proposed</p>
+        </Card>
       </div>
 
-      {byType.size > 0 && (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Savings by Type</h3>
+      {rollup.byType.length > 0 && (
+        <Card className="mt-4 p-6">
+          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Savings by Type</h3>
           <div className="flex flex-wrap gap-3">
-            {Array.from(byType.entries()).map(([type, amount]) => (
-              <div key={type} className="rounded-lg bg-gray-50 px-4 py-2 dark:bg-gray-700/50">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{type}</span>
-                <span className="ml-2 text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(amount)}</span>
+            {rollup.byType.map(({ name, value }) => (
+              <div key={name} className="rounded-lg bg-[var(--surface-2)] px-4 py-2">
+                <span className="text-sm font-medium text-[var(--text-2)]">{name}</span>
+                <span className="ml-2 text-sm font-bold text-[var(--text)]">{formatCurrency(value)}</span>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Calculations table */}
-      <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">All Savings Calculations</h3>
+      <Card className="mt-6 overflow-x-auto">
+        <div className="border-b border-[var(--border)] px-6 py-4">
+          <h3 className="text-sm font-semibold text-[var(--text)]">All Savings Calculations</h3>
         </div>
         <table className="w-full min-w-[1000px]">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Event</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Calculation</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Type</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Cost Reduction</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Cost Avoidance</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total Savings</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Savings Period</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Classification</th>
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Event</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Calculation</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Type</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Cost Reduction</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Cost Avoidance</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Total Savings</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Savings Period</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Classification</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="divide-y divide-[var(--border)]">
             {calcs.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-12 text-center">
-                  <Calculator className="mx-auto mb-2 h-8 w-8 text-gray-300 dark:text-gray-600" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No savings calculations yet</p>
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                    Calculations are created inside each sourcing event's Calculations tab
+                  <Calculator className="mx-auto mb-2 h-8 w-8 text-[var(--text-3)]" />
+                  <p className="text-sm text-[var(--text-3)]">No savings calculations yet</p>
+                  <p className="mt-1 text-xs text-[var(--text-3)]">
+                    Calculations are created inside each sourcing event&apos;s Calculations tab
                   </p>
                 </td>
               </tr>
             ) : (
               calcs.map((calc: any) => {
-                const event = getFirst(calc.event)
-                const totalForCalc = (calc.cost_reduction_amount || 0) + (calc.cost_avoidance_amount || 0) || (calc.gross_savings_amount || 0)
-                const startDate = calc.savings_start_date
-                const isRealized = startDate ? new Date(startDate) <= now : false
+                const event = getFirst<any>(calc.event)
+                const totalForCalc = reportedSavings(calc)
+                const isRealized = classifyRealization(calc, contractStartByEventId, now) === 'Realized'
                 return (
-                  <tr key={calc.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <tr key={calc.id} className="hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3">
                       {event?.event_name ? (
-                        <Link href={`/events/${calc.event_id}`} className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
+                        <Link href={`/events/${calc.event_id}`} className="flex items-center gap-1 text-sm font-medium text-[var(--brand-ink)] hover:underline">
                           {event.event_name}
                           <ArrowRight className="h-3 w-3" />
                         </Link>
-                      ) : <span className="text-sm text-gray-400">—</span>}
+                      ) : <span className="text-sm text-[var(--text-3)]">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{calc.calculation_name}</td>
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">{calc.calculation_name}</td>
                     <td className="px-4 py-3">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                      <Badge tone="neutral" className="rounded">
                         {calc.savings_type}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">
                       {formatCurrency(calc.cost_reduction_amount)}
@@ -166,14 +139,14 @@ export default async function SavingsPage() {
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(totalForCalc)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">
                       {calc.savings_start_date ? `${formatDate(calc.savings_start_date)} → ${formatDate(calc.savings_end_date)}` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{calc.calculation_status}</td>
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">{calc.calculation_status}</td>
                     <td className="px-4 py-3">
-                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${isRealized ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                      <Badge tone={isRealized ? 'success' : 'info'}>
                         {isRealized ? 'Realized' : 'Accrued'}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 )
@@ -181,7 +154,7 @@ export default async function SavingsPage() {
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   )
 }

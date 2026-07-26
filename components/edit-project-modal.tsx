@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X } from 'lucide-react'
-import { clsx } from 'clsx'
+import { Button } from '@/components/ui/button'
+import { Input, Select } from '@/components/ui/input'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string }
 
@@ -44,8 +45,53 @@ export function EditProjectModal({
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const titleId = 'edit-project-title'
 
   const isSupport = project.project_type === 'Support'
+
+  // Accessible dialog behavior: lock scroll, focus in, trap Tab, Esc to close,
+  // and restore focus to the trigger on close.
+  useEffect(() => {
+    const prevActive = document.activeElement as HTMLElement | null
+    document.body.style.overflow = 'hidden'
+
+    const focusables = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      )
+
+    focusables()[0]?.focus()
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key === 'Tab') {
+        const list = focusables()
+        if (list.length === 0) return
+        const first = list[0]
+        const last = list[list.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+      prevActive?.focus?.()
+    }
+  }, [onClose])
 
   const [form, setForm] = useState({
     event_name: project.event_name || '',
@@ -126,172 +172,130 @@ export function EditProjectModal({
     window.location.href = '/events'
   }
 
-  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
-  const labelClass = 'block text-xs font-medium text-gray-600 dark:text-gray-400'
+  const labelClass = 'mb-1 block text-xs font-medium text-[var(--text-2)]'
+  const textareaClass = 'w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] transition-colors focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30'
   const statuses = isSupport ? SUPPORT_STATUSES : SOURCING_STATUSES
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-[var(--surface)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Edit Project</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
+          <h2 id={titleId} className="text-xl font-bold text-[var(--text)]">Edit Project</h2>
+          <button onClick={onClose} aria-label="Close dialog" className="rounded-md p-1 text-[var(--text-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-400">
+          <div className="mb-4 rounded-md bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]" role="alert">
             {error}
           </div>
         )}
 
         {/* Form fields */}
         <div className="space-y-4">
-          {/* Name */}
           <div>
-            <label className={labelClass}>Project Name *</label>
-            <input
-              type="text"
-              required
-              value={form.event_name}
-              onChange={(e) => handleChange('event_name', e.target.value)}
-              className={inputClass}
-            />
+            <label htmlFor="ep-name" className={labelClass}>Project Name *</label>
+            <Input id="ep-name" type="text" required value={form.event_name} onChange={(e) => handleChange('event_name', e.target.value)} />
           </div>
 
-          {/* Description */}
           <div>
-            <label className={labelClass}>Description</label>
-            <textarea
-              value={form.event_description}
-              onChange={(e) => handleChange('event_description', e.target.value)}
-              className={inputClass}
-              rows={2}
-            />
+            <label htmlFor="ep-desc" className={labelClass}>Description</label>
+            <textarea id="ep-desc" value={form.event_description} onChange={(e) => handleChange('event_description', e.target.value)} className={textareaClass} rows={2} />
           </div>
 
-          {/* Status + Type + Method */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Status</label>
-              <select value={form.event_status} onChange={(e) => handleChange('event_status', e.target.value)} className={inputClass}>
+              <label htmlFor="ep-status" className={labelClass}>Status</label>
+              <Select id="ep-status" value={form.event_status} onChange={(e) => handleChange('event_status', e.target.value)}>
                 {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className={labelClass}>Event Type</label>
-              <input
-                type="text"
-                value={form.event_type}
-                onChange={(e) => handleChange('event_type', e.target.value)}
-                className={inputClass}
-              />
+              <label htmlFor="ep-type" className={labelClass}>Event Type</label>
+              <Input id="ep-type" type="text" value={form.event_type} onChange={(e) => handleChange('event_type', e.target.value)} />
             </div>
             {!isSupport && (
               <div>
-                <label className={labelClass}>Sourcing Method</label>
-                <select value={form.sourcing_method} onChange={(e) => handleChange('sourcing_method', e.target.value)} className={inputClass}>
+                <label htmlFor="ep-method" className={labelClass}>Sourcing Method</label>
+                <Select id="ep-method" value={form.sourcing_method} onChange={(e) => handleChange('sourcing_method', e.target.value)}>
                   <option value="">Select method...</option>
                   {SOURCING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+                </Select>
               </div>
             )}
             <div>
-              <label className={labelClass}>IP Owner / Buyer</label>
-              <input
-                type="text"
-                value={form.buyer_name}
-                onChange={(e) => handleChange('buyer_name', e.target.value)}
-                className={inputClass}
-                placeholder="e.g. Jane Smith"
-              />
+              <label htmlFor="ep-buyer" className={labelClass}>IP Owner / Buyer</label>
+              <Input id="ep-buyer" type="text" value={form.buyer_name} onChange={(e) => handleChange('buyer_name', e.target.value)} placeholder="e.g. Jane Smith" />
             </div>
           </div>
 
-          {/* Classification */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Category</label>
-              <select value={form.category_id} onChange={(e) => handleChange('category_id', e.target.value)} className={inputClass}>
+              <label htmlFor="ep-category" className={labelClass}>Category</label>
+              <Select id="ep-category" value={form.category_id} onChange={(e) => handleChange('category_id', e.target.value)}>
                 <option value="">Select category...</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.category_name}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className={labelClass}>Business Unit</label>
-              <select value={form.business_unit_id} onChange={(e) => handleChange('business_unit_id', e.target.value)} className={inputClass}>
+              <label htmlFor="ep-bu" className={labelClass}>Business Unit</label>
+              <Select id="ep-bu" value={form.business_unit_id} onChange={(e) => handleChange('business_unit_id', e.target.value)}>
                 <option value="">Select business unit...</option>
                 {businessUnits.map(b => <option key={b.id} value={b.id}>{b.business_unit_name}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className={labelClass}>Cost Center</label>
-              <select value={form.cost_center_id} onChange={(e) => handleChange('cost_center_id', e.target.value)} className={inputClass}>
+              <label htmlFor="ep-cc" className={labelClass}>Cost Center</label>
+              <Select id="ep-cc" value={form.cost_center_id} onChange={(e) => handleChange('cost_center_id', e.target.value)}>
                 <option value="">Select cost center...</option>
                 {costCenters.map(c => <option key={c.id} value={c.id}>{c.cost_center_name}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className={labelClass}>Incumbent Supplier</label>
-              <select value={form.incumbent_supplier_id} onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)} className={inputClass}>
+              <label htmlFor="ep-supplier" className={labelClass}>Incumbent Supplier</label>
+              <Select id="ep-supplier" value={form.incumbent_supplier_id} onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)}>
                 <option value="">Select supplier...</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplier_name}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
 
-          {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>{isSupport ? 'Start Date' : 'Project Start Date'}</label>
-              <input type="date" value={form.event_start_date} onChange={(e) => handleChange('event_start_date', e.target.value)} className={inputClass} />
+              <label htmlFor="ep-start" className={labelClass}>{isSupport ? 'Start Date' : 'Project Start Date'}</label>
+              <Input id="ep-start" type="date" value={form.event_start_date} onChange={(e) => handleChange('event_start_date', e.target.value)} />
             </div>
             <div>
-              <label className={labelClass}>{isSupport ? 'Due Date' : 'Project Close Date'}</label>
-              <input type="date" value={form.event_close_date} onChange={(e) => handleChange('event_close_date', e.target.value)} className={inputClass} />
+              <label htmlFor="ep-close" className={labelClass}>{isSupport ? 'Due Date' : 'Project Close Date'}</label>
+              <Input id="ep-close" type="date" value={form.event_close_date} onChange={(e) => handleChange('event_close_date', e.target.value)} />
             </div>
           </div>
 
-          {/* Notes */}
           <div>
-            <label className={labelClass}>Notes</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
-              className={inputClass}
-              rows={3}
-            />
+            <label htmlFor="ep-notes" className={labelClass}>Notes</label>
+            <textarea id="ep-notes" value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} className={textareaClass} rows={3} />
           </div>
         </div>
 
         {/* Action buttons */}
         <div className="mt-6 flex items-center justify-between">
-          <button
-            onClick={handleDelete}
-            disabled={loading}
-            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
-          >
+          <Button variant="danger" onClick={handleDelete} disabled={loading}>
             Delete Project
-          </button>
+          </Button>
           <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : 'Save Changes'}
-            </button>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? 'Saving…' : 'Save Changes'}
+            </Button>
           </div>
         </div>
       </div>

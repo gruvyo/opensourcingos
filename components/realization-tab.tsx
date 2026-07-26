@@ -8,14 +8,17 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { clsx } from 'clsx'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input, Select } from '@/components/ui/input'
 
 const REALIZATION_STATUS_COLORS: Record<string, string> = {
-  'Pending': 'bg-gray-100 text-gray-700',
-  'In Progress': 'bg-blue-100 text-blue-700',
-  'Realized': 'bg-green-100 text-green-700',
-  'Partially Realized': 'bg-amber-100 text-amber-700',
-  'Not Realized': 'bg-red-100 text-red-700',
-  'Leaked': 'bg-red-100 text-red-700',
+  'Pending': 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300',
+  'In Progress': 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  'Realized': 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300',
+  'Partially Realized': 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  'Not Realized': 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
+  'Leaked': 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
 }
 
 const REALIZATION_STATUSES = ['Pending', 'In Progress', 'Realized', 'Partially Realized', 'Not Realized', 'Leaked']
@@ -132,7 +135,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-gray-500">Loading realization data...</div>
+    return <div className="p-8 text-center text-sm text-[var(--text-3)]">Loading realization data...</div>
   }
 
   // Summary stats
@@ -146,36 +149,33 @@ export function RealizationTab({ eventId }: { eventId: string }) {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Realization Tracking</h3>
-          <p className="text-sm text-gray-600">Track actual savings vs projected savings over time</p>
+          <h3 className="text-lg font-semibold text-[var(--text)]">Realization Tracking</h3>
+          <p className="text-sm text-[var(--text-2)]">Track actual savings vs projected savings over time</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
+        <Button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Period
-        </button>
+        </Button>
       </div>
 
       {/* Summary Cards */}
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">Projected Savings</p>
-          <p className="mt-1 text-xl font-bold text-gray-900">{formatCurrency(totalProjected)}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">Realized Savings</p>
-          <p className="mt-1 text-xl font-bold text-green-600">{formatCurrency(totalRealized)}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">Leakage</p>
-          <p className="mt-1 text-xl font-bold text-red-600">{formatCurrency(totalLeakage)}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">Realization Rate</p>
-          <p className="mt-1 text-xl font-bold text-indigo-600">{realizationRate.toFixed(1)}%</p>
-        </div>
+        <Card className="p-4">
+          <p className="text-xs text-[var(--text-3)]">Projected Savings</p>
+          <p className="mt-1 text-xl font-bold text-[var(--text)]">{formatCurrency(totalProjected)}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-[var(--text-3)]">Realized Savings</p>
+          <p className="mt-1 text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRealized)}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-[var(--text-3)]">Leakage</p>
+          <p className="mt-1 text-xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalLeakage)}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-[var(--text-3)]">Realization Rate</p>
+          <p className="mt-1 text-xl font-bold text-indigo-600 dark:text-indigo-400">{realizationRate.toFixed(1)}%</p>
+        </Card>
       </div>
 
       {/* Add Period Form */}
@@ -189,17 +189,17 @@ export function RealizationTab({ eventId }: { eventId: string }) {
 
       {/* Periods Table */}
       {periods.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm">
-          <TrendingUp className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-          <h3 className="text-sm font-medium text-gray-900">No realization periods yet</h3>
-          <p className="mt-1 text-sm text-gray-500">Click "Add Period" to track savings over time.</p>
-        </div>
+        <Card className="p-12 text-center">
+          <TrendingUp className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
+          <h3 className="text-sm font-medium text-[var(--text)]">No realization periods yet</h3>
+          <p className="mt-1 text-sm text-[var(--text-3)]">Click "Add Period" to track savings over time.</p>
+        </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase text-gray-500">
+                <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs uppercase text-[var(--text-3)]">
                   <th className="px-4 py-3">Period</th>
                   <th className="px-4 py-3 text-right">Baseline</th>
                   <th className="px-4 py-3 text-right">Projected</th>
@@ -211,62 +211,62 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-[var(--border)]">
                 {periods.map((period) => (
-                  <tr key={period.id} className="hover:bg-gray-50">
+                  <tr key={period.id} className="hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">{period.period_name}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm font-medium text-[var(--text)]">{period.period_name}</div>
+                      <div className="text-xs text-[var(--text-3)]">
                         {formatDate(period.period_start_date)} → {formatDate(period.period_end_date)}
                       </div>
                       {period.savings_calculation && (
-                        <div className="text-xs text-gray-400">{period.savings_calculation.calculation_name}</div>
+                        <div className="text-xs text-[var(--text-3)]">{period.savings_calculation.calculation_name}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-700">
+                    <td className="px-4 py-3 text-right text-sm text-[var(--text-2)]">
                       {formatCurrency(period.baseline_amount)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                    <td className="px-4 py-3 text-right text-sm font-medium text-[var(--text)]">
                       {formatCurrency(period.projected_savings)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <input
+                      <Input
                         type="number"
                         step="0.01"
                         defaultValue={period.actual_amount || ''}
                         onBlur={(e) => updateActualAmount(period.id, e.target.value)}
                         placeholder="0"
-                        className="w-28 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-28"
                       />
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-green-600">
+                    <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
                       {formatCurrency(period.realized_savings)}
                     </td>
                     <td className={clsx('px-4 py-3 text-right text-sm font-medium',
-                      period.leakage_amount > 0 ? 'text-red-600' : 'text-gray-700'
+                      period.leakage_amount > 0 ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-2)]'
                     )}>
                       {period.leakage_amount > 0 ? formatCurrency(period.leakage_amount) : '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <select
+                      <Select
                         value={period.realization_status}
                         onChange={(e) => updateStatus(period.id, e.target.value)}
-                        className={clsx('rounded-full border-0 px-2.5 py-1 text-xs font-medium',
+                        className={clsx('w-auto rounded-full border-0 px-2.5 py-1 text-xs font-medium',
                           REALIZATION_STATUS_COLORS[period.realization_status]
                         )}
                       >
                         {REALIZATION_STATUSES.map((s) => (
                           <option key={s} value={s}>{s}</option>
                         ))}
-                      </select>
+                      </Select>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button onClick={() => toggleFinanceValidated(period)}
                         className={clsx(
                           'inline-flex items-center justify-center rounded-full p-1',
                           period.finance_validated
-                            ? 'bg-emerald-100 text-emerald-600'
-                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                            ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
+                            : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--border)]'
                         )}
                         title="Toggle Finance Validation"
                       >
@@ -275,7 +275,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => handleDelete(period.id)}
-                        className="text-gray-400 hover:text-red-600">
+                        className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -283,28 +283,28 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                  <td className="px-4 py-3 text-sm text-gray-900">Totals</td>
+                <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)] font-semibold">
+                  <td className="px-4 py-3 text-sm text-[var(--text)]">Totals</td>
                   <td className="px-4 py-3"></td>
-                  <td className="px-4 py-3 text-right text-sm text-gray-900">{formatCurrency(totalProjected)}</td>
+                  <td className="px-4 py-3 text-right text-sm text-[var(--text)]">{formatCurrency(totalProjected)}</td>
                   <td className="px-4 py-3"></td>
-                  <td className="px-4 py-3 text-right text-sm font-bold text-green-600">{formatCurrency(totalRealized)}</td>
-                  <td className="px-4 py-3 text-right text-sm font-bold text-red-600">{formatCurrency(totalLeakage)}</td>
+                  <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRealized)}</td>
+                  <td className="px-4 py-3 text-right text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(totalLeakage)}</td>
                   <td colSpan={3} className="px-4 py-3"></td>
                 </tr>
               </tfoot>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Info */}
-      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-500/10">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
           <div>
-            <h4 className="text-sm font-semibold text-blue-900">Realization Formula</h4>
-            <p className="mt-1 text-xs text-blue-700">
+            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Realization Formula</h4>
+            <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
               <strong>Realized Savings</strong> = Baseline − Actual Invoice Amount<br/>
               <strong>Leakage</strong> = Projected Savings − Realized Savings (if &gt; 0, savings leaked)<br/>
               Enter the actual invoice amount in the "Actual" column to auto-calculate realized savings and leakage.
@@ -333,66 +333,63 @@ function AddPeriodForm({ calculations, onSaved, onCancel }: {
     projected_savings: '',
   })
 
-  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
-  const labelClass = 'block text-xs font-medium text-gray-600'
+  const labelClass = 'block text-xs font-medium text-[var(--text-2)]'
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSaved(form) }}
-      className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6">
-      <h4 className="mb-4 font-medium text-gray-900">New Realization Period</h4>
+      className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-900 dark:bg-indigo-500/10">
+      <h4 className="mb-4 font-medium text-[var(--text)]">New Realization Period</h4>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className={labelClass}>Period Name *</label>
-          <input type="text" required value={form.period_name}
+          <Input type="text" required value={form.period_name}
             onChange={(e) => setForm({ ...form, period_name: e.target.value })}
-            className={inputClass} placeholder="e.g. Q1 FY2026 (Apr-Jun)" />
+            className="mt-1" placeholder="e.g. Q1 FY2026 (Apr-Jun)" />
         </div>
         <div>
           <label className={labelClass}>Linked Calculation</label>
-          <select value={form.savings_calculation_id}
+          <Select value={form.savings_calculation_id}
             onChange={(e) => setForm({ ...form, savings_calculation_id: e.target.value })}
-            className={inputClass}>
+            className="mt-1">
             <option value="">None</option>
             {calculations.map((c) => (
               <option key={c.id} value={c.id}>{c.calculation_name}</option>
             ))}
-          </select>
+          </Select>
         </div>
         <div></div>
         <div>
           <label className={labelClass}>Period Start Date *</label>
-          <input type="date" required value={form.period_start_date}
+          <Input type="date" required value={form.period_start_date}
             onChange={(e) => setForm({ ...form, period_start_date: e.target.value })}
-            className={inputClass} />
+            className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Period End Date *</label>
-          <input type="date" required value={form.period_end_date}
+          <Input type="date" required value={form.period_end_date}
             onChange={(e) => setForm({ ...form, period_end_date: e.target.value })}
-            className={inputClass} />
+            className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Baseline Amount *</label>
-          <input type="number" step="0.01" required value={form.baseline_amount}
+          <Input type="number" step="0.01" required value={form.baseline_amount}
             onChange={(e) => setForm({ ...form, baseline_amount: e.target.value })}
-            className={inputClass} placeholder="0.00" />
+            className="mt-1" placeholder="0.00" />
         </div>
         <div>
           <label className={labelClass}>Projected Savings *</label>
-          <input type="number" step="0.01" required value={form.projected_savings}
+          <Input type="number" step="0.01" required value={form.projected_savings}
             onChange={(e) => setForm({ ...form, projected_savings: e.target.value })}
-            className={inputClass} placeholder="0.00" />
+            className="mt-1" placeholder="0.00" />
         </div>
       </div>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" onClick={onCancel}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+        <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
-        </button>
-        <button type="submit"
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+        </Button>
+        <Button type="submit">
           Add Period
-        </button>
+        </Button>
       </div>
     </form>
   )

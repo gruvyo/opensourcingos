@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { clsx } from 'clsx'
 
 export default function LoginPage() {
@@ -40,77 +43,71 @@ export default function LoginPage() {
     }
   }
 
+  const tabClass = (active: boolean) =>
+    clsx(
+      'flex-1 rounded-md py-2 text-sm font-medium transition-colors',
+      active
+        ? 'bg-[var(--brand)] text-[var(--on-brand)]'
+        : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)]',
+    )
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center gap-2">
-          <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">OpenSourcing</span>
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-lg text-white font-bold">
+          <span className="text-3xl font-bold text-[var(--text)]">OpenSourcing</span>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--brand)] text-lg text-white font-bold">
             OS
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 p-8 shadow-sm">
+        <Card className="p-8">
           <div className="mb-6 flex gap-2">
-            <button
-              onClick={() => { setMode('signin'); setError(null) }}
-              className={clsx(
-                'flex-1 rounded-lg py-2 text-sm font-medium transition-colors',
-                mode === 'signin' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-              )}
-            >
+            <button onClick={() => { setMode('signin'); setError(null) }} className={tabClass(mode === 'signin')}>
               Sign In
             </button>
-            <button
-              onClick={() => { setMode('signup'); setError(null) }}
-              className={clsx(
-                'flex-1 rounded-lg py-2 text-sm font-medium transition-colors',
-                mode === 'signup' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-              )}
-            >
+            <button onClick={() => { setMode('signup'); setError(null) }} className={tabClass(mode === 'signup')}>
               Sign Up
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
-              <input
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-sm font-medium text-[var(--text-2)]">Email</label>
+              <Input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                autoComplete="email"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
-              <input
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-[var(--text-2)]">Password</label>
+              <Input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Minimum 6 characters</p>
+              <p className="text-xs text-[var(--text-3)]">Minimum 6 characters</p>
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-400">
+              <div className="rounded-md bg-[var(--danger-soft)] px-3 py-2.5 text-sm text-[var(--danger)]" role="alert">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
-            </button>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+            </Button>
           </form>
-        </div>
+        </Card>
       </div>
     </div>
   )

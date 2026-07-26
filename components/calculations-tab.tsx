@@ -8,6 +8,9 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { clsx } from 'clsx'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input, Select } from '@/components/ui/input'
 
 const SAVINGS_TYPES = [
   'Cost Reduction', 'Cost Avoidance', 'Demand Reduction',
@@ -86,23 +89,20 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">Loading calculations...</div>
+    return <div className="p-8 text-center text-sm text-[var(--text-3)]">Loading calculations...</div>
   }
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Savings Calculations</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Cost reduction and cost avoidance calculations</p>
+          <h3 className="text-lg font-semibold text-[var(--text)]">Savings Calculations</h3>
+          <p className="text-sm text-[var(--text-2)]">Cost reduction and cost avoidance calculations</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
+        <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4" />
           Add Calculation
-        </button>
+        </Button>
       </div>
 
       <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
@@ -131,11 +131,11 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       )}
 
       {calculations.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <Calculator className="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" />
-          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">No savings calculations yet</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Click &quot;Add Calculation&quot; to calculate savings.</p>
-        </div>
+        <Card className="p-12 text-center">
+          <Calculator className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
+          <h3 className="text-sm font-medium text-[var(--text)]">No savings calculations yet</h3>
+          <p className="mt-1 text-sm text-[var(--text-3)]">Click &quot;Add Calculation&quot; to calculate savings.</p>
+        </Card>
       ) : (
         <div className="space-y-3">
           {calculations.map((calc) => {
@@ -144,15 +144,15 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
             const isNegative = (calc.gross_savings_amount || 0) < 0
 
             return (
-              <div key={calc.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+              <Card key={calc.id} className="overflow-hidden">
                 <div className="flex items-center gap-4 p-4">
-                  <button onClick={() => toggleExpand(calc.id)} className="text-gray-400 hover:text-gray-600 dark:text-gray-500">
+                  <button onClick={() => toggleExpand(calc.id)} className="text-[var(--text-3)] hover:text-[var(--text-2)]">
                     {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                   </button>
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{calc.calculation_name}</h4>
+                      <h4 className="text-sm font-semibold text-[var(--text)]">{calc.calculation_name}</h4>
                       <span className={clsx('rounded px-2 py-0.5 text-xs font-medium',
                         calc.savings_type === 'Cost Reduction' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                         calc.savings_type === 'Cost Avoidance' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
@@ -162,17 +162,17 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                         {calc.savings_type}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-[var(--text-3)]">
                       Baseline: {calc.baseline?.baseline_name || '—'} • Award: {calc.award?.award_name || '—'}
                     </p>
                   </div>
 
                   <div className="text-right">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Gross Savings</p>
+                    <p className="text-xs text-[var(--text-3)]">Gross Savings</p>
                     <p className={clsx('text-lg font-bold', isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
                       {isNegative ? '-' : ''}{formatCurrency(Math.abs(calc.gross_savings_amount || 0))}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{calc.savings_percentage?.toFixed(1)}%</p>
+                    <p className="text-xs text-[var(--text-3)]">{calc.savings_percentage?.toFixed(1)}%</p>
                   </div>
 
                   <span className={clsx('rounded-full px-2.5 py-1 text-xs font-medium',
@@ -183,59 +183,59 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
-                    <div className="grid grid-cols-4 gap-px border-b border-gray-200 bg-gray-200 dark:border-gray-700 dark:bg-gray-700">
-                      <div className="bg-white px-4 py-3 dark:bg-gray-800">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Baseline Total</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(calc.baseline_total_amount)}</p>
+                  <div className="border-t border-[var(--border)] bg-[var(--surface-2)]">
+                    <div className="grid grid-cols-4 gap-px border-b border-[var(--border)] bg-[var(--border)]">
+                      <div className="bg-[var(--surface)] px-4 py-3">
+                        <p className="text-xs text-[var(--text-3)]">Baseline Total</p>
+                        <p className="text-sm font-semibold text-[var(--text)]">{formatCurrency(calc.baseline_total_amount)}</p>
                       </div>
-                      <div className="bg-white px-4 py-3 dark:bg-gray-800">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Award Total</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(calc.award_total_amount)}</p>
+                      <div className="bg-[var(--surface)] px-4 py-3">
+                        <p className="text-xs text-[var(--text-3)]">Award Total</p>
+                        <p className="text-sm font-semibold text-[var(--text)]">{formatCurrency(calc.award_total_amount)}</p>
                       </div>
-                      <div className="bg-white px-4 py-3 dark:bg-gray-800">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Gross Savings</p>
+                      <div className="bg-[var(--surface)] px-4 py-3">
+                        <p className="text-xs text-[var(--text-3)]">Gross Savings</p>
                         <p className={clsx('text-sm font-semibold', isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
                           {formatCurrency(calc.gross_savings_amount)}
                         </p>
                       </div>
-                      <div className="bg-white px-4 py-3 dark:bg-gray-800">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Savings Period</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <div className="bg-[var(--surface)] px-4 py-3">
+                        <p className="text-xs text-[var(--text-3)]">Savings Period</p>
+                        <p className="text-sm font-semibold text-[var(--text)]">
                           {calc.savings_start_date ? formatDate(calc.savings_start_date) : '—'} – {calc.savings_end_date ? formatDate(calc.savings_end_date) : '—'}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Workflow:</span>
-                      <select
+                    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                      <span className="text-xs font-medium text-[var(--text-3)]">Workflow:</span>
+                      <Select
                         value={calc.calculation_status || 'identified'}
                         onChange={(e) => updateStatus(calc.id, e.target.value)}
-                        className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                        className="px-2.5 py-1 text-xs font-medium"
                       >
                         <option value="identified">Identified</option>
                         <option value="negotiated">Negotiated</option>
                         <option value="contracted">Contracted</option>
                         <option value="realized">Realized</option>
-                      </select>
+                      </Select>
                       <button onClick={() => handleDelete(calc.id)}
-                        className="ml-auto text-gray-400 hover:text-red-600 dark:text-gray-500">
+                        className="ml-auto text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
 
                     <div className="p-4">
-                      <h5 className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">Line-Level Savings Breakdown</h5>
+                      <h5 className="mb-3 text-sm font-medium text-[var(--text-2)]">Line-Level Savings Breakdown</h5>
                       {lines.length === 0 ? (
-                        <p className="py-6 text-center text-xs text-gray-500 dark:text-gray-400">
+                        <p className="py-6 text-center text-xs text-[var(--text-3)]">
                           No line-level breakdown available. Add savings calculation lines for detailed tracking.
                         </p>
                       ) : (
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                              <tr className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--text-3)]">
                                 <th className="px-2 py-2">#</th>
                                 <th className="px-2 py-2">Scope Line</th>
                                 <th className="px-2 py-2 text-right">Baseline Unit Price</th>
@@ -246,31 +246,31 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                                 <th className="px-2 py-2 text-right">Savings %</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-[var(--border)]">
                               {lines.map((line) => (
-                                <tr key={line.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                                  <td className="px-2 py-2 text-xs text-gray-500 dark:text-gray-400">{line.line_number}</td>
-                                  <td className="px-2 py-2 text-xs font-medium text-gray-900 dark:text-gray-100">
+                                <tr key={line.id} className="hover:bg-[var(--surface-2)]">
+                                  <td className="px-2 py-2 text-xs text-[var(--text-3)]">{line.line_number}</td>
+                                  <td className="px-2 py-2 text-xs font-medium text-[var(--text)]">
                                     {line.scope_line?.item_service_name || '—'}
                                   </td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.baseline_unit_price)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.baseline_extended_amount)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.awarded_unit_price)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatCurrency(line.awarded_extended_amount)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.baseline_unit_price)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.baseline_extended_amount)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.awarded_unit_price)}</td>
+                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.awarded_extended_amount)}</td>
                                   <td className={clsx('px-2 py-2 text-right text-xs font-medium',
                                     line.savings_amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                                   )}>{formatCurrency(line.savings_amount)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{line.savings_percentage?.toFixed(1)}%</td>
+                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{line.savings_percentage?.toFixed(1)}%</td>
                                 </tr>
                               ))}
                             </tbody>
                             <tfoot>
-                              <tr className="border-t-2 border-gray-200 bg-gray-50 font-medium dark:border-gray-700 dark:bg-gray-900">
-                                <td colSpan={6} className="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400">Total Savings:</td>
+                              <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)] font-medium">
+                                <td colSpan={6} className="px-2 py-2 text-right text-xs text-[var(--text-2)]">Total Savings:</td>
                                 <td className={clsx('px-2 py-2 text-right text-xs font-bold',
                                   isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                                 )}>{formatCurrency(calc.gross_savings_amount)}</td>
-                                <td className="px-2 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{calc.savings_percentage?.toFixed(1)}%</td>
+                                <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{calc.savings_percentage?.toFixed(1)}%</td>
                               </tr>
                             </tfoot>
                           </table>
@@ -279,7 +279,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
             )
           })}
         </div>
@@ -374,95 +374,94 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
     onSaved()
   }
 
-  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
-  const labelClass = 'block text-xs font-medium text-gray-600 dark:text-gray-400'
+  const labelClass = 'block text-xs font-medium text-[var(--text-2)]'
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-800 dark:bg-indigo-900/20">
-      <h4 className="mb-4 font-medium text-gray-900 dark:text-gray-100">New Savings Calculation</h4>
-      {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      <h4 className="mb-4 font-medium text-[var(--text)]">New Savings Calculation</h4>
+      {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className={labelClass}>Calculation Name *</label>
-          <input type="text" required value={form.calculation_name}
+          <Input type="text" required value={form.calculation_name}
             onChange={(e) => setForm({ ...form, calculation_name: e.target.value })}
-            className={inputClass} placeholder="e.g. Cost Reduction — Unit Price Negotiation" />
+            className="mt-1" placeholder="e.g. Cost Reduction — Unit Price Negotiation" />
         </div>
         <div>
           <label className={labelClass}>Savings Type</label>
-          <select value={form.savings_type}
+          <Select value={form.savings_type}
             onChange={(e) => setForm({ ...form, savings_type: e.target.value })}
-            className={inputClass}>
+            className="mt-1">
             {SAVINGS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          </Select>
         </div>
         <div>
           <label className={labelClass}>Official Baseline *</label>
-          <select required value={form.baseline_id}
+          <Select required value={form.baseline_id}
             onChange={(e) => setForm({ ...form, baseline_id: e.target.value })}
-            className={inputClass}>
+            className="mt-1">
             <option value="">Select baseline...</option>
             {baselines.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.baseline_name} ({formatCurrency(b.baseline_total_amount)})
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label className={labelClass}>Award</label>
-          <select value={form.award_id}
+          <Select value={form.award_id}
             onChange={(e) => setForm({ ...form, award_id: e.target.value })}
-            className={inputClass}>
+            className="mt-1">
             <option value="">Select award...</option>
             {awards.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.award_name} ({formatCurrency(a.award_total_amount)})
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label className={labelClass}>Cost Reduction Amount ($)</label>
-          <input type="number" step="0.01" value={form.cost_reduction_amount}
+          <Input type="number" step="0.01" value={form.cost_reduction_amount}
             onChange={(e) => setForm({ ...form, cost_reduction_amount: e.target.value })}
-            className={inputClass} placeholder="Auto-calculated if empty" />
+            className="mt-1" placeholder="Auto-calculated if empty" />
         </div>
         <div>
           <label className={labelClass}>Cost Avoidance Amount ($)</label>
-          <input type="number" step="0.01" value={form.cost_avoidance_amount}
+          <Input type="number" step="0.01" value={form.cost_avoidance_amount}
             onChange={(e) => setForm({ ...form, cost_avoidance_amount: e.target.value })}
-            className={inputClass} placeholder="Auto-calculated if empty" />
+            className="mt-1" placeholder="Auto-calculated if empty" />
         </div>
         <div>
           <label className={labelClass}>Savings Start Date</label>
-          <input type="date" value={form.savings_start_date}
+          <Input type="date" value={form.savings_start_date}
             onChange={(e) => setForm({ ...form, savings_start_date: e.target.value })}
-            className={inputClass} />
+            className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Savings End Date</label>
-          <input type="date" value={form.savings_end_date}
+          <Input type="date" value={form.savings_end_date}
             onChange={(e) => setForm({ ...form, savings_end_date: e.target.value })}
-            className={inputClass} />
+            className="mt-1" />
         </div>
         {form.baseline_id && form.award_id && (
-          <div className="md:col-span-2 rounded-lg bg-white p-4 dark:bg-gray-800">
+          <div className="md:col-span-2 rounded-lg bg-[var(--surface)] p-4">
             <div className="flex items-center justify-around text-center">
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Baseline</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(selectedBaseline?.baseline_total_amount || 0)}</p>
+                <p className="text-xs text-[var(--text-3)]">Baseline</p>
+                <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(selectedBaseline?.baseline_total_amount || 0)}</p>
               </div>
-              <TrendingDown className="h-6 w-6 text-gray-400" />
+              <TrendingDown className="h-6 w-6 text-[var(--text-3)]" />
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Award</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xs text-[var(--text-3)]">Award</p>
+                <p className="text-lg font-bold text-[var(--text)]">
                   {formatCurrency(selectedAward?.award_total_amount || 0)}
                 </p>
               </div>
-              <div className="text-2xl font-bold text-gray-400">=</div>
+              <div className="text-2xl font-bold text-[var(--text-3)]">=</div>
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Gross Savings</p>
+                <p className="text-xs text-[var(--text-3)]">Gross Savings</p>
                 <p className="text-lg font-bold text-green-600 dark:text-green-400">
                   {formatCurrency(
                     (selectedBaseline?.baseline_total_amount || 0) -
@@ -475,14 +474,12 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
         )}
       </div>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" onClick={onCancel}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+        <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
-        </button>
-        <button type="submit" disabled={loading}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+        </Button>
+        <Button type="submit" disabled={loading}>
           {loading ? 'Creating...' : 'Create Calculation'}
-        </button>
+        </Button>
       </div>
     </form>
   )

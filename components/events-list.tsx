@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Search, Briefcase, LifeBuoy } from 'lucide-react'
-import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
+import { formatDate, statusColor } from '@/lib/utils'
+import { Input, Select } from '@/components/ui/input'
 import { clsx } from 'clsx'
 
 type EventRow = {
@@ -66,74 +67,61 @@ export function EventsList({ events }: { events: EventRow[] }) {
     <div className="mt-6">
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
+          <Input
             type="text"
             placeholder="Search projects..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            className="pl-10"
           />
         </div>
-        {/* Project type filter */}
-        <select
-          value={projectTypeFilter}
-          onChange={(e) => setProjectTypeFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        >
+        <Select value={projectTypeFilter} onChange={(e) => setProjectTypeFilter(e.target.value)} className="w-auto">
           <option value="">All Projects</option>
           <option value="Sourcing">Sourcing</option>
           <option value="Support">Support</option>
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        >
+        </Select>
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto">
           <option value="">All Statuses</option>
           {EVENT_STATUSES.map((status) => (
             <option key={status} value={status}>{status}</option>
           ))}
-        </select>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        >
+        </Select>
+        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto">
           <option value="">All Types</option>
           {EVENT_TYPES.map((type) => (
             <option key={type} value={type}>{type}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <table className="w-full min-w-[800px]">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">IP Owner</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Category</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Business Unit</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Supplier</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Contract</th>
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Name</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Type</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">IP Owner</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Category</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Business Unit</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Supplier</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Contract</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="divide-y divide-[var(--border)]">
             {filteredEvents.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center">
-                  <Briefcase className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No projects found</p>
+                  <Briefcase className="mx-auto mb-2 h-8 w-8 text-[var(--text-3)]" />
+                  <p className="text-sm text-[var(--text-3)]">No projects found</p>
                 </td>
               </tr>
             ) : (
               filteredEvents.map((event) => {
                 const isSupport = event.project_type === 'Support'
                 return (
-                  <tr key={event.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <tr key={event.id} className="transition-colors hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {isSupport ? (
@@ -141,20 +129,20 @@ export function EventsList({ events }: { events: EventRow[] }) {
                         ) : (
                           <Briefcase className="h-4 w-4 shrink-0 text-indigo-500" />
                         )}
-                        <Link href={`/events/${event.id}`} className="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">
+                        <Link href={`/events/${event.id}`} className="text-sm font-medium text-[var(--brand-ink)] hover:underline">
                           {event.event_name}
                         </Link>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{event.event_type}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{event.buyer_name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">{event.event_type}</td>
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">{event.buyer_name || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">
                       {getFirst(event.category)?.category_name || '—'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">
                       {getFirst(event.business_unit)?.business_unit_name || '—'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">
                       {getFirst(event.awarded_supplier)?.supplier_name || getFirst(event.incumbent_supplier)?.supplier_name || '—'}
                     </td>
                     <td className="px-4 py-3">
@@ -162,7 +150,7 @@ export function EventsList({ events }: { events: EventRow[] }) {
                         {event.event_status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">
                       {event.contract_start_date ? `${formatDate(event.contract_start_date)} → ${formatDate(event.contract_end_date)}` : '—'}
                     </td>
                   </tr>
@@ -173,7 +161,7 @@ export function EventsList({ events }: { events: EventRow[] }) {
         </table>
       </div>
 
-      <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+      <p className="mt-4 text-sm text-[var(--text-3)]">
         Showing {filteredEvents.length} of {events.length} projects
       </p>
     </div>
