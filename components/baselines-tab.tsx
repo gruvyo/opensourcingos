@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Plus, Lock, FileCheck, Star, Trash2, ChevronDown,
+  Plus, Star, Trash2, ChevronDown,
   ChevronRight, AlertCircle, Shield, TrendingUp, Calculator
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -55,14 +55,6 @@ const BASELINE_TYPE_DEFENSIBILITY: Record<string, string> = {
   'Market Index': 'Medium-High',
   'Should-Cost Model': 'Medium',
   'Initial Supplier Quote': 'Medium-Low',
-}
-
-const LOCK_STATUS_COLORS: Record<string, string> = {
-  'Draft': 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
-  'Locked': 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-  'Submitted': 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-  'Approved': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-  'Rejected': 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
 }
 
 export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLines: ScopeLine[] }) {
@@ -119,46 +111,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
     }
   }
 
-  const updateLockStatus = async (baselineId: string, newStatus: string) => {
-    const updates: any = { baseline_lock_status: newStatus }
-    if (newStatus === 'Locked' || newStatus === 'Approved') {
-      updates.baseline_lock_date = new Date().toISOString()
-    }
-    if (newStatus === 'Approved') {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) updates.baseline_approved_by = user.id
-      updates.baseline_approval_date = new Date().toISOString()
-      // Auto-handle the common case: when this is the only baseline for the event,
-      // it IS the official one for every category — so mark it automatically and the
-      // user never has to touch "Mark Official". Manual toggles still appear when a
-      // project has multiple competing baselines (see the render below).
-      if (baselines.length === 1) {
-        updates.official_for_hard_savings = true
-        updates.official_for_cost_avoidance = true
-        updates.official_for_demand_reduction = true
-      }
-    }
 
-    await supabase.from('baselines').update(updates).eq('id', baselineId)
-    fetchBaselines()
-  }
-
-  const toggleOfficial = async (baseline: Baseline, field: 'official_for_hard_savings' | 'official_for_cost_avoidance' | 'official_for_demand_reduction') => {
-    // Only approved baselines can be marked official
-    if (baseline.baseline_lock_status !== 'Approved') return
-
-    // Only one baseline can be official for each type — unset others first
-    const others = baselines.filter(b => b.id !== baseline.id && b[field])
-    for (const other of others) {
-      await supabase.from('baselines').update({ [field]: false }).eq('id', other.id)
-    }
-
-    await supabase
-      .from('baselines')
-      .update({ [field]: !baseline[field] })
-      .eq('id', baseline.id)
-    fetchBaselines()
-  }
 
   const handleDelete = async (baselineId: string) => {
     if (!confirm('Delete this baseline and all its lines? This cannot be undone.')) return
@@ -202,6 +155,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
         <AddBaselineForm
           eventId={eventId}
           scopeLines={scopeLines}
+          isFirstBaseline={baselines.length === 0}
           onSaved={() => { setShowForm(false); fetchBaselines() }}
           onCancel={() => setShowForm(false)}
         />
@@ -267,10 +221,6 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                     )}
                   </div>
 
-                  {/* Lock Status Badge */}
-                  <span className={clsx('rounded-full px-2.5 py-1 text-xs font-medium', LOCK_STATUS_COLORS[baseline.baseline_lock_status])}>
-                    {baseline.baseline_lock_status}
-                  </span>
 
                   {/* Official badges. With a single baseline the per-category
                       distinction is noise, so collapse to one "Official" chip. */}
@@ -301,81 +251,16 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                 {/* Expanded View */}
                 {isExpanded && (
                   <div className="border-t border-[var(--border)] bg-[var(--surface-2)]">
-                    {/* Actions Bar */}
-                    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-                      <span className="text-xs font-medium text-[var(--text-3)]">Workflow:</span>
-                      {baseline.baseline_lock_status === 'Draft' && (
-                        <button onClick={() => updateLockStatus(baseline.id, 'Locked')}
-                          className="flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30">
-                          <Lock className="h-3 w-3" /> Lock Baseline
-                        </button>
-                      )}
-                      {baseline.baseline_lock_status === 'Locked' && (
-                        <button onClick={() => updateLockStatus(baseline.id, 'Submitted')}
-                          className="flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:bg-amber-900/30">
-                          <FileCheck className="h-3 w-3" /> Submit for Approval
-                        </button>
-                      )}
-                      {baseline.baseline_lock_status === 'Submitted' && (
-                        <>
-                          <button onClick={() => updateLockStatus(baseline.id, 'Approved')}
-                            className="flex items-center gap-1 rounded bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:bg-green-900/30">
-                            <FileCheck className="h-3 w-3" /> Approve
-                          </button>
-                          <button onClick={() => updateLockStatus(baseline.id, 'Rejected')}
-                            className="flex items-center gap-1 rounded bg-red-50 dark:bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:bg-red-900/30">
-                            Reject
-                          </button>
-                        </>
-                      )}
-                      {/* "Mark Official" only matters when there is more than one
-                          baseline to choose between. With a single baseline it is
-                          set automatically on approval (see updateLockStatus). */}
-                      {baseline.baseline_lock_status === 'Approved' && baselines.length === 1 && (
-                        <span className="text-xs text-[var(--text-3)]">
-                          Official baseline for this project (set automatically).
-                        </span>
-                      )}
-                      {baseline.baseline_lock_status === 'Approved' && baselines.length > 1 && (
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-medium text-[var(--text-3)]">Mark Official:</span>
-                          <button onClick={() => toggleOfficial(baseline, 'official_for_hard_savings')}
-                            className={clsx(
-                              'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                              baseline.official_for_hard_savings
-                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                                : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
-                            )}>
-                            <Star className="h-3 w-3" /> Hard Savings
-                          </button>
-                          <button onClick={() => toggleOfficial(baseline, 'official_for_cost_avoidance')}
-                            className={clsx(
-                              'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                              baseline.official_for_cost_avoidance
-                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
-                            )}>
-                            <Star className="h-3 w-3" /> Cost Avoidance
-                          </button>
-                          <button onClick={() => toggleOfficial(baseline, 'official_for_demand_reduction')}
-                            className={clsx(
-                              'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                              baseline.official_for_demand_reduction
-                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                                : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
-                            )}>
-                            <Star className="h-3 w-3" /> Demand Reduction
-                          </button>
-                        </div>
-                      )}
-                      <div className="ml-auto">
-                        {baseline.baseline_lock_status === 'Draft' && (
-                          <button onClick={() => handleDelete(baseline.id)}
-                            className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
+                    {/* Actions. The Lock -> Submit -> Approve -> Reject workflow and the
+                        per-category "Mark Official" toggles were removed: the real process has
+                        no baseline-approval concept, and the savings calculation no longer
+                        depends on which baseline is flagged official. Baselines stay editable. */}
+                    <div className="flex items-center justify-end border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+                      <button onClick={() => handleDelete(baseline.id)}
+                        title="Delete this baseline"
+                        className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
 
                     {/* Baseline Lines Table */}
@@ -401,9 +286,10 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 // ============================================
 // Add Baseline Form
 // ============================================
-function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
+function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, onSaved, onCancel }: {
   eventId: string
   scopeLines: ScopeLine[]
+  isFirstBaseline: boolean
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -447,6 +333,12 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
         // primary path; baseline lines are optional detail that, when present,
         // recompute this value.
         baseline_total_amount: form.baseline_total_amount === '' ? 0 : parseFloat(form.baseline_total_amount),
+        // First baseline on an event is the official one for every category. The
+        // manual Mark-Official step was removed; nothing in the savings math reads
+        // these now, but the offers-tab comparison still uses them.
+        official_for_hard_savings: isFirstBaseline,
+        official_for_cost_avoidance: isFirstBaseline,
+        official_for_demand_reduction: isFirstBaseline,
         created_by: user.id,
       })
 

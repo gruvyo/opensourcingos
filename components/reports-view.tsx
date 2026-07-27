@@ -121,7 +121,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
   }
 
   const exportEvents = () => {
-    const headers = ['Project Name', 'Type', 'Status', 'IP Owner', 'Category', 'Business Unit', 'Supplier', 'Event Start', 'Due Date', 'Contract Start', 'Contract End']
+    const headers = ['Project Name', 'Type', 'Status', 'Owner', 'Category', 'Business Unit', 'Supplier', 'Event Start', 'Due Date', 'Contract Start', 'Contract End']
     const rows = [headers, ...filteredEvents.map(e => [
       e.event_name, e.event_type, e.event_status, e.buyer_name || '',
       getFirst(e.category)?.category_name || '',
@@ -222,9 +222,9 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
           </div>
         </Card>
 
-        {/* By Buyer / IP Owner */}
+        {/* By Owner / Buyer */}
         <Card className="p-6">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Projects by IP Owner</h3>
+          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Projects by Owner</h3>
           <div className="space-y-2">
             {Array.from(byBuyer.entries()).sort((a, b) => b[1] - a[1]).map(([buyer, count]) => (
               <div key={buyer} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-4 py-2">
@@ -280,7 +280,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Project</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">IP Owner</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Owner</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Business Unit</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Supplier</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Due Date</th>

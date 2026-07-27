@@ -108,7 +108,7 @@ export function EventDetail({
               </span>
             </div>
             <p className="mt-1 text-sm text-[var(--text-2)]">
-              {event.event_type} • {isSupport ? (event.event_status || '—') : (event.sourcing_method || '—')}
+              {event.event_type || '—'}
             </p>
           </div>
           <span className={clsx('inline-flex shrink-0 rounded-full px-3 py-1 text-sm font-medium', statusColor(event.event_status))}>
@@ -176,12 +176,11 @@ function OverviewTab({ event }: { event: Event }) {
 
   const details = [
     { label: 'Project Type', value: isSupport ? 'Support / Non-Commercial' : 'Sourcing' },
-    { label: 'IP Owner / Buyer', value: event.buyer_name },
+    { label: 'Owner / Buyer', value: event.buyer_name },
     { label: 'Category', value: getFirst(event.category)?.category_name },
     { label: 'Business Unit', value: getFirst(event.business_unit)?.business_unit_name },
     { label: 'Cost Center', value: getFirst(event.cost_center)?.cost_center_name },
     { label: 'Incumbent Supplier', value: getFirst(event.incumbent_supplier)?.supplier_name },
-    { label: 'Currency', value: event.currency_code },
   ].filter(Boolean) as { label: string; value: any }[]
 
   const dates = [
