@@ -66,6 +66,17 @@ export function OffersTab({
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const supabase = createClient()
+  // The `suppliers` prop is a server-render snapshot from page load. A supplier
+  // created inline must show up in the next dropdown without a page refresh, so
+  // the tab owns the list and refetches on demand.
+  const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers)
+  useEffect(() => { setSupplierList(suppliers) }, [suppliers])
+
+  const refreshSuppliers = useCallback(async () => {
+    const { data } = await supabase
+      .from('suppliers').select('id, supplier_name').order('supplier_name')
+    if (data) setSupplierList(data as Supplier[])
+  }, [supabase])
 
   const saveOfferTotal = async (offerId: string) => {
     const v = parseFloat(editTotalValue)
@@ -244,12 +255,18 @@ export function OffersTab({
         </div>
       </div>
 
+      {/* Comparison View */}
+      {showCompare && offers.length >= 2 && (
+        <ComparisonView offers={offers} offerLines={offerLines} fetchOfferLines={fetchOfferLines} eventId={eventId} />
+      )}
+
       {/* Add Offer Form */}
       {showForm && (
         <AddOfferForm
           eventId={eventId}
           scopeLines={scopeLines}
-          suppliers={suppliers}
+          suppliers={supplierList}
+          onSupplierAdded={refreshSuppliers}
           onSaved={() => { setShowForm(false); fetchOffers() }}
           onCancel={() => setShowForm(false)}
         />
@@ -259,16 +276,12 @@ export function OffersTab({
         <AddOfferForm
           eventId={eventId}
           scopeLines={scopeLines}
-          suppliers={suppliers}
+          suppliers={supplierList}
+          onSupplierAdded={refreshSuppliers}
           existing={editingOffer}
           onSaved={() => { setEditingOffer(null); fetchOffers() }}
           onCancel={() => setEditingOffer(null)}
         />
-      )}
-
-      {/* Comparison View */}
-      {showCompare && offers.length >= 2 && (
-        <ComparisonView offers={offers} offerLines={offerLines} fetchOfferLines={fetchOfferLines} eventId={eventId} />
       )}
 
       {/* Offers List */}
@@ -283,7 +296,13 @@ export function OffersTab({
           {offers.map((offer) => {
             const isExpanded = expandedId === offer.id
             const lines = offerLines[offer.id] || []
-            const isLowest = offers.length > 1 && offer.offer_total_amount === Math.min(...offers.map(o => o.offer_total_amount))
+            // Rank on the annual run-rate, never the raw total: a 36-month deal
+            // has a bigger total than a 12-month one while being cheaper per year.
+            const annualOf = (o: Offer) => termRates(o.offer_total_amount, o.offer_term_months).perYear
+            const comparable = offers.filter(o => termRates(o.offer_total_amount, o.offer_term_months).known)
+            const isLowest = comparable.length > 1
+              && termRates(offer.offer_total_amount, offer.offer_term_months).known
+              && annualOf(offer) === Math.min(...comparable.map(annualOf))
 
             return (
               <Card key={offer.id} className="overflow-hidden">
@@ -419,10 +438,11 @@ export function OffersTab({
 // ============================================
 // Add Offer Form
 // ============================================
-function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSaved, onCancel }: {
+function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSupplierAdded, onSaved, onCancel }: {
   eventId: string
   scopeLines: ScopeLine[]
   suppliers: Supplier[]
+  onSupplierAdded?: () => void
   /** When set, the form edits this offer instead of creating a new one. */
   existing?: any | null
   onSaved: () => void
@@ -468,6 +488,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSaved, onCan
     setForm(prev => ({ ...prev, supplier_id: data.id }))
     setNewSupplierName('')
     setShowNewSupplier(false)
+    onSupplierAdded?.()   // keep the tab-level list in step
   }
 
   const [form, setForm] = useState({
@@ -959,6 +980,11 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
 
   // Calculate savings vs baseline for each offer
   const baselineTotal = baselines[0]?.baseline_total_amount || 0
+  // Compare on the annual run-rate so unlike terms are not subtracted from each
+  // other. Before this, a 36-month offer looked ~3x more expensive than a
+  // 12-month baseline purely because it covered three times the period.
+  const baselineRates = termRates(baselineTotal, baselines[0]?.baseline_term_months)
+  const baselineAnnual = baselineRates.known ? baselineRates.perYear : 0
   const baselineLines = baselines[0]?.baseline_lines || []
 
   const getBaselineLineAmount = (scopeLineId: string) => {
@@ -973,7 +999,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
           <GitCompare className="h-4 w-4" />
           Side-by-Side Offer Comparison
         </h4>
-        <p className="mt-1 text-xs text-[var(--text-3)]">Compare all supplier offers line by line</p>
+        <p className="mt-1 text-xs text-[var(--text-3)]">Compared on the annual run-rate, so terms of different lengths line up</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -990,7 +1016,9 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                 </th>
               )}
               {offers.map((offer) => {
-                const isLowest = offer.offer_total_amount === Math.min(...offers.map(o => o.offer_total_amount))
+                const annualOf2 = (o: any) => termRates(o.offer_total_amount, o.offer_term_months).perYear
+                const cmp2 = offers.filter((o: any) => termRates(o.offer_total_amount, o.offer_term_months).known)
+                const isLowest = cmp2.length > 0 && annualOf2(offer) === Math.min(...cmp2.map(annualOf2))
                 return (
                   <th key={offer.id} className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">
                     <div className="flex items-center justify-end gap-1">
@@ -1055,15 +1083,24 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
               <td className="sticky left-0 bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--text)]">Total</td>
               {baselines[0] && (
                 <td className="px-4 py-3 text-right text-sm text-[var(--text)]">
-                  {formatCurrency(baselineTotal)}
+                  {formatCurrency(baselineAnnual)}<span className="text-[var(--text-3)]">/yr</span>
+                  <div className="text-[11px] font-normal text-[var(--text-3)]">
+                    {formatCurrency(baselineTotal)} over {baselines[0]?.baseline_term_months ?? '?'} mo
+                  </div>
                 </td>
               )}
               {offers.map((offer) => {
-                const savings = baselineTotal ? grossSavings(baselineTotal, offer.offer_total_amount) : null
-                const savingsPct = baselineTotal ? savingsPctOf(savings!, baselineTotal) : null
+                const r = termRates(offer.offer_total_amount, offer.offer_term_months)
+                const offerAnnual = r.known ? r.perYear : 0
+                const comparable = baselineAnnual > 0 && r.known
+                const savings = comparable ? grossSavings(baselineAnnual, offerAnnual) : null
+                const savingsPct = comparable ? savingsPctOf(savings!, baselineAnnual) : null
                 return (
                   <td key={offer.id} className="px-4 py-3 text-right text-sm">
-                    <div className="text-[var(--text)]">{formatCurrency(offer.offer_total_amount)}</div>
+                    <div className="text-[var(--text)]">{formatCurrency(offerAnnual)}<span className="text-[var(--text-3)]">/yr</span></div>
+                    <div className="text-[11px] text-[var(--text-3)]">
+                      {formatCurrency(offer.offer_total_amount)} over {offer.offer_term_months ?? '?'} mo
+                    </div>
                     {savings !== null && savings > 0 && (
                       <div className="text-xs font-medium text-green-600 dark:text-green-400">
                         ↓ {formatCurrency(savings)} ({savingsPct?.toFixed(1)}%)
