@@ -10,11 +10,6 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 
-const SAVINGS_TYPES = [
-  'Cost Reduction', 'Cost Avoidance', 'Demand Reduction',
-  'TCO Improvement', 'Working Capital',
-]
-
 const CALC_STATUSES = [
   { value: 'identified', label: 'Identified' },
   { value: 'negotiated', label: 'Negotiated' },
@@ -50,10 +45,8 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const [existing, setExisting] = useState<any | null>(null)
 
   const [basis, setBasis] = useState<RateBasis>('perYear')
-  const [savingsType, setSavingsType] = useState('Cost Reduction')
   const [status, setStatus] = useState('identified')
   const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
 
   const load = useCallback(async () => {
     const [{ data: bases }, { data: offers }, { data: calcs }, { data: ev }] = await Promise.all([
@@ -75,14 +68,11 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     const calc = (calcs || [])[0] ?? null
     setExisting(calc)
     if (calc) {
-      setSavingsType(calc.savings_type || 'Cost Reduction')
       setStatus(calc.calculation_status || 'identified')
       setStartDate(calc.savings_start_date || '')
-      setEndDate(calc.savings_end_date || '')
       setSavedAt(calc.updated_at || calc.created_at || null)
     } else {
       setStartDate(ev?.contract_start_date || '')
-      setEndDate(ev?.contract_end_date || '')
     }
     setLoading(false)
   }, [eventId, supabase])
@@ -96,8 +86,17 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const oRates = termRates(opening?.offer_total_amount, opening?.offer_term_months)
   const fRates = termRates(final?.offer_total_amount, final?.offer_term_months)
 
+  // The deal's term is the Final offer's term - that is what was signed. On a
+  // "whole term" basis every anchor is extended to it, otherwise a 12-month
+  // baseline would be subtracted from a 36-month final, which is the exact
+  // apples-to-oranges error the monthly rate exists to prevent.
+  const dealMonths = Number(final?.offer_term_months) || Number(baseline?.baseline_term_months) || 12
+
   const pick = (r: ReturnType<typeof termRates>, present: boolean) =>
-    !present ? null : basis === 'perMonth' ? r.perMonth : basis === 'perYear' ? r.perYear : r.perTerm
+    !present ? null
+      : basis === 'perMonth' ? r.perMonth
+      : basis === 'perYear' ? r.perYear
+      : r.perMonth * dealMonths
 
   const chain = chainSavings({
     opening: pick(oRates, !!opening),
@@ -126,7 +125,18 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     },
   ]
 
-  const basisLabel = basis === 'perMonth' ? 'per month' : basis === 'perYear' ? 'per year' : 'whole term'
+  // The end date is not a separate fact: the deal term already says how long
+  // the savings run. Derive it so it can never contradict the term.
+  const derivedEnd = (() => {
+    if (!startDate) return null
+    const d = new Date(startDate + 'T00:00:00')
+    if (isNaN(d.getTime())) return null
+    d.setMonth(d.getMonth() + dealMonths)
+    d.setDate(d.getDate() - 1)          // inclusive of the final day
+    return d.toISOString().slice(0, 10)
+  })()
+
+  const basisLabel = basis === 'perMonth' ? 'per month' : basis === 'perYear' ? 'per year' : `over the ${dealMonths}-month term`
 
   const save = async () => {
     if (!final) { setError('Select a Final offer before saving.'); return }
@@ -142,7 +152,10 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       event_id: eventId,
       baseline_id: baseline?.id ?? null,
       calculation_name: `${basisLabel} savings`,
-      savings_type: savingsType,
+      // Derived, never chosen. A negotiation produces BOTH legs; the label just
+      // records which one carried the deal. The dashboard splits on the two
+      // amount columns, not on this.
+      savings_type: (chain.reduction ?? 0) >= chain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
       calculation_status: status,
       baseline_total_amount: pick(bRates, !!baseline),
       opening_proposal_amount: pick(oRates, !!opening),
@@ -153,7 +166,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       savings_percentage: denom > 0 ? Math.round((chain.total / denom) * 10000) / 100 : 0,
       net_savings_amount: chain.total,
       savings_start_date: startDate || null,
-      savings_end_date: endDate || null,
+      savings_end_date: derivedEnd,
       recognition_notes: `Derived from the selected anchors on a ${basisLabel} basis.`,
       updated_by: user.id,
     }
@@ -208,7 +221,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
               className="w-auto px-2 py-1 text-xs">
               <option value="perYear">Per year</option>
               <option value="perMonth">Per month</option>
-              <option value="perTerm">Whole term</option>
+              <option value="perTerm">{`Whole term (${dealMonths} mo)`}</option>
             </Select>
           </div>
         </div>
@@ -216,7 +229,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {anchors.map((a, i) => {
             const r = termRates(a.amount, a.months)
-            const shown = a.missing ? null : basis === 'perMonth' ? r.perMonth : basis === 'perYear' ? r.perYear : r.perTerm
+            const shown = a.missing ? null : basis === 'perMonth' ? r.perMonth : basis === 'perYear' ? r.perYear : r.perMonth * dealMonths
             return (
               <div key={a.label} className={clsx(
                 'rounded-lg border p-3',
@@ -302,14 +315,12 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           </Card>
 
           <Card className="p-4">
-            <h4 className="mb-3 text-sm font-semibold text-[var(--text)]">Recognition</h4>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-2)]">Savings type</label>
-                <Select value={savingsType} onChange={(e) => setSavingsType(e.target.value)} className="mt-1">
-                  {SAVINGS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </Select>
-              </div>
+            <h4 className="mb-1 text-sm font-semibold text-[var(--text)]">Reporting</h4>
+            <p className="mb-3 text-xs text-[var(--text-3)]">
+              How this figure is reported. The savings type is derived from the chain, and the end
+              date from the {dealMonths}-month term, so neither can contradict the numbers above.
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Stage</label>
                 <Select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1">
@@ -322,10 +333,16 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Savings start</label>
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1" />
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">When the new pricing takes effect.</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Savings end</label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1" />
+                <div className="mt-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-2)]">
+                  {derivedEnd ?? 'set a start date'}
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                  Start + {dealMonths} months, from the Final offer term.
+                </p>
               </div>
             </div>
 
