@@ -56,7 +56,9 @@ const SOURCING_TABS = [
   // anyway. Code kept; restore this entry to bring the tab back.
   { id: 'baselines', label: 'Baselines', icon: BarChart2 },
   { id: 'offers', label: 'Supplier Offers', icon: Users },
-  { id: 'awards', label: 'Awards', icon: FileCheck },
+  // Awards tab retired (2026-07-27): marking an offer as the Final offer on the
+  // Supplier Offers tab IS the award decision. The separate award record and its
+  // two-step ceremony added no information the chain needs. AwardsTab code kept.
   { id: 'calculations', label: 'Calculations', icon: Calculator },
   // Realization tab hidden per product decision (2026-07-26): realized savings are
   // assumed = projected, so realization tracking adds no signal. Code kept (import +

@@ -22,6 +22,7 @@ type Baseline = {
   baseline_period_end: string | null
   baseline_total_amount: number
   baseline_term_months: number | null
+  is_selected: boolean
   baseline_normalized_amount: number
   baseline_lock_status: string
   baseline_lock_date: string | null
@@ -69,6 +70,15 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const supabase = createClient()
+
+  // Exactly one baseline per project is THE baseline. Clear the others first so
+  // the partial unique index can never be violated.
+  const selectBaseline = async (baselineId: string) => {
+    await supabase.from('baselines').update({ is_selected: false })
+      .eq('event_id', eventId).neq('id', baselineId)
+    await supabase.from('baselines').update({ is_selected: true }).eq('id', baselineId)
+    fetchBaselines()
+  }
 
   const saveTotal = async (baselineId: string) => {
     const v = parseFloat(editTotalValue)
@@ -251,10 +261,17 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                   {/* Official badges. With a single baseline the per-category
                       distinction is noise, so collapse to one "Official" chip. */}
                   <div className="flex gap-1">
-                    {baselines.length === 1 && (baseline.official_for_hard_savings || baseline.official_for_cost_avoidance || baseline.official_for_demand_reduction) && (
-                      <span className="flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300" title="Official baseline for this project">
-                        <Star className="h-3 w-3 fill-current" /> Official
+                    {baseline.is_selected ? (
+                      <span className="flex items-center gap-1 rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                        title="This is the baseline the savings chain measures against">
+                        <Star className="h-3 w-3 fill-current" /> Baseline
                       </span>
+                    ) : (
+                      <button onClick={() => selectBaseline(baseline.id)}
+                        className="rounded border border-[var(--border-strong)] px-2 py-1 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                        title="Use this as the baseline for the savings chain">
+                        Use as baseline
+                      </button>
                     )}
                     {baselines.length > 1 && baseline.official_for_hard_savings && (
                       <span className="flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300" title="Official for Hard Savings">

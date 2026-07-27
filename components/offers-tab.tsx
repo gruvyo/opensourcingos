@@ -24,6 +24,7 @@ type Offer = {
   offer_date: string | null
   offer_total_amount: number
   offer_term_months: number | null
+  offer_role: string | null
   offer_valid_until: string | null
   compliant_bid_flag: boolean
   selected_for_award_flag: boolean
@@ -77,6 +78,29 @@ export function OffersTab({
       .from('suppliers').select('id, supplier_name').order('supplier_name')
     if (data) setSupplierList(data as Supplier[])
   }, [supabase])
+
+  // An offer's role IS the decision: marking one 'final' replaces the whole
+  // award ceremony. At most one of each role per project.
+  const setRole = async (offerId: string, role: 'opening' | 'final' | null) => {
+    if (role) {
+      await supabase.from('supplier_offers').update({ offer_role: null })
+        .eq('event_id', eventId).eq('offer_role', role).neq('id', offerId)
+    }
+    await supabase.from('supplier_offers').update({ offer_role: role }).eq('id', offerId)
+
+    // Marking an offer Final IS the award decision, so record who won on the
+    // project. sourcing_events.awarded_supplier_id is read by the Projects list,
+    // event detail, Reports and Suppliers; the retired award flow used to be the
+    // only thing that set it.
+    if (role === 'final') {
+      const won = offers.find(o => o.id === offerId)
+      if (won?.supplier_id) {
+        await supabase.from('sourcing_events')
+          .update({ awarded_supplier_id: won.supplier_id }).eq('id', eventId)
+      }
+    }
+    fetchOffers()
+  }
 
   const saveOfferTotal = async (offerId: string) => {
     const v = parseFloat(editTotalValue)
@@ -320,10 +344,11 @@ export function OffersTab({
                       {isLowest && (
                         <Badge tone="success">Lowest Bid</Badge>
                       )}
-                      {offer.selected_for_award_flag && (
-                        <Badge tone="warning">
-                          <Award className="h-3 w-3" /> Selected for Award
-                        </Badge>
+                      {offer.offer_role === 'opening' && (
+                        <Badge tone="info">Opening proposal</Badge>
+                      )}
+                      {offer.offer_role === 'final' && (
+                        <Badge tone="success"><Award className="h-3 w-3" /> Final offer</Badge>
                       )}
                     </div>
                     <p className="mt-1 text-xs text-[var(--text-3)]">
@@ -394,26 +419,28 @@ export function OffersTab({
                 {/* Expanded View */}
                 {isExpanded && (
                   <div className="border-t border-[var(--border)] bg-[var(--surface-2)]">
-                    {/* Actions */}
+                    {/* Role in the savings chain. Marking an offer 'Final' IS the
+                        award decision - it replaces the old two-step ceremony. */}
                     <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-                      <button
-                        onClick={() => selectForAward(offer)}
-                        className={clsx(
-                          'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                          offer.selected_for_award_flag
-                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                            : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
-                        )}
-                      >
-                        <Award className="h-3 w-3" />
-                        {offer.selected_for_award_flag ? 'Selected for Award' : 'Select for Award'}
-                      </button>
-                      <button
-                        onClick={() => createAward(offer)}
-                        className="flex items-center gap-1 rounded bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
-                      >
-                        <FileText className="h-3 w-3" /> Create Award from Offer
-                      </button>
+                      <span className="text-xs font-medium text-[var(--text-3)]">Role in savings chain:</span>
+                      {([
+                        { role: 'opening' as const, label: 'Opening proposal', hint: 'The vendor first ask. Drives Cost Avoidance.' },
+                        { role: 'final' as const, label: 'Final offer', hint: 'What was signed. Drives Cost Reduction.' },
+                      ]).map(({ role, label, hint }) => (
+                        <button key={role} title={hint}
+                          onClick={() => setRole(offer.id, offer.offer_role === role ? null : role)}
+                          className={clsx(
+                            'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                            offer.offer_role === role
+                              ? 'bg-[var(--brand-soft)] text-[var(--brand-ink)]'
+                              : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
+                          )}>
+                          {offer.offer_role === role ? `\u2713 ${label}` : label}
+                        </button>
+                      ))}
+                      <span className="ml-auto text-[11px] text-[var(--text-3)]">
+                        Marking an offer Final is the award decision.
+                      </span>
                     </div>
 
                     {/* Offer Lines Table */}
