@@ -69,14 +69,19 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [editingBaseline, setEditingBaseline] = useState<Baseline | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
   const supabase = createClient()
 
   // Exactly one baseline per project is THE baseline. Clear the others first so
   // the partial unique index can never be violated.
   const selectBaseline = async (baselineId: string) => {
-    await supabase.from('baselines').update({ is_selected: false })
+    setActionError(null)
+    const clear = await supabase.from('baselines').update({ is_selected: false })
       .eq('event_id', eventId).neq('id', baselineId)
-    await supabase.from('baselines').update({ is_selected: true }).eq('id', baselineId)
+    if (clear.error) { setActionError(clear.error.message); return }
+    const set = await supabase.from('baselines').update({ is_selected: true }).eq('id', baselineId)
+    // Surface it. A failed write here used to do nothing at all on screen.
+    if (set.error) { setActionError(set.error.message); return }
     fetchBaselines()
   }
 
@@ -149,6 +154,15 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
           Add Baseline
         </Button>
       </div>
+
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <strong>Could not save:</strong> {actionError}
+          {actionError.includes('does not exist') && (
+            <span> — this usually means a database migration has not been run yet.</span>
+          )}
+        </div>
+      )}
 
       {/* Baseline Hierarchy Info */}
       <div className="mb-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 p-4">

@@ -193,6 +193,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
             <p className="mt-1"><strong>Cost Reduction</strong> = Baseline − Final. Hard, hits the P&amp;L. Can be negative, shown in parentheses.</p>
             <p><strong>Cost Avoidance</strong> = Opening − Baseline. Soft, the increase you held off.</p>
             <p><strong>Total procurement performance</strong> = Opening − Final = Reduction + Avoidance, counted once.</p>
+            <p className="mt-1 opacity-80">All figures are pre-tax. Procurement does not negotiate tax, and the savings percentage is the same either way.</p>
           </div>
         </div>
       </div>

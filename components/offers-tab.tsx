@@ -66,6 +66,7 @@ export function OffersTab({
   const [editingOffer, setEditingOffer] = useState<any | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
   const supabase = createClient()
   // The `suppliers` prop is a server-render snapshot from page load. A supplier
   // created inline must show up in the next dropdown without a page refresh, so
@@ -82,11 +83,13 @@ export function OffersTab({
   // An offer's role IS the decision: marking one 'final' replaces the whole
   // award ceremony. At most one of each role per project.
   const setRole = async (offerId: string, role: 'opening' | 'final' | null) => {
+    setActionError(null)
     if (role) {
       await supabase.from('supplier_offers').update({ offer_role: null })
         .eq('event_id', eventId).eq('offer_role', role).neq('id', offerId)
     }
-    await supabase.from('supplier_offers').update({ offer_role: role }).eq('id', offerId)
+    const res = await supabase.from('supplier_offers').update({ offer_role: role }).eq('id', offerId)
+    if (res.error) { setActionError(res.error.message); return }
 
     // Marking an offer Final IS the award decision, so record who won on the
     // project. sourcing_events.awarded_supplier_id is read by the Projects list,
@@ -278,6 +281,15 @@ export function OffersTab({
           </Button>
         </div>
       </div>
+
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <strong>Could not save:</strong> {actionError}
+          {actionError.includes('does not exist') && (
+            <span> — this usually means a database migration has not been run yet.</span>
+          )}
+        </div>
+      )}
 
       {/* Comparison View */}
       {showCompare && offers.length >= 2 && (
