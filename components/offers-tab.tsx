@@ -7,7 +7,7 @@ import {
   Award, GitCompare, Users, FileText, Pencil
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { grossSavings, savingsPct as savingsPctOf } from '@/lib/savings'
+import { grossSavings, savingsPct as savingsPctOf, termRates } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ type Offer = {
   offer_round: number
   offer_date: string | null
   offer_total_amount: number
+  offer_term_months: number | null
   offer_valid_until: string | null
   compliant_bid_flag: boolean
   selected_for_award_flag: boolean
@@ -315,7 +316,9 @@ export function OffersTab({
 
                   {/* Total — click to edit. */}
                   <div className="text-right">
-                    <p className="text-xs text-[var(--text-3)]">Total Offer</p>
+                    <p className="text-xs text-[var(--text-3)]">
+                      Total Offer{offer.offer_term_months ? ` · ${offer.offer_term_months} mo` : ''}
+                    </p>
                     {editingTotalId === offer.id ? (
                       <div className="mt-0.5 flex items-center gap-1">
                         <Input type="number" step="0.01" autoFocus value={editTotalValue}
@@ -334,6 +337,15 @@ export function OffersTab({
                         {formatCurrency(offer.offer_total_amount)}
                       </button>
                     )}
+                    {(() => {
+                      const r = termRates(offer.offer_total_amount, offer.offer_term_months)
+                      if (!r.known) return null
+                      return (
+                        <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+                          {formatCurrency(r.perMonth)}/mo · {formatCurrency(r.perYear)}/yr
+                        </p>
+                      )
+                    })()}
                   </div>
 
                   {/* Compliance Badge */}
@@ -466,6 +478,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSaved, onCan
     offer_valid_until: existing?.offer_valid_until ?? '',
     notes: existing?.notes ?? '',
     offer_total_amount: existing ? String(existing.offer_total_amount ?? '') : '',
+    offer_term_months: existing ? String(existing.offer_term_months ?? '12') : '12',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -492,6 +505,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSaved, onCan
       // Direct total entry (primary path). Offer lines are optional detail
       // and recompute this when present.
       offer_total_amount: form.offer_total_amount === '' ? 0 : parseFloat(form.offer_total_amount),
+      offer_term_months: form.offer_term_months === '' ? null : parseFloat(form.offer_term_months),
     }
 
     if (isEdit) {
@@ -562,6 +576,22 @@ function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSaved, onCan
           <Input type="number" step="0.01" required value={form.offer_total_amount}
             onChange={(e) => setForm({ ...form, offer_total_amount: e.target.value })}
             className="mt-1" placeholder="e.g. 1200000" />
+        </div>
+        <div>
+          <label className={labelClass}>Term (months) *</label>
+          <Input type="number" step="1" min="1" required value={form.offer_term_months}
+            onChange={(e) => setForm({ ...form, offer_term_months: e.target.value })}
+            className="mt-1" placeholder="12" />
+          {(() => {
+            const r = termRates(form.offer_total_amount, form.offer_term_months)
+            return r.known ? (
+              <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                {formatCurrency(r.perMonth)}/mo · {formatCurrency(r.perYear)}/yr
+              </p>
+            ) : (
+              <p className="mt-1 text-[11px] text-[var(--text-3)]">Price any escalator into the total.</p>
+            )
+          })()}
         </div>
         <div>
           <label className={labelClass}>Offer Type</label>

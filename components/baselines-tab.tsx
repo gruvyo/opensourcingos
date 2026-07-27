@@ -7,6 +7,7 @@ import {
   ChevronRight, AlertCircle, Shield, TrendingUp, Calculator
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { termRates } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ type Baseline = {
   baseline_period_start: string | null
   baseline_period_end: string | null
   baseline_total_amount: number
+  baseline_term_months: number | null
   baseline_normalized_amount: number
   baseline_lock_status: string
   baseline_lock_date: string | null
@@ -212,7 +214,10 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 
                   {/* Total Amount — click to edit. Lines, when present, still recompute it. */}
                   <div className="text-right">
-                    <p className="text-xs text-[var(--text-3)]">Total Baseline</p>
+                    <p className="text-xs text-[var(--text-3)]">
+                      Total Baseline
+                      {baseline.baseline_term_months ? ` · ${baseline.baseline_term_months} mo` : ''}
+                    </p>
                     {editingTotalId === baseline.id ? (
                       <div className="mt-0.5 flex items-center gap-1">
                         <Input type="number" step="0.01" autoFocus value={editTotalValue}
@@ -231,6 +236,15 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         {formatCurrency(baseline.baseline_total_amount)}
                       </button>
                     )}
+                    {(() => {
+                      const r = termRates(baseline.baseline_total_amount, baseline.baseline_term_months)
+                      if (!r.known) return null
+                      return (
+                        <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+                          {formatCurrency(r.perMonth)}/mo · {formatCurrency(r.perYear)}/yr
+                        </p>
+                      )
+                    })()}
                   </div>
 
 
@@ -321,6 +335,7 @@ function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, existing, onSav
     baseline_period_start: existing?.baseline_period_start ?? '',
     baseline_period_end: existing?.baseline_period_end ?? '',
     baseline_total_amount: existing ? String(existing.baseline_total_amount ?? '') : '',
+    baseline_term_months: existing ? String(existing.baseline_term_months ?? '12') : '12',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -348,6 +363,7 @@ function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, existing, onSav
       baseline_period_start: form.baseline_period_start || null,
       baseline_period_end: form.baseline_period_end || null,
       baseline_total_amount: form.baseline_total_amount === '' ? 0 : parseFloat(form.baseline_total_amount),
+      baseline_term_months: form.baseline_term_months === '' ? null : parseFloat(form.baseline_term_months),
     }
 
     if (isEdit) {
@@ -406,15 +422,29 @@ function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, existing, onSav
             onChange={(e) => setForm({ ...form, baseline_source: e.target.value })}
             className="mt-1" placeholder="e.g. Existing contract rate card" />
         </div>
-        <div className="md:col-span-2">
+        <div>
           <label className={labelClass}>Baseline Total ($) *</label>
           <Input type="number" step="0.01" required value={form.baseline_total_amount}
             onChange={(e) => setForm({ ...form, baseline_total_amount: e.target.value })}
-            className="mt-1" placeholder="e.g. 1000000 — what you pay today" />
-          <p className="mt-1 text-xs text-[var(--text-3)]">
-            Enter the total directly. Line-item detail is optional; if you add lines later the
-            total is recalculated from them.
-          </p>
+            className="mt-1" placeholder="e.g. 1000000" />
+        </div>
+        <div>
+          <label className={labelClass}>Term (months) *</label>
+          <Input type="number" step="1" min="1" required value={form.baseline_term_months}
+            onChange={(e) => setForm({ ...form, baseline_term_months: e.target.value })}
+            className="mt-1" placeholder="12" />
+        </div>
+        <div className="md:col-span-2 -mt-1">
+          {(() => {
+            const r = termRates(form.baseline_total_amount, form.baseline_term_months)
+            return (
+              <p className="text-xs text-[var(--text-3)]">
+                {r.known
+                  ? <>That is <strong className="text-[var(--text-2)]">{formatCurrency(r.perMonth)}/month</strong> · <strong className="text-[var(--text-2)]">{formatCurrency(r.perYear)}/year</strong>. The term lets a 12-month baseline be compared with, say, a 36-month offer.</>
+                  : <>Enter the total and the number of months it covers. Line detail is optional.</>}
+              </p>
+            )
+          })()}
         </div>
         <div>
           <label className={labelClass}>Period Start</label>

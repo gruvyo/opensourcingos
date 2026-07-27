@@ -122,6 +122,40 @@ export function reportedSavings(c: SavingsCalcRow): number {
   return num(c.gross_savings_amount)
 }
 
+// ---- TERM NORMALISATION ------------------------------------------------
+// Every anchor carries an amount and a term in MONTHS. Normalising to a
+// monthly rate is what lets a 12-month baseline be compared with a 36-month
+// offer. Deliberately no dates: no day-counting, no timezone edge cases.
+// Escalators are priced into the amount by the buyer, so a flat rate is exact.
+
+export interface TermRates {
+  /** amount / months. 0 when the term is missing or non-positive. */
+  perMonth: number
+  /** perMonth * 12 — the annual run-rate. */
+  perYear: number
+  /** The full amount over the whole term (what was entered). */
+  perTerm: number
+  /** False when the term is missing/invalid, so callers can show "—" not "0". */
+  known: boolean
+}
+
+/** Derive monthly and annual run-rates from an amount and a term in months. */
+export function termRates(amount: unknown, months: unknown): TermRates {
+  const amt = num(amount)
+  const m = num(months)
+  if (m <= 0) return { perMonth: 0, perYear: 0, perTerm: amt, known: false }
+  const perMonth = amt / m
+  return { perMonth, perYear: perMonth * 12, perTerm: amt, known: true }
+}
+
+/** Basis on which a set of anchors is compared. */
+export type RateBasis = 'perMonth' | 'perYear' | 'perTerm'
+
+/** Pick one basis off a TermRates. Keeps callers from hand-picking fields. */
+export function onBasis(r: TermRates, basis: RateBasis): number {
+  return basis === 'perMonth' ? r.perMonth : basis === 'perYear' ? r.perYear : r.perTerm
+}
+
 // ---- THE CHAIN (the locked savings methodology) -----------------------
 
 /** Anchors accept strings too (form inputs); `present()` and `num()` coerce safely.
