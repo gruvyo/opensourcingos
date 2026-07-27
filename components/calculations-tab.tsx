@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Calculator, Plus, Trash2, ChevronDown, ChevronRight,
-  FileCheck, TrendingDown,
+  FileCheck, TrendingDown, ArrowRight,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { chainSavings } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,11 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const [calcLines, setCalcLines] = useState<Record<string, any[]>>({})
   const [baselines, setBaselines] = useState<any[]>([])
   const [awards, setAwards] = useState<any[]>([])
+  const [eventDates, setEventDates] = useState<{ contract_start_date: string | null; contract_end_date: string | null }>({
+    contract_start_date: null,
+    contract_end_date: null,
+  })
+  const [openingOffer, setOpeningOffer] = useState<any | null>(null)
   const supabase = createClient()
 
   const fetchCalculations = useCallback(async () => {
@@ -45,12 +51,27 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   }, [eventId, supabase])
 
   const fetchBaselinesAndAwards = useCallback(async () => {
-    const [{ data: baseData }, { data: awardData }] = await Promise.all([
+    // NOTE: contract_start_date / contract_end_date live on sourcing_events, NOT on awards.
+    // Selecting them from `awards` made PostgREST return 400 ("column awards.contract_start_date
+    // does not exist"), which left the award list empty — so the award picker never populated and
+    // a saved calculation booked 100% of the baseline as savings. Fetch the dates from the event.
+    const [{ data: baseData }, { data: awardData }, { data: eventData }, { data: offerData }] = await Promise.all([
       supabase.from('baselines').select('id, baseline_name, baseline_total_amount, official_for_hard_savings, official_for_cost_avoidance, baseline_lock_status').eq('event_id', eventId),
-      supabase.from('awards').select('id, award_name, award_total_amount, award_status, contract_start_date, contract_end_date').eq('event_id', eventId),
+      supabase.from('awards').select('id, award_name, award_total_amount, award_status, award_date').eq('event_id', eventId),
+      supabase.from('sourcing_events').select('contract_start_date, contract_end_date').eq('id', eventId).maybeSingle(),
+      // The opening proposal is normally already captured on the Offers tab as the
+      // first round. Offer it as a one-click default for the Opening field.
+      supabase.from('supplier_offers').select('id, offer_total_amount, offer_type, offer_round').eq('event_id', eventId).order('offer_round', { ascending: true }),
     ])
     setBaselines(baseData || [])
     setAwards(awardData || [])
+    setOpeningOffer(
+      (offerData || []).find((o: any) => o.offer_type === 'Initial') ?? (offerData || [])[0] ?? null
+    )
+    setEventDates({
+      contract_start_date: eventData?.contract_start_date ?? null,
+      contract_end_date: eventData?.contract_end_date ?? null,
+    })
   }, [eventId, supabase])
 
   useEffect(() => {
@@ -125,6 +146,8 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           eventId={eventId}
           baselines={baselines}
           awards={awards}
+          eventDates={eventDates}
+          openingOffer={openingOffer}
           onSaved={() => { setShowForm(false); fetchCalculations() }}
           onCancel={() => setShowForm(false)}
         />
@@ -176,7 +199,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                   </div>
 
                   <span className={clsx('rounded-full px-2.5 py-1 text-xs font-medium',
-                    CALC_STATUS_COLORS[calc.calculation_status] || 'bg-gray-100 text-gray-700'
+                    CALC_STATUS_COLORS[calc.calculation_status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                   )}>
                     {calc.calculation_status}
                   </span>
@@ -291,10 +314,12 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
 // ============================================
 // Add Calculation Form
 // ============================================
-function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
+function AddCalculationForm({ eventId, baselines, awards, eventDates, openingOffer, onSaved, onCancel }: {
   eventId: string
   baselines: any[]
   awards: any[]
+  eventDates: { contract_start_date: string | null; contract_end_date: string | null }
+  openingOffer: any | null
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -306,14 +331,21 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
     savings_type: 'Cost Reduction',
     baseline_id: '',
     award_id: '',
-    cost_reduction_amount: '',
-    cost_avoidance_amount: '',
+    opening_proposal_amount: '',
+    baseline_amount: '',
+    final_amount: '',
     savings_start_date: '',
     savings_end_date: '',
   })
 
-  const selectedBaseline = baselines.find(b => b.id === form.baseline_id)
-  const selectedAward = awards.find(a => a.id === form.award_id)
+  // THE CHAIN: Opening -> Baseline -> Final. The three typed amounts ARE the
+  // calculation; linking a baseline/award record only pre-fills them. Reduction
+  // and Avoidance are derived, never typed, so they sum to the total exactly.
+  const chain = chainSavings({
+    opening: form.opening_proposal_amount === '' ? null : form.opening_proposal_amount,
+    baseline: form.baseline_amount === '' ? null : form.baseline_amount,
+    final: form.final_amount === '' ? 0 : form.final_amount,
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -329,20 +361,34 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
       .eq('id', user!.id)
       .single()
 
-    const baseline = baselines.find(b => b.id === form.baseline_id)
-    const award = awards.find(a => a.id === form.award_id)
-    const baselineAmount = baseline?.baseline_total_amount || 0
-    const awardAmount = award?.award_total_amount || 0
-    const grossSavings = baselineAmount - awardAmount
-    const savingsPct = baselineAmount > 0 ? (grossSavings / baselineAmount) * 100 : 0
+    const baselineAmount = form.baseline_amount === '' ? null : parseFloat(form.baseline_amount)
+    const awardAmount = form.final_amount === '' ? 0 : parseFloat(form.final_amount)
+    const openingAmount = form.opening_proposal_amount === '' ? null : parseFloat(form.opening_proposal_amount)
 
-    // Use manually entered amounts, or fall back to gross savings
-    const costReduction = form.cost_reduction_amount ? parseFloat(form.cost_reduction_amount) : (form.savings_type === 'Cost Reduction' ? grossSavings : 0)
-    const costAvoidance = form.cost_avoidance_amount ? parseFloat(form.cost_avoidance_amount) : (form.savings_type === 'Cost Avoidance' ? grossSavings : 0)
+    // Derive the three figures from the chain. They are never hand-typed, so
+    // reduction + avoidance === total by construction.
+    const { reduction, avoidance, total } = chainSavings({
+      opening: openingAmount,
+      baseline: baselineAmount,
+      final: awardAmount,
+    })
 
-    // If award has contract dates, use them as defaults for savings period
-    const savingsStart = form.savings_start_date || award?.contract_start_date || null
-    const savingsEnd = form.savings_end_date || award?.contract_end_date || null
+    // Savings % denominator is the baseline when there is one, else the opening.
+    // Never the award. Returns 0 when there is no meaningful denominator.
+    const denominator = baselineAmount ?? openingAmount ?? 0
+    const savingsPct = denominator > 0 ? (total / denominator) * 100 : 0
+
+    // gross_savings_amount carries THE CHAIN TOTAL, so every existing card,
+    // table, chart and export reports the headline without further change.
+    const grossSavings = total
+    const costReduction = reduction
+    const costAvoidance = avoidance
+
+    // Fall back to the event's contract dates for the savings period (they live on
+    // sourcing_events, not awards). Keeps prorateByYear and the Realized/Accrued
+    // classification working when the user leaves the period blank.
+    const savingsStart = form.savings_start_date || eventDates.contract_start_date || null
+    const savingsEnd = form.savings_end_date || eventDates.contract_end_date || null
 
     const { error: insertError } = await supabase
       .from('savings_calculations')
@@ -354,6 +400,7 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
         calculation_name: form.calculation_name,
         savings_type: form.savings_type,
         baseline_total_amount: baselineAmount,
+        opening_proposal_amount: openingAmount,
         award_total_amount: awardAmount,
         gross_savings_amount: grossSavings,
         savings_percentage: Math.round(savingsPct * 100) / 100,
@@ -396,11 +443,19 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
           </Select>
         </div>
         <div>
-          <label className={labelClass}>Official Baseline *</label>
-          <Select required value={form.baseline_id}
-            onChange={(e) => setForm({ ...form, baseline_id: e.target.value })}
+          <label className={labelClass}>Link a baseline record (optional)</label>
+          <Select value={form.baseline_id}
+            onChange={(e) => {
+              const b = baselines.find(x => x.id === e.target.value)
+              setForm({
+                ...form,
+                baseline_id: e.target.value,
+                // Pre-fill the amount from the linked record; still editable.
+                baseline_amount: b ? String(b.baseline_total_amount ?? '') : form.baseline_amount,
+              })
+            }}
             className="mt-1">
-            <option value="">Select baseline...</option>
+            <option value="">Not linked — I&apos;ll type the amount</option>
             {baselines.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.baseline_name} ({formatCurrency(b.baseline_total_amount)})
@@ -409,11 +464,18 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
           </Select>
         </div>
         <div>
-          <label className={labelClass}>Award</label>
+          <label className={labelClass}>Link an award record (optional)</label>
           <Select value={form.award_id}
-            onChange={(e) => setForm({ ...form, award_id: e.target.value })}
+            onChange={(e) => {
+              const a = awards.find(x => x.id === e.target.value)
+              setForm({
+                ...form,
+                award_id: e.target.value,
+                final_amount: a ? String(a.award_total_amount ?? '') : form.final_amount,
+              })
+            }}
             className="mt-1">
-            <option value="">Select award...</option>
+            <option value="">Not linked — I&apos;ll type the amount</option>
             {awards.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.award_name} ({formatCurrency(a.award_total_amount)})
@@ -421,17 +483,43 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
             ))}
           </Select>
         </div>
-        <div>
-          <label className={labelClass}>Cost Reduction Amount ($)</label>
-          <Input type="number" step="0.01" value={form.cost_reduction_amount}
-            onChange={(e) => setForm({ ...form, cost_reduction_amount: e.target.value })}
-            className="mt-1" placeholder="Auto-calculated if empty" />
-        </div>
-        <div>
-          <label className={labelClass}>Cost Avoidance Amount ($)</label>
-          <Input type="number" step="0.01" value={form.cost_avoidance_amount}
-            onChange={(e) => setForm({ ...form, cost_avoidance_amount: e.target.value })}
-            className="mt-1" placeholder="Auto-calculated if empty" />
+
+        {/* THE THREE ANCHORS. Type them directly — linking records above just
+            pre-fills these. This is the whole calculation. */}
+        <div className="md:col-span-2 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-4">
+          <p className="mb-3 text-sm font-semibold text-[var(--text)]">The three anchors</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div>
+              <label className={labelClass}>Opening proposal ($)</label>
+              <Input type="number" step="0.01" value={form.opening_proposal_amount}
+                onChange={(e) => setForm({ ...form, opening_proposal_amount: e.target.value })}
+                className="mt-1" placeholder="vendor's first ask" />
+              <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                Blank = not captured.
+                {openingOffer != null && (
+                  <button type="button"
+                    onClick={() => setForm({ ...form, opening_proposal_amount: String(openingOffer.offer_total_amount ?? '') })}
+                    className="ml-1 font-medium text-[var(--brand-ink)] hover:underline">
+                    use {formatCurrency(openingOffer.offer_total_amount)}
+                  </button>
+                )}
+              </p>
+            </div>
+            <div>
+              <label className={labelClass}>Baseline / current spend ($)</label>
+              <Input type="number" step="0.01" value={form.baseline_amount}
+                onChange={(e) => setForm({ ...form, baseline_amount: e.target.value })}
+                className="mt-1" placeholder="what you pay today" />
+              <p className="mt-1 text-[11px] text-[var(--text-3)]">Blank = no baseline anchor.</p>
+            </div>
+            <div>
+              <label className={labelClass}>Final offer ($) *</label>
+              <Input type="number" step="0.01" required value={form.final_amount}
+                onChange={(e) => setForm({ ...form, final_amount: e.target.value })}
+                className="mt-1" placeholder="what you signed" />
+              <p className="mt-1 text-[11px] text-[var(--text-3)]">What you actually committed to.</p>
+            </div>
+          </div>
         </div>
         <div>
           <label className={labelClass}>Savings Start Date</label>
@@ -445,31 +533,80 @@ function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
             onChange={(e) => setForm({ ...form, savings_end_date: e.target.value })}
             className="mt-1" />
         </div>
-        {form.baseline_id && form.award_id && (
-          <div className="md:col-span-2 rounded-lg bg-[var(--surface)] p-4">
-            <div className="flex items-center justify-around text-center">
+        {form.final_amount !== '' && (
+          <div className="md:col-span-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+            {/* The chain, left to right, exactly as the methodology states it. */}
+            <div className="mb-3 flex flex-wrap items-center justify-around gap-2 text-center">
               <div>
-                <p className="text-xs text-[var(--text-3)]">Baseline</p>
-                <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(selectedBaseline?.baseline_total_amount || 0)}</p>
-              </div>
-              <TrendingDown className="h-6 w-6 text-[var(--text-3)]" />
-              <div>
-                <p className="text-xs text-[var(--text-3)]">Award</p>
-                <p className="text-lg font-bold text-[var(--text)]">
-                  {formatCurrency(selectedAward?.award_total_amount || 0)}
+                <p className="text-xs text-[var(--text-3)]">Opening proposal</p>
+                <p className="text-base font-bold text-[var(--text)]">
+                  {form.opening_proposal_amount === ''
+                    ? <span className="text-[var(--text-3)]">not captured</span>
+                    : formatCurrency(Number(form.opening_proposal_amount))}
                 </p>
               </div>
-              <div className="text-2xl font-bold text-[var(--text-3)]">=</div>
+              <ArrowRight className="h-4 w-4 text-[var(--text-3)]" />
               <div>
-                <p className="text-xs text-[var(--text-3)]">Gross Savings</p>
-                <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                  {formatCurrency(
-                    (selectedBaseline?.baseline_total_amount || 0) -
-                    (selectedAward?.award_total_amount || 0)
-                  )}
+                <p className="text-xs text-[var(--text-3)]">Baseline (current spend)</p>
+                <p className="text-base font-bold text-[var(--text)]">
+                  {form.baseline_amount === ''
+                    ? <span className="text-[var(--text-3)]">no baseline</span>
+                    : formatCurrency(Number(form.baseline_amount))}
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-[var(--text-3)]" />
+              <div>
+                <p className="text-xs text-[var(--text-3)]">Final offer</p>
+                <p className="text-base font-bold text-[var(--text)]">
+                  {formatCurrency(Number(form.final_amount))}
                 </p>
               </div>
             </div>
+
+            <div className="grid grid-cols-3 gap-3 border-t border-[var(--border)] pt-3 text-center">
+              <div>
+                <p className="text-xs text-[var(--text-3)]">Cost Reduction</p>
+                <p className={clsx('text-base font-bold',
+                  chain.reduction === null ? 'text-[var(--text-3)]'
+                    : chain.reduction < 0 ? 'text-red-600 dark:text-red-400'
+                    : 'text-[var(--text)]')}>
+                  {chain.reduction === null
+                    ? 'n/a'
+                    : chain.reduction < 0
+                      ? `(${formatCurrency(Math.abs(chain.reduction))})`
+                      : formatCurrency(chain.reduction)}
+                </p>
+                <p className="text-[10px] text-[var(--text-3)]">Baseline − Final · hard</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-3)]">Cost Avoidance</p>
+                <p className="text-base font-bold text-[var(--text)]">{formatCurrency(chain.avoidance)}</p>
+                <p className="text-[10px] text-[var(--text-3)]">Opening − Baseline · soft</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-3)]">Total performance</p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(chain.total)}</p>
+                <p className="text-[10px] text-[var(--text-3)]">Opening − Final · the headline</p>
+              </div>
+            </div>
+
+            {chain.reduction === null && form.opening_proposal_amount !== '' && (
+              <p className="mt-2 text-xs text-[var(--text-3)]">
+                No baseline anchor, so the whole span books as avoidance and Cost Reduction is
+                not applicable.
+              </p>
+            )}
+            {form.opening_proposal_amount === '' && form.baseline_id && (
+              <p className="mt-2 text-xs text-[var(--text-3)]">
+                No opening captured, so Total collapses to Cost Reduction.
+              </p>
+            )}
+            {chain.reduction !== null && chain.reduction < 0 && (
+              <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                This is a genuine cost increase against the baseline, shown in parentheses. It is
+                not relabelled as savings.
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -12,10 +12,25 @@
 
 // ---- Loose row shapes (match the DB columns; tolerate nulls) ----------
 
+/**
+ * Workflow stages that mean a deal is still IN THE PIPELINE — its savings are a
+ * forecast, not a booked result. Everything else counts as booked.
+ * Keep in step with the calculation_status CHECK constraint.
+ */
+export const FORECAST_STATUSES = ['identified', 'negotiated'] as const
+export const BOOKED_STATUSES = ['contracted', 'realized'] as const
+
+/** Is this calculation still a forecast (pipeline), rather than a booked result? */
+export function isForecast(c: SavingsCalcRow): boolean {
+  const s = (c.calculation_status || '').toLowerCase()
+  return (FORECAST_STATUSES as readonly string[]).includes(s)
+}
+
 export interface SavingsCalcRow {
   id?: string
   event_id?: string | null
   savings_type?: string | null
+  calculation_status?: string | null
   gross_savings_amount?: number | null
   cost_reduction_amount?: number | null
   cost_avoidance_amount?: number | null
@@ -100,12 +115,78 @@ export function toReportingUsd(amount: unknown, fxRateToUsd: unknown): number {
 
 /**
  * THE canonical "reported total savings" for a single calculation.
- * One definition, used by every table and card. It is the gross savings —
- * cost_reduction / cost_avoidance are shown in their own columns, they are
- * not re-summed into the total (that produced two different totals before).
+ * One definition, used by every table and card. This holds the CHAIN TOTAL
+ * (Opening − Final) — see chainSavings() below, which is what writes it.
  */
 export function reportedSavings(c: SavingsCalcRow): number {
   return num(c.gross_savings_amount)
+}
+
+// ---- THE CHAIN (the locked savings methodology) -----------------------
+
+/** Anchors accept strings too (form inputs); `present()` and `num()` coerce safely.
+ *  An empty string is treated as NOT CAPTURED, never as zero. */
+export interface ChainAnchors {
+  /** The vendor's opening proposal. null/undefined/'' = not captured. */
+  opening?: number | string | null
+  /** Current spend / baseline. null/undefined/'' = no baseline anchor. */
+  baseline?: number | string | null
+  /** The final signed offer. */
+  final?: number | string | null
+}
+
+export interface ChainResult {
+  /** Baseline − Final. Hard, hits the P&L. MAY BE NEGATIVE (a real cost increase).
+   *  null means NOT APPLICABLE (no baseline anchor) — a distinct state from zero. */
+  reduction: number | null
+  /** Opening − Baseline. Soft. */
+  avoidance: number
+  /** Opening − Final. The headline. Always === reduction + avoidance. */
+  total: number
+}
+
+/**
+ * THE CHAIN — three anchors, Opening → Baseline → Final.
+ *
+ *   Cost Reduction = Baseline − Final    (hard; may legitimately be negative)
+ *   Cost Avoidance = Opening  − Baseline (soft)
+ *   Total          = Opening  − Final    = Reduction + Avoidance, exactly.
+ *
+ * Total is the headline because it is the only figure that cannot be moved by
+ * choosing a flattering baseline. Missing anchors COLLAPSE segments rather than
+ * erroring:
+ *   • no baseline → the whole span is avoidance; reduction is NOT APPLICABLE
+ *     (null), which is distinct from both zero and unknown.
+ *   • no opening  → Total equals Reduction.
+ *
+ * A negative reduction is never sign-flipped and never relabelled as savings.
+ */
+export function chainSavings({ opening, baseline, final }: ChainAnchors): ChainResult {
+  const present = (v: unknown) =>
+    v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v))
+
+  const hasOpening = present(opening)
+  const hasBaseline = present(baseline)
+  const O = num(opening)
+  const B = num(baseline)
+  const F = num(final)
+
+  if (hasOpening && hasBaseline) {
+    const reduction = B - F
+    const avoidance = O - B
+    return { reduction, avoidance, total: reduction + avoidance }
+  }
+  if (hasOpening) {
+    // No baseline anchor: the entire span books as avoidance.
+    const avoidance = O - F
+    return { reduction: null, avoidance, total: avoidance }
+  }
+  if (hasBaseline) {
+    // No opening captured: Total collapses to Reduction.
+    const reduction = B - F
+    return { reduction, avoidance: 0, total: reduction }
+  }
+  return { reduction: null, avoidance: 0, total: 0 }
 }
 
 // ---- Realized vs Accrued (ONE rule for the whole app) -----------------
@@ -143,6 +224,13 @@ export interface PortfolioRollup {
   totalCostAvoidance: number
   realized: number
   accrued: number
+  /** Savings on deals still in the pipeline (identified/negotiated) — a FORECAST. */
+  forecast: number
+  /** Savings on deals that reached contracted/realized — BOOKED. */
+  booked: number
+  /** How many calculations sit in each bucket. */
+  forecastCount: number
+  bookedCount: number
   /** Gross savings grouped by savings_type — always sums to totalSavings. */
   byType: { name: string; value: number }[]
   /** Gross savings grouped by the event's category (matched by event_id). */
@@ -185,6 +273,10 @@ export function portfolioRollup(
   let totalCostAvoidance = 0
   let realized = 0
   let accrued = 0
+  let forecast = 0
+  let booked = 0
+  let forecastCount = 0
+  let bookedCount = 0
   const typeMap = new Map<string, number>()
   const catMap = new Map<string, number>()
   const buMap = new Map<string, { value: number; count: number }>()
@@ -197,6 +289,10 @@ export function portfolioRollup(
 
     if (classifyRealization(c, contractStartByEventId, now) === 'Realized') realized += gross
     else accrued += gross
+
+    // Pipeline vs booked, driven by workflow stage (not by date).
+    if (isForecast(c)) { forecast += gross; forecastCount++ }
+    else { booked += gross; bookedCount++ }
 
     const type = c.savings_type || 'Unspecified'
     typeMap.set(type, (typeMap.get(type) || 0) + gross)
@@ -249,6 +345,10 @@ export function portfolioRollup(
     totalCostAvoidance,
     realized,
     accrued,
+    forecast,
+    booked,
+    forecastCount,
+    bookedCount,
     byType,
     byCategory,
     byBusinessUnit,

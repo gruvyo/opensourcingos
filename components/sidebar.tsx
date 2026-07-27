@@ -10,7 +10,6 @@ import {
   BarChart3,
   Settings,
   Briefcase,
-  TrendingUp,
   LogOut,
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -21,7 +20,6 @@ const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Projects', href: '/events', icon: Briefcase },
   { label: 'Savings', href: '/savings', icon: Calculator },
-  { label: 'Realization', href: '/realization', icon: TrendingUp },
   { label: 'Suppliers', href: '/suppliers', icon: Users },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Settings', href: '/settings', icon: Settings },

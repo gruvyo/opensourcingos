@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   FileText, List, BarChart2, Users, FileCheck,
   Calculator, Clock, StickyNote, Pencil,
-  Briefcase, LifeBuoy, TrendingUp,
+  Briefcase, LifeBuoy,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatDate, statusColor } from '@/lib/utils'
@@ -51,12 +51,16 @@ type Event = {
 
 const SOURCING_TABS = [
   { id: 'overview', label: 'Overview', icon: FileText },
-  { id: 'scope', label: 'Scope Lines', icon: List },
+  // Scope Lines hidden (2026-07-26): no savings figure reads scope-line data — it
+  // supplies labels only, and quantities get re-typed on the baseline and the offer
+  // anyway. Code kept; restore this entry to bring the tab back.
   { id: 'baselines', label: 'Baselines', icon: BarChart2 },
   { id: 'offers', label: 'Supplier Offers', icon: Users },
   { id: 'awards', label: 'Awards', icon: FileCheck },
   { id: 'calculations', label: 'Calculations', icon: Calculator },
-  { id: 'realization', label: 'Realization', icon: TrendingUp },
+  // Realization tab hidden per product decision (2026-07-26): realized savings are
+  // assumed = projected, so realization tracking adds no signal. Code kept (import +
+  // render below) so it can be re-enabled by restoring this entry.
   { id: 'notes', label: 'Notes', icon: StickyNote },
 ]
 

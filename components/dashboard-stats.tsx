@@ -2,7 +2,7 @@
 
 import { formatCurrency } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
-import { DollarSign, Briefcase, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { DollarSign, Briefcase, ArrowDownRight, ArrowUpRight, TrendingUp } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { ComponentType } from 'react'
 
@@ -11,6 +11,10 @@ type Stats = {
   activeEvents: number
   totalCostReduction: number
   totalCostAvoidance: number
+  booked: number
+  forecast: number
+  bookedCount: number
+  forecastCount: number
 }
 
 type CardDef = {
@@ -47,7 +51,11 @@ export function DashboardStats({ stats }: { stats: Stats }) {
     { label: 'Cost Avoidance', value: formatCurrency(stats.totalCostAvoidance), icon: ArrowUpRight, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30', sub: 'Value not paid — negotiated below supplier proposal' },
   ]
 
-  const projectCards: CardDef[] = [
+  // Pipeline vs booked. Deals still at identified/negotiated are a FORECAST and
+  // are reported separately so they never inflate the booked number.
+  const pipelineCards: CardDef[] = [
+    { label: 'Booked Savings', value: formatCurrency(stats.booked), icon: DollarSign, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30', sub: `Contracted or realized · ${stats.bookedCount} ${stats.bookedCount === 1 ? 'deal' : 'deals'}` },
+    { label: 'Forecast (pipeline)', value: formatCurrency(stats.forecast), icon: TrendingUp, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30', sub: `Identified or negotiated, not yet closed · ${stats.forecastCount} ${stats.forecastCount === 1 ? 'deal' : 'deals'}` },
     { label: 'Active Projects', value: stats.activeEvents.toString(), icon: Briefcase, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/30', sub: 'Sourcing + support projects in progress' },
   ]
 
@@ -60,7 +68,7 @@ export function DashboardStats({ stats }: { stats: Stats }) {
 
       {/* Project cards — separate row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {projectCards.map((card) => <StatCard key={card.label} card={card} />)}
+        {pipelineCards.map((card) => <StatCard key={card.label} card={card} />)}
       </div>
     </div>
   )

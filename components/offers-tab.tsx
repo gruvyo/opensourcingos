@@ -61,7 +61,17 @@ export function OffersTab({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [offerLines, setOfferLines] = useState<Record<string, any[]>>({})
   const [selectedForAward, setSelectedForAward] = useState<string | null>(null)
+  const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
+  const [editTotalValue, setEditTotalValue] = useState('')
   const supabase = createClient()
+
+  const saveOfferTotal = async (offerId: string) => {
+    const v = parseFloat(editTotalValue)
+    setEditingTotalId(null)
+    if (!Number.isFinite(v)) return
+    await supabase.from('supplier_offers').update({ offer_total_amount: v }).eq('id', offerId)
+    fetchOffers()
+  }
 
   const fetchOffers = useCallback(async () => {
     const { data } = await supabase
@@ -158,6 +168,16 @@ export function OffersTab({
       })
       .select('id')
       .single()
+
+    if (!error && award) {
+      // Record WHO won on the project itself. sourcing_events.awarded_supplier_id is
+      // read by the Projects list, event detail, Reports and Suppliers, but nothing
+      // ever wrote it — so every post-award screen kept showing the incumbent.
+      await supabase
+        .from('sourcing_events')
+        .update({ awarded_supplier_id: offer.supplier_id })
+        .eq('id', eventId)
+    }
 
     if (!error && award && lines) {
       // Create award lines from offer lines
@@ -281,10 +301,27 @@ export function OffersTab({
                     </p>
                   </div>
 
-                  {/* Total */}
+                  {/* Total — click to edit. */}
                   <div className="text-right">
                     <p className="text-xs text-[var(--text-3)]">Total Offer</p>
-                    <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(offer.offer_total_amount)}</p>
+                    {editingTotalId === offer.id ? (
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Input type="number" step="0.01" autoFocus value={editTotalValue}
+                          onChange={(e) => setEditTotalValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveOfferTotal(offer.id) }
+                            if (e.key === 'Escape') setEditingTotalId(null)
+                          }}
+                          className="w-36 py-1 text-right text-sm" />
+                        <Button type="button" size="sm" onClick={() => saveOfferTotal(offer.id)}>Save</Button>
+                      </div>
+                    ) : (
+                      <button type="button" title="Click to edit"
+                        onClick={() => { setEditingTotalId(offer.id); setEditTotalValue(String(offer.offer_total_amount ?? '')) }}
+                        className="text-lg font-bold text-[var(--text)] underline decoration-dotted underline-offset-4 hover:text-[var(--brand-ink)]">
+                        {formatCurrency(offer.offer_total_amount)}
+                      </button>
+                    )}
                   </div>
 
                   {/* Compliance Badge */}
@@ -318,7 +355,7 @@ export function OffersTab({
                           'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
                           offer.selected_for_award_flag
                             ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                            : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-gray-200'
+                            : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
                         )}
                       >
                         <Award className="h-3 w-3" />
@@ -364,6 +401,44 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Most projects involve a first-time vendor, so a supplier must be creatable
+  // right here rather than only on the New Project screen.
+  const [localSuppliers, setLocalSuppliers] = useState<Supplier[]>(suppliers)
+  const [showNewSupplier, setShowNewSupplier] = useState(false)
+  const [newSupplierName, setNewSupplierName] = useState('')
+  const [addingSupplier, setAddingSupplier] = useState(false)
+
+  useEffect(() => { setLocalSuppliers(suppliers) }, [suppliers])
+
+  const handleAddSupplier = async () => {
+    const name = newSupplierName.trim()
+    if (!name) return
+    setAddingSupplier(true)
+    setError(null)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles').select('organization_id').eq('id', user!.id).single()
+
+    const { data, error: insertError } = await supabase
+      .from('suppliers')
+      .insert({
+        supplier_name: name,
+        organization_id: profile?.organization_id,
+        supplier_status: 'Active',
+      })
+      .select('id, supplier_name')
+      .single()
+
+    setAddingSupplier(false)
+    if (insertError) { setError(insertError.message); return }
+
+    setLocalSuppliers(prev => [...prev, data as Supplier])
+    setForm(prev => ({ ...prev, supplier_id: data.id }))
+    setNewSupplierName('')
+    setShowNewSupplier(false)
+  }
+
   const [form, setForm] = useState({
     supplier_id: '',
     offer_type: 'Initial',
@@ -371,6 +446,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
     offer_date: '',
     offer_valid_until: '',
     notes: '',
+    offer_total_amount: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -398,6 +474,9 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
         offer_date: form.offer_date || null,
         offer_valid_until: form.offer_valid_until || null,
         notes: form.notes || null,
+        // Direct total entry (primary path). Offer lines are optional detail
+        // and recompute this when present.
+        offer_total_amount: form.offer_total_amount === '' ? 0 : parseFloat(form.offer_total_amount),
         created_by: user.id,
       })
 
@@ -418,15 +497,40 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
       {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
-          <label className={labelClass}>Supplier *</label>
-          <Select required value={form.supplier_id}
-            onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
-            className="mt-1">
-            <option value="">Select supplier...</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.supplier_name}</option>
-            ))}
-          </Select>
+          <div className="flex items-center justify-between">
+            <label className={labelClass}>Supplier *</label>
+            <button type="button" onClick={() => setShowNewSupplier(v => !v)}
+              className="text-xs font-medium text-[var(--brand-ink)] hover:underline">
+              {showNewSupplier ? 'Cancel' : '+ New supplier'}
+            </button>
+          </div>
+          {showNewSupplier ? (
+            <div className="mt-1 flex gap-2">
+              <Input type="text" value={newSupplierName} autoFocus
+                onChange={(e) => setNewSupplierName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSupplier() } }}
+                placeholder="New supplier name" />
+              <Button type="button" size="sm" disabled={addingSupplier || !newSupplierName.trim()}
+                onClick={handleAddSupplier}>
+                {addingSupplier ? 'Adding...' : 'Add'}
+              </Button>
+            </div>
+          ) : (
+            <Select required value={form.supplier_id}
+              onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+              className="mt-1">
+              <option value="">Select supplier...</option>
+              {localSuppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.supplier_name}</option>
+              ))}
+            </Select>
+          )}
+        </div>
+        <div>
+          <label className={labelClass}>Offer Total ($) *</label>
+          <Input type="number" step="0.01" required value={form.offer_total_amount}
+            onChange={(e) => setForm({ ...form, offer_total_amount: e.target.value })}
+            className="mt-1" placeholder="e.g. 1200000" />
         </div>
         <div>
           <label className={labelClass}>Offer Type</label>
@@ -545,27 +649,30 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
       .single()
 
     if (!error && data) {
-      setLines([...lines, data])
+      const nextLines = [...lines, data]
+      setLines(nextLines)
       setNewLine({
         scope_line_id: '', offer_unit_price: '', offer_quantity: '',
         offer_term_months: '12', offer_one_time_amount: '', compliance_status: 'Compliant',
       })
       setShowAddLine(false)
       onLinesChanged()
-      updateOfferTotal()
+      // Same stale-closure fix as baselines-tab: total the NEXT array, not React state.
+      updateOfferTotal(nextLines)
     }
   }
 
   const handleDeleteLine = async (lineId: string) => {
     if (!confirm('Delete this offer line? This cannot be undone.')) return
     await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
-    setLines(lines.filter(l => l.id !== lineId))
+    const nextLines = lines.filter(l => l.id !== lineId)
+    setLines(nextLines)
     onLinesChanged()
-    updateOfferTotal()
+    updateOfferTotal(nextLines)
   }
 
-  const updateOfferTotal = async () => {
-    const total = lines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
+  const updateOfferTotal = async (currentLines: any[]) => {
+    const total = currentLines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
     await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
   }
 

@@ -124,7 +124,12 @@ export function EventForm({
       .insert({
         supplier_name: name,
         organization_id: profile.organization_id,
-        created_by: user.id,
+        // NOTE: the suppliers table has no created_by column (it carries only
+        // created_at/updated_at). Sending it made PostgREST reject the insert
+        // with 400 "column suppliers.created_by does not exist", so adding a
+        // new vendor inline always failed silently — and most new projects
+        // involve a first-time vendor.
+        supplier_status: 'Active',
       })
       .select('id, supplier_name')
       .single()

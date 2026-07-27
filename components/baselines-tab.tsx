@@ -71,7 +71,17 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [baselineLines, setBaselineLines] = useState<Record<string, any[]>>({})
+  const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
+  const [editTotalValue, setEditTotalValue] = useState('')
   const supabase = createClient()
+
+  const saveTotal = async (baselineId: string) => {
+    const v = parseFloat(editTotalValue)
+    setEditingTotalId(null)
+    if (!Number.isFinite(v)) return
+    await supabase.from('baselines').update({ baseline_total_amount: v }).eq('id', baselineId)
+    fetchBaselines()
+  }
 
   const fetchBaselines = useCallback(async () => {
     const { data } = await supabase
@@ -118,6 +128,15 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       const { data: { user } } = await supabase.auth.getUser()
       if (user) updates.baseline_approved_by = user.id
       updates.baseline_approval_date = new Date().toISOString()
+      // Auto-handle the common case: when this is the only baseline for the event,
+      // it IS the official one for every category — so mark it automatically and the
+      // user never has to touch "Mark Official". Manual toggles still appear when a
+      // project has multiple competing baselines (see the render below).
+      if (baselines.length === 1) {
+        updates.official_for_hard_savings = true
+        updates.official_for_cost_avoidance = true
+        updates.official_for_demand_reduction = true
+      }
     }
 
     await supabase.from('baselines').update(updates).eq('id', baselineId)
@@ -225,10 +244,27 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                     )}
                   </div>
 
-                  {/* Total Amount */}
+                  {/* Total Amount — click to edit. Lines, when present, still recompute it. */}
                   <div className="text-right">
                     <p className="text-xs text-[var(--text-3)]">Total Baseline</p>
-                    <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(baseline.baseline_total_amount)}</p>
+                    {editingTotalId === baseline.id ? (
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Input type="number" step="0.01" autoFocus value={editTotalValue}
+                          onChange={(e) => setEditTotalValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveTotal(baseline.id) }
+                            if (e.key === 'Escape') setEditingTotalId(null)
+                          }}
+                          className="w-36 py-1 text-right text-sm" />
+                        <Button type="button" size="sm" onClick={() => saveTotal(baseline.id)}>Save</Button>
+                      </div>
+                    ) : (
+                      <button type="button" title="Click to edit"
+                        onClick={() => { setEditingTotalId(baseline.id); setEditTotalValue(String(baseline.baseline_total_amount ?? '')) }}
+                        className="text-lg font-bold text-[var(--text)] underline decoration-dotted underline-offset-4 hover:text-[var(--brand-ink)]">
+                        {formatCurrency(baseline.baseline_total_amount)}
+                      </button>
+                    )}
                   </div>
 
                   {/* Lock Status Badge */}
@@ -236,19 +272,25 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                     {baseline.baseline_lock_status}
                   </span>
 
-                  {/* Official badges */}
+                  {/* Official badges. With a single baseline the per-category
+                      distinction is noise, so collapse to one "Official" chip. */}
                   <div className="flex gap-1">
-                    {baseline.official_for_hard_savings && (
+                    {baselines.length === 1 && (baseline.official_for_hard_savings || baseline.official_for_cost_avoidance || baseline.official_for_demand_reduction) && (
+                      <span className="flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300" title="Official baseline for this project">
+                        <Star className="h-3 w-3 fill-current" /> Official
+                      </span>
+                    )}
+                    {baselines.length > 1 && baseline.official_for_hard_savings && (
                       <span className="flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300" title="Official for Hard Savings">
                         <Star className="h-3 w-3 fill-current" /> Hard $
                       </span>
                     )}
-                    {baseline.official_for_cost_avoidance && (
+                    {baselines.length > 1 && baseline.official_for_cost_avoidance && (
                       <span className="flex items-center gap-1 rounded bg-purple-100 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300" title="Official for Cost Avoidance">
                         <Star className="h-3 w-3 fill-current" /> Avoid
                       </span>
                     )}
-                    {baseline.official_for_demand_reduction && (
+                    {baselines.length > 1 && baseline.official_for_demand_reduction && (
                       <span className="flex items-center gap-1 rounded bg-orange-100 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-300" title="Official for Demand Reduction">
                         <Star className="h-3 w-3 fill-current" /> Demand
                       </span>
@@ -286,7 +328,15 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                           </button>
                         </>
                       )}
-                      {baseline.baseline_lock_status === 'Approved' && (
+                      {/* "Mark Official" only matters when there is more than one
+                          baseline to choose between. With a single baseline it is
+                          set automatically on approval (see updateLockStatus). */}
+                      {baseline.baseline_lock_status === 'Approved' && baselines.length === 1 && (
+                        <span className="text-xs text-[var(--text-3)]">
+                          Official baseline for this project (set automatically).
+                        </span>
+                      )}
+                      {baseline.baseline_lock_status === 'Approved' && baselines.length > 1 && (
                         <div className="flex items-center gap-3">
                           <span className="text-xs font-medium text-[var(--text-3)]">Mark Official:</span>
                           <button onClick={() => toggleOfficial(baseline, 'official_for_hard_savings')}
@@ -366,6 +416,7 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
     baseline_source: '',
     baseline_period_start: '',
     baseline_period_end: '',
+    baseline_total_amount: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -392,6 +443,10 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
         baseline_source: form.baseline_source || null,
         baseline_period_start: form.baseline_period_start || null,
         baseline_period_end: form.baseline_period_end || null,
+        // Direct total entry. The real process is totals-only, so this is the
+        // primary path; baseline lines are optional detail that, when present,
+        // recompute this value.
+        baseline_total_amount: form.baseline_total_amount === '' ? 0 : parseFloat(form.baseline_total_amount),
         created_by: user.id,
       })
 
@@ -416,6 +471,16 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
           <Input type="text" required value={form.baseline_name}
             onChange={(e) => setForm({ ...form, baseline_name: e.target.value })}
             className="mt-1" placeholder="e.g. Current Contract Baseline" />
+        </div>
+        <div className="md:col-span-2">
+          <label className={labelClass}>Baseline Total ($) *</label>
+          <Input type="number" step="0.01" required value={form.baseline_total_amount}
+            onChange={(e) => setForm({ ...form, baseline_total_amount: e.target.value })}
+            className="mt-1" placeholder="e.g. 1000000 — what you pay today" />
+          <p className="mt-1 text-xs text-[var(--text-3)]">
+            Enter the total directly. Line-item detail is optional; if you add lines later the
+            total is recalculated from them.
+          </p>
         </div>
         <div>
           <label className={labelClass}>Baseline Type *</label>
@@ -539,28 +604,33 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       .single()
 
     if (!error && data) {
-      setLines([...lines, data])
+      const nextLines = [...lines, data]
+      setLines(nextLines)
       setNewLine({
         scope_line_id: '', baseline_unit_price: '', baseline_quantity: '',
         baseline_term_months: '12', baseline_recurring_amount: '', baseline_one_time_amount: '',
       })
       setShowAddLine(false)
       onLinesChanged()
-      // Update baseline total
-      updateBaselineTotal()
+      // Total the NEXT array, not React state. setLines() is async, so reading `lines`
+      // here saw the pre-update value — the first line added wrote a total of 0, and a
+      // delete left the removed amount in. This total is the minuend of every savings
+      // calculation, so the error propagated straight into the headline number.
+      updateBaselineTotal(nextLines)
     }
   }
 
   const handleDeleteLine = async (lineId: string) => {
     if (!confirm('Delete this baseline line? This cannot be undone.')) return
     await supabase.from('baseline_lines').delete().eq('id', lineId)
-    setLines(lines.filter(l => l.id !== lineId))
+    const nextLines = lines.filter(l => l.id !== lineId)
+    setLines(nextLines)
     onLinesChanged()
-    updateBaselineTotal()
+    updateBaselineTotal(nextLines)
   }
 
-  const updateBaselineTotal = async () => {
-    const total = lines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
+  const updateBaselineTotal = async (currentLines: any[]) => {
+    const total = currentLines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
     await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
   }
 
@@ -572,7 +642,13 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   return (
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h5 className="text-sm font-medium text-[var(--text-2)]">Baseline Lines</h5>
+        <div>
+          <h5 className="text-sm font-medium text-[var(--text-2)]">Line detail (optional)</h5>
+          <p className="text-xs text-[var(--text-3)]">
+            Only if you want item-level breakdown. Adding lines replaces the total above with
+            their sum. Most deals just need the total.
+          </p>
+        </div>
         {!isLocked && (
           <button onClick={() => setShowAddLine(!showAddLine)}
             className="flex items-center gap-1 rounded bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">

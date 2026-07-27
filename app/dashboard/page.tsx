@@ -31,7 +31,8 @@ export default async function DashboardPage() {
     supabase.from('savings_calculations').select(`
       id, savings_type, gross_savings_amount,
       cost_reduction_amount, cost_avoidance_amount,
-      savings_start_date, savings_end_date, event_id
+      savings_start_date, savings_end_date, event_id,
+      calculation_status
     `),
   ])
 
@@ -65,6 +66,10 @@ export default async function DashboardPage() {
         activeEvents,
         totalCostReduction: rollup.totalCostReduction,
         totalCostAvoidance: rollup.totalCostAvoidance,
+        booked: rollup.booked,
+        forecast: rollup.forecast,
+        bookedCount: rollup.bookedCount,
+        forecastCount: rollup.forecastCount,
       }} />
 
       {/* Savings by Year — full width */}
