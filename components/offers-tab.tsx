@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, CheckCircle, XCircle,
-  Award, GitCompare, Users, FileText
+  Award, GitCompare, Users, FileText, Pencil
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { grossSavings, savingsPct as savingsPctOf } from '@/lib/savings'
@@ -61,6 +61,7 @@ export function OffersTab({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [offerLines, setOfferLines] = useState<Record<string, any[]>>({})
   const [selectedForAward, setSelectedForAward] = useState<string | null>(null)
+  const [editingOffer, setEditingOffer] = useState<any | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const supabase = createClient()
@@ -253,6 +254,17 @@ export function OffersTab({
         />
       )}
 
+      {editingOffer && (
+        <AddOfferForm
+          eventId={eventId}
+          scopeLines={scopeLines}
+          suppliers={suppliers}
+          existing={editingOffer}
+          onSaved={() => { setEditingOffer(null); fetchOffers() }}
+          onCancel={() => setEditingOffer(null)}
+        />
+      )}
+
       {/* Comparison View */}
       {showCompare && offers.length >= 2 && (
         <ComparisonView offers={offers} offerLines={offerLines} fetchOfferLines={fetchOfferLines} eventId={eventId} />
@@ -339,6 +351,10 @@ export function OffersTab({
                   </button>
 
                   {/* Delete */}
+                  <button onClick={() => setEditingOffer(offer)} title="Edit offer"
+                    className="text-[var(--text-3)] hover:text-[var(--brand-ink)]">
+                    <Pencil className="h-4 w-4" />
+                  </button>
                   <button onClick={() => handleDelete(offer.id)} className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -391,13 +407,16 @@ export function OffersTab({
 // ============================================
 // Add Offer Form
 // ============================================
-function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
+function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSaved, onCancel }: {
   eventId: string
   scopeLines: ScopeLine[]
   suppliers: Supplier[]
+  /** When set, the form edits this offer instead of creating a new one. */
+  existing?: any | null
   onSaved: () => void
   onCancel: () => void
 }) {
+  const isEdit = !!existing
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -440,13 +459,13 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
   }
 
   const [form, setForm] = useState({
-    supplier_id: '',
-    offer_type: 'Initial',
-    offer_round: '1',
-    offer_date: '',
-    offer_valid_until: '',
-    notes: '',
-    offer_total_amount: '',
+    supplier_id: existing?.supplier_id ?? '',
+    offer_type: existing?.offer_type ?? 'Initial',
+    offer_round: existing ? String(existing.offer_round ?? '1') : '1',
+    offer_date: existing?.offer_date ?? '',
+    offer_valid_until: existing?.offer_valid_until ?? '',
+    notes: existing?.notes ?? '',
+    offer_total_amount: existing ? String(existing.offer_total_amount ?? '') : '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -463,20 +482,32 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
       .eq('id', user!.id)
       .single()
 
+    const payload: Record<string, any> = {
+      supplier_id: form.supplier_id,
+      offer_type: form.offer_type,
+      offer_round: parseInt(form.offer_round) || 1,
+      offer_date: form.offer_date || null,
+      offer_valid_until: form.offer_valid_until || null,
+      notes: form.notes || null,
+      // Direct total entry (primary path). Offer lines are optional detail
+      // and recompute this when present.
+      offer_total_amount: form.offer_total_amount === '' ? 0 : parseFloat(form.offer_total_amount),
+    }
+
+    if (isEdit) {
+      const { error: updateError } = await supabase
+        .from('supplier_offers').update(payload).eq('id', existing.id)
+      if (updateError) { setError(updateError.message); setLoading(false); return }
+      onSaved()
+      return
+    }
+
     const { error: insertError } = await supabase
       .from('supplier_offers')
       .insert({
+        ...payload,
         organization_id: profile?.organization_id,
         event_id: eventId,
-        supplier_id: form.supplier_id,
-        offer_type: form.offer_type,
-        offer_round: parseInt(form.offer_round) || 1,
-        offer_date: form.offer_date || null,
-        offer_valid_until: form.offer_valid_until || null,
-        notes: form.notes || null,
-        // Direct total entry (primary path). Offer lines are optional detail
-        // and recompute this when present.
-        offer_total_amount: form.offer_total_amount === '' ? 0 : parseFloat(form.offer_total_amount),
         created_by: user.id,
       })
 
@@ -493,7 +524,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
-      <h4 className="mb-4 font-medium text-[var(--text)]">New Supplier Offer</h4>
+      <h4 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Supplier Offer' : 'New Supplier Offer'}</h4>
       {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
@@ -570,7 +601,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
           Cancel
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? 'Creating...' : 'Create Offer'}
+          {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Offer'}
         </Button>
       </div>
     </form>

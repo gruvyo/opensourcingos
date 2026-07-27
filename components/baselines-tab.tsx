@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Plus, Star, Trash2, ChevronDown,
+  Plus, Star, Trash2, ChevronDown, Pencil,
   ChevronRight, AlertCircle, Shield, TrendingUp, Calculator
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -63,6 +63,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [baselineLines, setBaselineLines] = useState<Record<string, any[]>>({})
+  const [editingBaseline, setEditingBaseline] = useState<Baseline | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const supabase = createClient()
@@ -161,6 +162,17 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
         />
       )}
 
+      {editingBaseline && (
+        <AddBaselineForm
+          eventId={eventId}
+          scopeLines={scopeLines}
+          isFirstBaseline={false}
+          existing={editingBaseline}
+          onSaved={() => { setEditingBaseline(null); fetchBaselines() }}
+          onCancel={() => setEditingBaseline(null)}
+        />
+      )}
+
       {/* Baselines List */}
       {baselines.length === 0 ? (
         <Card className="p-12 text-center">
@@ -255,7 +267,11 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         per-category "Mark Official" toggles were removed: the real process has
                         no baseline-approval concept, and the savings calculation no longer
                         depends on which baseline is flagged official. Baselines stay editable. */}
-                    <div className="flex items-center justify-end border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+                    <div className="flex items-center justify-end gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+                      <button onClick={() => setEditingBaseline(baseline)}
+                        className="flex items-center gap-1 text-xs font-medium text-[var(--brand-ink)] hover:underline">
+                        <Pencil className="h-3.5 w-3.5" /> Edit baseline
+                      </button>
                       <button onClick={() => handleDelete(baseline.id)}
                         title="Delete this baseline"
                         className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
@@ -286,23 +302,25 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 // ============================================
 // Add Baseline Form
 // ============================================
-function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, onSaved, onCancel }: {
+function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, existing, onSaved, onCancel }: {
   eventId: string
   scopeLines: ScopeLine[]
   isFirstBaseline: boolean
+  /** When set, the form edits this baseline instead of creating a new one. */
+  existing?: Baseline | null
   onSaved: () => void
   onCancel: () => void
 }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isEdit = !!existing
   const [form, setForm] = useState({
-    baseline_name: '',
-    baseline_type: '',
-    baseline_source: '',
-    baseline_period_start: '',
-    baseline_period_end: '',
-    baseline_total_amount: '',
+    baseline_type: existing?.baseline_type ?? '',
+    baseline_source: existing?.baseline_source ?? '',
+    baseline_period_start: existing?.baseline_period_start ?? '',
+    baseline_period_end: existing?.baseline_period_end ?? '',
+    baseline_total_amount: existing ? String(existing.baseline_total_amount ?? '') : '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -319,20 +337,33 @@ function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, onSaved, onCanc
       .eq('id', user!.id)
       .single()
 
+    // baseline_name is NOT NULL in the schema but is redundant on screen: the
+    // type plus the source already identify a baseline. Derive it.
+    const derivedName = [form.baseline_type, form.baseline_source].filter(Boolean).join(' - ')
+
+    const payload: Record<string, any> = {
+      baseline_name: derivedName || form.baseline_type || 'Baseline',
+      baseline_type: form.baseline_type,
+      baseline_source: form.baseline_source || null,
+      baseline_period_start: form.baseline_period_start || null,
+      baseline_period_end: form.baseline_period_end || null,
+      baseline_total_amount: form.baseline_total_amount === '' ? 0 : parseFloat(form.baseline_total_amount),
+    }
+
+    if (isEdit) {
+      const { error: updateError } = await supabase
+        .from('baselines').update(payload).eq('id', existing!.id)
+      if (updateError) { setError(updateError.message); setLoading(false); return }
+      onSaved()
+      return
+    }
+
     const { error: insertError } = await supabase
       .from('baselines')
       .insert({
+        ...payload,
         organization_id: profile?.organization_id,
         event_id: eventId,
-        baseline_name: form.baseline_name,
-        baseline_type: form.baseline_type,
-        baseline_source: form.baseline_source || null,
-        baseline_period_start: form.baseline_period_start || null,
-        baseline_period_end: form.baseline_period_end || null,
-        // Direct total entry. The real process is totals-only, so this is the
-        // primary path; baseline lines are optional detail that, when present,
-        // recompute this value.
-        baseline_total_amount: form.baseline_total_amount === '' ? 0 : parseFloat(form.baseline_total_amount),
         // First baseline on an event is the official one for every category. The
         // manual Mark-Official step was removed; nothing in the savings math reads
         // these now, but the offers-tab comparison still uses them.
@@ -355,25 +386,9 @@ function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, onSaved, onCanc
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
-      <h4 className="mb-4 font-medium text-[var(--text)]">New Baseline</h4>
+      <h4 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Baseline' : 'New Baseline'}</h4>
       {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label className={labelClass}>Baseline Name *</label>
-          <Input type="text" required value={form.baseline_name}
-            onChange={(e) => setForm({ ...form, baseline_name: e.target.value })}
-            className="mt-1" placeholder="e.g. Current Contract Baseline" />
-        </div>
-        <div className="md:col-span-2">
-          <label className={labelClass}>Baseline Total ($) *</label>
-          <Input type="number" step="0.01" required value={form.baseline_total_amount}
-            onChange={(e) => setForm({ ...form, baseline_total_amount: e.target.value })}
-            className="mt-1" placeholder="e.g. 1000000 — what you pay today" />
-          <p className="mt-1 text-xs text-[var(--text-3)]">
-            Enter the total directly. Line-item detail is optional; if you add lines later the
-            total is recalculated from them.
-          </p>
-        </div>
         <div>
           <label className={labelClass}>Baseline Type *</label>
           <Select required value={form.baseline_type}
@@ -390,6 +405,16 @@ function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, onSaved, onCanc
           <Input type="text" value={form.baseline_source}
             onChange={(e) => setForm({ ...form, baseline_source: e.target.value })}
             className="mt-1" placeholder="e.g. Existing contract rate card" />
+        </div>
+        <div className="md:col-span-2">
+          <label className={labelClass}>Baseline Total ($) *</label>
+          <Input type="number" step="0.01" required value={form.baseline_total_amount}
+            onChange={(e) => setForm({ ...form, baseline_total_amount: e.target.value })}
+            className="mt-1" placeholder="e.g. 1000000 — what you pay today" />
+          <p className="mt-1 text-xs text-[var(--text-3)]">
+            Enter the total directly. Line-item detail is optional; if you add lines later the
+            total is recalculated from them.
+          </p>
         </div>
         <div>
           <label className={labelClass}>Period Start</label>
@@ -409,7 +434,7 @@ function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, onSaved, onCanc
           Cancel
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? 'Creating...' : 'Create Baseline'}
+          {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Baseline'}
         </Button>
       </div>
     </form>
