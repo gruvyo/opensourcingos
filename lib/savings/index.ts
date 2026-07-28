@@ -223,6 +223,287 @@ export function chainSavings({ opening, baseline, final }: ChainAnchors): ChainR
   return { reduction: null, avoidance: 0, total: 0 }
 }
 
+// ---- THE SAVINGS SCHEDULE (the period model) --------------------------
+// A deal does not save its money all at once — it saves it period by period,
+// and the CFO wants the figure for THIS fiscal year, not for the whole term.
+// So the deal is spread over a schedule: a start month/year, a period type,
+// and a period count produce one row per period, each carrying the same three
+// anchors and running the same chain.
+//
+// Joe's model (project-savings-tab-ideation-and-calculation.xlsx) has three
+// period types, and the point of it is that ALL THREE GIVE THE SAME TOTAL:
+//
+//   Monthly  36 rows x the per-month rate
+//   Annual    3 rows x the per-year rate
+//   One-Time  1 row  x the whole-term amount
+//
+// That falls out of one formula — every row books `perMonth x months_in_row` —
+// because per-year is just per-month x 12 and whole-term is per-month x term.
+// There is no second definition of savings here; the chain does all the work.
+
+/** How the deal's savings are spread over time. */
+export type PeriodType = 'monthly' | 'annual' | 'one_time'
+
+export const PERIOD_TYPES: { value: PeriodType; label: string }[] = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'annual', label: 'Annual' },
+  { value: 'one_time', label: 'One-Time' },
+]
+
+/**
+ * Months covered by ONE period of this type. One-Time collapses the whole deal
+ * into a single row, so its period is the deal term itself.
+ */
+export function periodMonths(type: PeriodType, dealMonths: number): number {
+  if (type === 'monthly') return 1
+  if (type === 'annual') return 12
+  return Math.max(1, Math.round(num(dealMonths)))
+}
+
+/**
+ * How many periods it takes to cover the deal term exactly. A 30-month deal on
+ * an annual schedule needs 3 rows — the third being a 6-month stub, not a full
+ * year — which is why the row's own span is what drives its amount.
+ */
+export function defaultPeriodCount(type: PeriodType, dealMonths: number): number {
+  const d = Math.max(1, Math.round(num(dealMonths)))
+  if (type === 'one_time') return 1
+  return Math.max(1, Math.ceil(d / periodMonths(type, d)))
+}
+
+/** The schedule header: where it starts, how it is sliced, how many slices. */
+export interface ScheduleSpec {
+  /** 1-12. */
+  startMonth: number
+  startYear: number
+  periodType: PeriodType
+  periodCount: number
+  /** The deal term — the Final offer's term. Bounds what the schedule may book. */
+  dealMonths: number
+}
+
+/**
+ * The three anchors as MONTHLY rates. null means the anchor was never captured,
+ * which propagates through the chain as "not applicable" — never as zero.
+ */
+export interface ScheduleRates {
+  baselinePerMonth: number | null
+  openingPerMonth: number | null
+  finalPerMonth: number
+}
+
+export interface SchedulePeriod {
+  /** 1-based. */
+  periodNumber: number
+  /** 1-12. */
+  month: number
+  year: number
+  /** Months of the deal term this row books. Zero past the end of the term. */
+  months: number
+  baseline: number | null
+  opening: number | null
+  final: number
+  /** May be negative (a real cost increase); null when there is no baseline. */
+  reduction: number | null
+  avoidance: number
+  total: number
+}
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+/** 1-12 -> "August". Out-of-range returns an em dash rather than undefined. */
+export function monthName(month: unknown): string {
+  const m = Math.round(num(month))
+  return m >= 1 && m <= 12 ? MONTH_NAMES[m - 1] : '—'
+}
+
+/** Advance a (month, year) pair by n months. Month is 1-12 throughout. */
+export function addMonths(month: number, year: number, n: number): { month: number; year: number } {
+  const zero = (year * 12) + (Math.round(num(month)) - 1) + Math.round(num(n))
+  return { month: (zero % 12) + 1, year: Math.floor(zero / 12) }
+}
+
+/**
+ * Generate the schedule. Every row books `perMonth x months`, where `months` is
+ * how much of the DEAL TERM that row still has left to spend:
+ *
+ *     months(i) = clamp(dealMonths - i * step, 0, step)
+ *
+ * The clamp is the honest part. Rows scheduled past the end of the term book
+ * ZERO rather than inventing savings the contract cannot produce, and a term
+ * that is not a whole number of periods ends in a short final period instead of
+ * being rounded up. Both keep the schedule's grand total equal to the
+ * whole-term figure on the Calculations tab, for every period type.
+ *
+ * Rows are a starting point, not a verdict — they are saved and then editable.
+ */
+export function generateSchedule(spec: ScheduleSpec, rates: ScheduleRates): SchedulePeriod[] {
+  const dealMonths = Math.max(0, Math.round(num(spec.dealMonths)))
+  const step = periodMonths(spec.periodType, dealMonths)
+  const count = Math.max(0, Math.round(num(spec.periodCount)))
+  const rows: SchedulePeriod[] = []
+
+  for (let i = 0; i < count; i++) {
+    const { month, year } = addMonths(spec.startMonth, spec.startYear, i * step)
+    const months = Math.max(0, Math.min(step, dealMonths - i * step))
+
+    const baseline = rates.baselinePerMonth === null ? null : rates.baselinePerMonth * months
+    const opening = rates.openingPerMonth === null ? null : rates.openingPerMonth * months
+    const final = num(rates.finalPerMonth) * months
+    const chain = chainSavings({ baseline, opening, final })
+
+    rows.push({
+      periodNumber: i + 1,
+      month,
+      year,
+      months,
+      baseline,
+      opening,
+      final,
+      reduction: chain.reduction,
+      avoidance: chain.avoidance,
+      total: chain.total,
+    })
+  }
+  return rows
+}
+
+/** A row as it comes back from the database (numbers may arrive as strings). */
+export interface SchedulePeriodRow {
+  period_number?: number | null
+  period_month?: number | null
+  period_year?: number | null
+  period_months?: number | null
+  baseline_amount?: number | string | null
+  opening_amount?: number | string | null
+  final_amount?: number | string | null
+  cost_reduction_amount?: number | string | null
+  cost_avoidance_amount?: number | string | null
+  total_savings_amount?: number | string | null
+}
+
+export interface ScheduleTotals {
+  baseline: number
+  opening: number
+  final: number
+  /** null when NO row has a baseline — not applicable, distinct from zero. */
+  reduction: number | null
+  avoidance: number
+  total: number
+  periodCount: number
+  /** Months of deal term the schedule actually books. */
+  months: number
+}
+
+/** Grand totals down the schedule. The column footer, and the reconciliation. */
+export function scheduleTotals(rows: SchedulePeriod[]): ScheduleTotals {
+  const t: ScheduleTotals = {
+    baseline: 0, opening: 0, final: 0,
+    reduction: null, avoidance: 0, total: 0,
+    periodCount: rows.length, months: 0,
+  }
+  for (const r of rows) {
+    t.baseline += num(r.baseline)
+    t.opening += num(r.opening)
+    t.final += num(r.final)
+    t.avoidance += num(r.avoidance)
+    t.total += num(r.total)
+    t.months += num(r.months)
+    // Stays null only while every row is null, so "no baseline anywhere" reads
+    // as not-applicable while a single grounded row makes the sum meaningful.
+    if (r.reduction !== null) t.reduction = num(t.reduction) + r.reduction
+  }
+  return t
+}
+
+export interface ScheduleYearBucket {
+  year: number
+  reduction: number
+  avoidance: number
+  total: number
+  /** How many of the deal's months fall in this calendar year. */
+  months: number
+}
+
+/**
+ * Group the schedule by CALENDAR YEAR — the fiscal-year report.
+ * (FY = calendar year for this business; it ran Oct-Sep historically, so any
+ * figure labelled FY24 elsewhere is ambiguous and should not be trusted.)
+ *
+ * EVERY PERIOD IS BOOKED PER MONTH, from the month it starts. A period that
+ * straddles a year boundary is split across both years by the months that
+ * actually fall in each — a 12-month period starting in September puts four
+ * months in the first year and eight in the second.
+ *
+ * Attributing a whole period to the year it starts in would round the ending
+ * up to a full year, which is precisely what deriving a per-month rate exists
+ * to prevent. It also made the fiscal-year report depend on how the schedule
+ * happened to be sliced. It no longer does: Monthly, Annual and One-Time all
+ * produce the SAME year buckets for the same deal, which is the invariant
+ * worth protecting here.
+ */
+export function scheduleByYear(rows: SchedulePeriod[]): ScheduleYearBucket[] {
+  const buckets = new Map<number, ScheduleYearBucket>()
+  const ensure = (y: number): ScheduleYearBucket => {
+    let b = buckets.get(y)
+    if (!b) { b = { year: y, reduction: 0, avoidance: 0, total: 0, months: 0 }; buckets.set(y, b) }
+    return b
+  }
+
+  for (const r of rows) {
+    const span = Math.max(0, Math.round(num(r.months)))
+
+    // A period booking no months has nothing to spread. It still carries money
+    // if someone hand-edited a past-term row, so book that to its start year
+    // rather than dividing by zero or dropping it silently.
+    if (span === 0) {
+      const b = ensure(Math.round(num(r.year)))
+      b.reduction += num(r.reduction)
+      b.avoidance += num(r.avoidance)
+      b.total += num(r.total)
+      continue
+    }
+
+    // Per-month rates for THIS period, then one month at a time into its own
+    // calendar year. Whatever the row carries — generated or hand-edited — is
+    // what gets spread; the split is never recomputed here.
+    const perMonth = {
+      reduction: r.reduction === null ? null : r.reduction / span,
+      avoidance: num(r.avoidance) / span,
+      total: num(r.total) / span,
+    }
+    for (let k = 0; k < span; k++) {
+      const { year } = addMonths(r.month, r.year, k)
+      const b = ensure(year)
+      if (perMonth.reduction !== null) b.reduction += perMonth.reduction
+      b.avoidance += perMonth.avoidance
+      b.total += perMonth.total
+      b.months += 1
+    }
+  }
+  return Array.from(buckets.values()).sort((a, b) => a.year - b.year)
+}
+
+/** Normalize DB rows into SchedulePeriods so every reader shares one shape. */
+export function toSchedulePeriods(rows: SchedulePeriodRow[]): SchedulePeriod[] {
+  const nullable = (v: unknown) => (v === null || v === undefined || v === '' ? null : num(v))
+  return rows.map((r, i) => ({
+    periodNumber: Math.round(num(r.period_number)) || i + 1,
+    month: Math.round(num(r.period_month)),
+    year: Math.round(num(r.period_year)),
+    months: num(r.period_months),
+    baseline: nullable(r.baseline_amount),
+    opening: nullable(r.opening_amount),
+    final: num(r.final_amount),
+    reduction: nullable(r.cost_reduction_amount),
+    avoidance: num(r.cost_avoidance_amount),
+    total: num(r.total_savings_amount),
+  }))
+}
+
 // ---- Realized vs Accrued (ONE rule for the whole app) -----------------
 
 /**

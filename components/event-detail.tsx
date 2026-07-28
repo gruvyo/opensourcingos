@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   FileText, List, BarChart2, Users, FileCheck,
-  Calculator, Clock, StickyNote, Pencil,
+  Calculator, CalendarRange, Clock, StickyNote, Pencil,
   Briefcase, LifeBuoy,
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -14,6 +14,7 @@ import { ScopeLinesTab } from './scope-lines-tab'
 import { BaselinesTab } from './baselines-tab'
 import { OffersTab } from './offers-tab'
 import { CalculationsTab } from './calculations-tab'
+import { ScheduleTab } from './schedule-tab'
 import { RealizationTab } from './realization-tab'
 import { EditProjectModal } from './edit-project-modal'
 
@@ -60,6 +61,7 @@ const SOURCING_TABS = [
   // Supplier Offers tab IS the award decision. The separate award record and its
   // two-step ceremony added no information the chain needs. AwardsTab code kept.
   { id: 'calculations', label: 'Calculations', icon: Calculator },
+  { id: 'schedule', label: 'Schedule', icon: CalendarRange },
   // Realization tab hidden per product decision (2026-07-26): realized savings are
   // assumed = projected, so realization tracking adds no signal. Code kept (import +
   // render below) so it can be re-enabled by restoring this entry.
@@ -154,6 +156,7 @@ export function EventDetail({
         {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} />}
         {!isSupport && activeTab === 'awards' && <AwardsTab eventId={event.id} />}
         {!isSupport && activeTab === 'calculations' && <CalculationsTab eventId={event.id} />}
+        {!isSupport && activeTab === 'schedule' && <ScheduleTab eventId={event.id} />}
         {!isSupport && activeTab === 'realization' && <RealizationTab eventId={event.id} />}
 
       </div>
@@ -188,6 +191,13 @@ function OverviewTab({ event }: { event: Event }) {
   const dates = [
     { label: isSupport ? 'Start Date' : 'Project Start', value: event.event_start_date },
     { label: isSupport ? 'Due Date' : 'Project Close', value: event.event_close_date },
+    // The contract start seeds "Savings start" on the Calculations tab, which
+    // seeds the savings schedule. It drove three downstream defaults while
+    // being invisible on this page.
+    ...(isSupport ? [] : [
+      { label: 'Contract Start', value: event.contract_start_date },
+      { label: 'Contract End', value: event.contract_end_date },
+    ]),
   ] as { label: string; value: string | null }[]
 
   return (
