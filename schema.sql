@@ -413,7 +413,7 @@ CREATE TABLE public.savings_calculation_lines (
     awarded_quantity numeric(15,2),
     awarded_extended_amount numeric(15,2) DEFAULT 0,
     savings_amount numeric(15,2) DEFAULT 0,
-    savings_percentage numeric(5,2) DEFAULT 0,
+    savings_percentage numeric(9,2) DEFAULT 0,
     savings_type text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
@@ -437,7 +437,7 @@ CREATE TABLE public.savings_calculations (
     baseline_total_amount numeric(15,2) DEFAULT 0,
     award_total_amount numeric(15,2) DEFAULT 0,
     gross_savings_amount numeric(15,2) DEFAULT 0,
-    savings_percentage numeric(5,2) DEFAULT 0,
+    savings_percentage numeric(9,2) DEFAULT 0,
     net_savings_amount numeric(15,2) DEFAULT 0,
     calculation_status text DEFAULT 'Draft'::text,
     recognition_notes text,
@@ -470,6 +470,13 @@ ALTER TABLE ONLY public.savings_calculations FORCE ROW LEVEL SECURITY;
 --
 
 COMMENT ON COLUMN public.savings_calculations.gross_savings_amount IS 'THE CHAIN TOTAL (Opening - Final) - the reported headline. Equals cost_reduction_amount + cost_avoidance_amount exactly. When no opening was captured this collapses to Cost Reduction (Baseline - Final).';
+
+
+--
+-- Name: COLUMN savings_calculations.savings_percentage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.savings_calculations.savings_percentage IS 'Total savings as a percentage of BASELINE spend (never of the opening ask or the awarded amount). NULL means not applicable -- no baseline anchor. Written only by reportableSavingsPct() in lib/savings.';
 
 
 --
