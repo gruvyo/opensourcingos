@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { chainSavings, termRates, type RateBasis } from '@/lib/savings'
+import { chainSavings, termRates, reportableSavingsPct, type RateBasis } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -92,8 +92,13 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   // apples-to-oranges error the monthly rate exists to prevent.
   const dealMonths = Number(final?.offer_term_months) || Number(baseline?.baseline_term_months) || 12
 
+  // An anchor whose TERM was never captured is NOT CAPTURED, not zero.
+  // termRates() returns perMonth 0 with known:false in that case; treating that
+  // as a real zero used to publish a baseline of $0 and a Cost Reduction of
+  // minus the entire deal, while leaving Total correct so no invariant fired.
+  // `known` exists precisely so callers show "—" instead of "0".
   const pick = (r: ReturnType<typeof termRates>, present: boolean) =>
-    !present ? null
+    !present || !r.known ? null
       : basis === 'perMonth' ? r.perMonth
       : basis === 'perYear' ? r.perYear
       : r.perMonth * dealMonths
@@ -140,6 +145,12 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
 
   const save = async () => {
     if (!final) { setError('Select a Final offer before saving.'); return }
+    // Without the Final offer's term there is no deal term, so nothing here is
+    // derivable. Refuse rather than publish a figure built on a guessed 12.
+    if (!fRates.known) {
+      setError('The Final offer has no term in months, so the deal term is unknown. Set it on the Supplier Offers tab.')
+      return
+    }
     setSaving(true); setError(null)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -154,14 +165,16 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     // been left, and the savings schedule (whole-term by construction) could
     // never agree with it.
     const overTerm = (r: ReturnType<typeof termRates>, present: boolean) =>
-      present ? r.perMonth * dealMonths : null
+      present && r.known ? r.perMonth * dealMonths : null
     const termChain = chainSavings({
       opening: overTerm(oRates, !!opening),
       baseline: overTerm(bRates, !!baseline),
       final: overTerm(fRates, !!final) ?? 0,
     })
 
-    const denom = overTerm(bRates, !!baseline) ?? overTerm(oRates, !!opening) ?? 0
+    // Denominator is BASELINE spend, never the opening ask. Null when there
+    // is no baseline -- see reportableSavingsPct.
+    const baselineOverTerm = overTerm(bRates, !!baseline)
     const payload: Record<string, any> = {
       event_id: eventId,
       baseline_id: baseline?.id ?? null,
@@ -177,7 +190,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       gross_savings_amount: termChain.total,
       cost_reduction_amount: termChain.reduction,
       cost_avoidance_amount: termChain.avoidance,
-      savings_percentage: denom > 0 ? Math.round((termChain.total / denom) * 10000) / 100 : 0,
+      savings_percentage: reportableSavingsPct(termChain.total, baselineOverTerm),
       net_savings_amount: termChain.total,
       savings_start_date: startDate || null,
       savings_end_date: derivedEnd,
@@ -261,9 +274,14 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                   </>
                 ) : (
                   <>
-                    <p className="mt-1 text-lg font-bold text-[var(--text)]">{formatCurrency(shown ?? 0)}</p>
-                    <p className="text-[11px] text-[var(--text-3)]">
-                      {formatCurrency(a.amount ?? 0)} over {a.months ?? '?'} mo
+                    <p className="mt-1 text-lg font-bold text-[var(--text)]">
+                      {r.known ? formatCurrency(shown ?? 0) : '—'}
+                    </p>
+                    <p className={clsx('text-[11px]',
+                      r.known ? 'text-[var(--text-3)]' : 'text-amber-600 dark:text-amber-400')}>
+                      {r.known
+                        ? `${formatCurrency(a.amount ?? 0)} over ${a.months} mo`
+                        : `${formatCurrency(a.amount ?? 0)}, term not captured — cannot be compared`}
                     </p>
                     <p className="mt-1 truncate text-[11px] text-[var(--text-3)]" title={a.detail}>{a.detail}</p>
                   </>

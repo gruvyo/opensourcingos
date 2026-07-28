@@ -37,6 +37,15 @@ export default async function SavingsPage() {
   // Single source of truth for every headline/breakdown number.
   const rollup = portfolioRollup(calcs, eventList as any, { now })
 
+  // The savings TYPE split comes from the two amount columns, never from the
+  // derived savings_type label — a negotiation produces both legs, and the
+  // label only records which one carried the deal. (See app/dashboard/page.tsx
+  // for the same approach.)
+  const typeSplit = [
+    { name: 'Cost Reduction', value: rollup.totalCostReduction },
+    { name: 'Cost Avoidance', value: rollup.totalCostAvoidance },
+  ]
+
   // For per-row realized/accrued badges, use the SAME canonical rule.
   const contractStartByEventId = new Map<string, string | null>()
   for (const e of eventList) contractStartByEventId.set((e as any).id, (e as any).contract_start_date ?? null)
@@ -66,7 +75,7 @@ export default async function SavingsPage() {
         </Card>
         <Card className="p-6">
           <p className="text-sm font-medium text-[var(--text-3)]">Cost Reduction</p>
-          <p className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(rollup.totalCostReduction)}</p>
+          <p className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{formatReduction(rollup.totalCostReduction)}</p>
           <p className="mt-1 text-xs text-[var(--text-3)]">Actual bottom-line reduction — price went down from what we were paying</p>
         </Card>
         <Card className="p-6">
@@ -76,19 +85,25 @@ export default async function SavingsPage() {
         </Card>
       </div>
 
-      {rollup.byType.length > 0 && (
-        <Card className="mt-4 p-6">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Savings by Type</h3>
-          <div className="flex flex-wrap gap-3">
-            {rollup.byType.map(({ name, value }) => (
-              <div key={name} className="rounded-lg bg-[var(--surface-2)] px-4 py-2">
-                <span className="text-sm font-medium text-[var(--text-2)]">{name}</span>
-                <span className="ml-2 text-sm font-bold text-[var(--text)]">{formatCurrency(value)}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {/* The savings TYPE split comes from the two amount columns, never from the
+          derived savings_type label — a negotiation produces both legs, and the
+          label only records which one carried the deal. This keeps the split in
+          agreement with the three cards above it. */}
+      <Card className="mt-4 p-6">
+        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Savings by Type</h3>
+        <div className="flex flex-wrap gap-3">
+          {typeSplit.map(({ name, value }) => (
+            <div key={name} className="rounded-lg bg-[var(--surface-2)] px-4 py-2">
+              <span className="text-sm font-medium text-[var(--text-2)]">{name}</span>
+              <span className="ml-2 text-sm font-bold text-[var(--text)]">{formatCurrency(value)}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-[var(--text-3)]">
+          Splits on the Cost Reduction and Cost Avoidance amounts, not on a project&apos;s
+          label — a negotiation produces both legs.
+        </p>
+      </Card>
 
       {/* Calculations table */}
       <Card className="mt-6 overflow-x-auto">

@@ -107,6 +107,27 @@ export function savingsPct(gross: unknown, baselineTotal: unknown): number {
   return (num(gross) / base) * 100
 }
 
+/**
+ * THE savings percentage that gets STORED and reported, rounded to 2dp.
+ *
+ * Returns null when there is no baseline — deliberately, and this is the whole
+ * point of the function. The two writers used to fall back to the OPENING
+ * proposal as the denominator when no baseline existed, so one CSV column
+ * called "Savings %" carried two different ratios with nothing to tell them
+ * apart: 30% against baseline spend on one row, 23.08% against a vendor's
+ * opening ask on the next. A percentage of a number nobody ever paid is not a
+ * savings percentage, and averaging that column produces a figure that means
+ * nothing at all.
+ *
+ * No baseline therefore reads "n/a", exactly as Cost Reduction does, and for
+ * the same reason.
+ */
+export function reportableSavingsPct(gross: unknown, baselineTotal: unknown): number | null {
+  const base = num(baselineTotal)
+  if (!Number.isFinite(base) || base <= 0) return null
+  return Math.round(savingsPct(gross, base) * 100) / 100
+}
+
 /** Convert an amount to the reporting currency (USD) using the row's FX rate. */
 export function toReportingUsd(amount: unknown, fxRateToUsd: unknown): number {
   const rate = num(fxRateToUsd)
@@ -654,9 +675,16 @@ export function portfolioRollup(
 
   const { byYear, unscheduled } = prorateByYear(calcs)
 
-  // Self-consistency: the type breakdown must add back to the headline total.
-  const typeSum = byType.reduce((s, t) => s + t.value, 0)
-  const reconciles = Math.abs(typeSum - totalSavings) < 0.01
+  // Self-consistency. This used to compare byType's sum against totalSavings --
+  // but both accumulate the same `gross` variable, so it was TRUE BY
+  // CONSTRUCTION and could never fire. It now checks the thing that can
+  // actually drift: the chain's own identity, Total = Reduction + Avoidance.
+  //
+  // Every UI path derives all three from one chainSavings() call, so drift can
+  // only arrive from a direct database write -- which is exactly how seed data
+  // and migrations get in. That is the case worth catching.
+  const reconciles =
+    Math.abs((totalCostReduction + totalCostAvoidance) - totalSavings) < 0.01
 
   return {
     totalSavings,

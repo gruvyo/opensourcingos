@@ -7,6 +7,7 @@ import { formatCurrency, formatReduction as money } from '@/lib/utils'
 import {
   chainSavings, termRates, generateSchedule, scheduleTotals, scheduleByYear,
   toSchedulePeriods, defaultPeriodCount, periodMonths, monthName, addMonths,
+  reportableSavingsPct,
   PERIOD_TYPES, type PeriodType, type ScheduleRates, type SchedulePeriod,
 } from '@/lib/savings'
 import { clsx } from 'clsx'
@@ -97,11 +98,24 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   // The deal term is the Final offer's term — that is what was signed.
   const dealMonths = Number(final?.offer_term_months) || Number(baseline?.baseline_term_months) || 12
 
-  const rates: ScheduleRates = useMemo(() => ({
-    baselinePerMonth: baseline ? termRates(baseline.baseline_total_amount, baseline.baseline_term_months).perMonth : null,
-    openingPerMonth: opening ? termRates(opening.offer_total_amount, opening.offer_term_months).perMonth : null,
-    finalPerMonth: final ? termRates(final.offer_total_amount, final.offer_term_months).perMonth : 0,
-  }), [baseline, opening, final])
+  // An anchor with an amount but NO TERM is not captured, not zero. termRates()
+  // reports that with known:false; ignoring it published a baseline of $0 and a
+  // Cost Reduction of minus the whole deal, with Total still correct so nothing
+  // flagged it.
+  const rates: ScheduleRates = useMemo(() => {
+    const rate = (amount: unknown, months: unknown) => {
+      const r = termRates(amount, months)
+      return r.known ? r.perMonth : null
+    }
+    return {
+      baselinePerMonth: baseline ? rate(baseline.baseline_total_amount, baseline.baseline_term_months) : null,
+      openingPerMonth: opening ? rate(opening.offer_total_amount, opening.offer_term_months) : null,
+      finalPerMonth: final ? (rate(final.offer_total_amount, final.offer_term_months) ?? 0) : 0,
+    }
+  }, [baseline, opening, final])
+
+  /** The deal term is unknown without the Final offer's term; nothing derives. */
+  const dealTermKnown = !!final && termRates(final.offer_total_amount, final.offer_term_months).known
 
   /** What Generate would produce with the settings as they currently stand. */
   const preview = useMemo(
@@ -306,6 +320,16 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
           <p className="text-sm font-medium text-[var(--text)]">No Final offer selected</p>
           <p className="mt-1 text-sm text-[var(--text-3)]">
             The deal term comes from the Final offer, and the schedule cannot be built without it.
+          </p>
+        </Card>
+      ) : !dealTermKnown ? (
+        <Card className="p-8 text-center">
+          <AlertCircle className="mx-auto mb-3 h-8 w-8 text-amber-500" />
+          <p className="text-sm font-medium text-[var(--text)]">The Final offer has no term</p>
+          <p className="mt-1 text-sm text-[var(--text-3)]">
+            Without a term in months there is no deal term, so no period can be sized. Set it on the
+            Supplier Offers tab. Building a schedule on an assumed 12 months would publish a figure
+            nobody could defend.
           </p>
         </Card>
       ) : (
@@ -611,7 +635,7 @@ function publishable(rows: SchedulePeriod[], startMonth: number, startYear: numb
   const end = addMonths(startMonth, startYear, Math.max(1, Math.round(t.months)))
   const endDate = new Date(end.year, end.month - 1, 1)
   endDate.setDate(endDate.getDate() - 1)   // inclusive of the final day
-  const denom = t.baseline > 0 ? t.baseline : t.opening
+  // Denominator is BASELINE spend, never the opening ask; null without one.
 
   return {
     baseline_total_amount: t.baseline,
@@ -624,7 +648,7 @@ function publishable(rows: SchedulePeriod[], startMonth: number, startYear: numb
     // Derived the same way the Calculations tab derives it, so republishing
     // cannot leave a stale label behind.
     savings_type: (t.reduction ?? 0) >= t.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
-    savings_percentage: denom > 0 ? Math.round((t.total / denom) * 10000) / 100 : 0,
+    savings_percentage: reportableSavingsPct(t.total, t.baseline),
     savings_start_date: `${startYear}-${String(startMonth).padStart(2, '0')}-01`,
     savings_end_date: endDate.toISOString().slice(0, 10),
     calculation_name: `${rows.length}-period savings schedule`,

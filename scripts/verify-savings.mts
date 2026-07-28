@@ -27,6 +27,7 @@ import {
   monthSpan,
   calcToPeriods,
   portfolioByYear,
+  portfolioRollup,
   yearOverYear,
   type PeriodType,
   type ScheduleRates,
@@ -545,6 +546,30 @@ section('13. Portfolio rollup: exact, estimated, and unplaceable')
   near('placed + unscheduled === the portfolio',
     p.years.reduce((s, y) => s + y.total, 0) + p.unscheduled,
     GRAND.total + 120_000 + 55_000)
+}
+
+section('14a. The portfolio reconciliation flag can actually fail')
+{
+  // It used to compare two sums that both accumulated the same variable, so it
+  // was true by construction. The case that matters is a row written straight
+  // to the database whose three amounts do not satisfy the chain identity.
+  const consistent = portfolioRollup([
+    { id: 'a', gross_savings_amount: 900_000, cost_reduction_amount: 300_000, cost_avoidance_amount: 600_000 },
+  ], [])
+  eq('a coherent portfolio reconciles', consistent.reconciles, true)
+
+  const corrupted = portfolioRollup([
+    { id: 'a', gross_savings_amount: 900_000, cost_reduction_amount: 300_000, cost_avoidance_amount: 600_000 },
+    { id: 'b', gross_savings_amount: 100_000, cost_reduction_amount: 999_999, cost_avoidance_amount: 888_888 },
+  ], [])
+  eq('a row that breaks Total = Reduction + Avoidance is caught', corrupted.reconciles, false)
+
+  // No baseline anywhere: reduction is null on every row, so the identity is
+  // Total = Avoidance and it must still reconcile rather than false-alarm.
+  const noBaseline = portfolioRollup([
+    { id: 'a', gross_savings_amount: 75_000, cost_reduction_amount: null, cost_avoidance_amount: 75_000 },
+  ], [])
+  eq('an all-avoidance portfolio still reconciles', noBaseline.reconciles, true)
 }
 
 section('14. Year on year')

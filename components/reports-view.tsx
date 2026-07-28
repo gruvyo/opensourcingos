@@ -91,8 +91,15 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
   // Savings figures — single source of truth (lib/savings), scoped to sourcing projects.
   // byBusinessUnit here attributes savings to events by event_id (the old code matched
   // by event_name, which mis-attributed whenever two events shared a name).
+  // savingsCalcs is filtered to sourcingEvents' ids first so the headline total, the
+  // business-unit breakdown, the savings table and the CSV export all count the SAME
+  // set — a calculation belonging to a non-sourcing project would otherwise inflate
+  // the total without appearing in any row, and the table used to ignore the page's
+  // own type/status/business-unit filters entirely while the cards obeyed them.
   const now = new Date()
-  const rollup = portfolioRollup(savingsCalcs as any, sourcingEvents as any, { now })
+  const sourcingEventIds = new Set(sourcingEvents.map((e) => e.id))
+  const sourcingSavingsCalcs = savingsCalcs.filter((c) => c.event_id != null && sourcingEventIds.has(c.event_id))
+  const rollup = portfolioRollup(sourcingSavingsCalcs as any, sourcingEvents as any, { now })
   const totalSavings = rollup.totalSavings
   const totalCostReduction = rollup.totalCostReduction
   const totalCostAvoidance = rollup.totalCostAvoidance
@@ -135,7 +142,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
 
   const exportSavings = () => {
     const headers = ['Event', 'Calculation', 'Type', 'Cost Reduction', 'Cost Avoidance', 'Total Savings', 'Savings %', 'Status', 'Savings Start', 'Savings End', 'Classification']
-    const rows = [headers, ...savingsCalcs.map(c => {
+    const rows = [headers, ...sourcingSavingsCalcs.map(c => {
       const isRealized = classifyRealization(c as any, contractStartByEventId, now) === 'Realized'
       return [
         getFirst(c.event)?.event_name || '', c.calculation_name, c.savings_type,
@@ -158,7 +165,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className="p-6">
           <p className={labelClass}>Cost Reduction</p>
-          <p className={`${valueClass} text-red-600 dark:text-red-400`}>{formatCurrency(totalCostReduction)}</p>
+          <p className={`${valueClass} text-red-600 dark:text-red-400`}>{formatReduction(totalCostReduction)}</p>
           <p className="mt-1 text-xs text-[var(--text-3)]">Actual bottom-line reduction — price went down from what we were paying</p>
         </Card>
         <Card className="p-6">
@@ -332,7 +339,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             {savingsCalcs.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--text-3)]">No savings calculations yet</td></tr>
             ) : (
-              savingsCalcs.map((c) => {
+              sourcingSavingsCalcs.map((c) => {
                 const isRealized = classifyRealization(c as any, contractStartByEventId, now) === 'Realized'
                 return (
                   <tr key={c.id} className="hover:bg-[var(--surface-2)]">

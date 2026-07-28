@@ -296,21 +296,14 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         Use as baseline
                       </button>
                     )}
-                    {baselines.length > 1 && baseline.official_for_hard_savings && (
-                      <span className="flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300" title="Official for Hard Savings">
-                        <Star className="h-3 w-3 fill-current" /> Hard $
-                      </span>
-                    )}
-                    {baselines.length > 1 && baseline.official_for_cost_avoidance && (
-                      <span className="flex items-center gap-1 rounded bg-purple-100 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300" title="Official for Cost Avoidance">
-                        <Star className="h-3 w-3 fill-current" /> Avoid
-                      </span>
-                    )}
-                    {baselines.length > 1 && baseline.official_for_demand_reduction && (
-                      <span className="flex items-center gap-1 rounded bg-orange-100 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-300" title="Official for Demand Reduction">
-                        <Star className="h-3 w-3 fill-current" /> Demand
-                      </span>
-                    )}
+                    {/* The "Hard $" / "Avoid" / "Demand" badges lived here. They
+                        rendered official_for_hard_savings and its two siblings,
+                        which are only ever written at INSERT (true for the first
+                        baseline) -- the "Mark Official" control that could change
+                        them was retired on 2026-07-26. So they pinned themselves
+                        to whichever baseline happened to be added first and then
+                        contradicted the "Selected" badge above forever after.
+                        The columns still exist; nothing reads them. */}
                   </div>
                 </div>
 

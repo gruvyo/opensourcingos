@@ -1018,16 +1018,27 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
 }) {
   const supabase = createClient()
   const [baselines, setBaselines] = useState<any[]>([])
+  const [baselineError, setBaselineError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch the official baseline for comparison
+    // THE baseline is the one marked is_selected -- the same one the chain, the
+    // Calculations tab and the Schedule tab all measure against.
+    //
+    // This used to query official_for_hard_savings instead. That column is only
+    // ever written at insert (true for the first baseline) and the UI that could
+    // change it -- "Mark Official" -- was deliberately removed, so nothing could
+    // move it afterwards. Add a second, more accurate baseline and click "Use as
+    // baseline", and this comparison silently kept measuring against the first
+    // one: two different verdicts about the same offer, on two tabs, with no way
+    // to reconcile them.
     const fetchBaseline = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('baselines')
         .select('*, baseline_lines(*)')
         .eq('event_id', eventId)
-        .eq('official_for_hard_savings', true)
+        .eq('is_selected', true)
         .maybeSingle()
+      if (error) { setBaselineError(error.message); return }
       if (data) setBaselines([data])
     }
     fetchBaseline()
@@ -1080,6 +1091,22 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
     return line ? line.baseline_extended_amount : null
   }
 
+  // The ANNUAL run-rate for a line, which is what a line-level comparison has
+  // to use. Subtracting raw extended amounts made a 36-month offer line look
+  // 1.7m worse than a 12-month baseline line while the Total row directly
+  // beneath it -- correctly annualized -- called the same offer 100k cheaper.
+  // Same column, opposite verdicts. Both tables already store the annualized
+  // figure; only the row comparison was ignoring it.
+  const getBaselineLineAnnual = (scopeLineId: string) => {
+    const line = baselineLines.find((l: any) => l.scope_line_id === scopeLineId)
+    return line ? (line.annualized_baseline_amount ?? null) : null
+  }
+
+  const getLineAnnual = (offerId: string, scopeLineId: string) => {
+    const line = (offerLines[offerId] || []).find((l: any) => l.scope_line_id === scopeLineId)
+    return line ? (line.annualized_offer_amount ?? null) : null
+  }
+
   return (
     <Card className="mb-6 overflow-hidden">
       <div className="border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
@@ -1088,6 +1115,11 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
           Side-by-Side Offer Comparison
         </h4>
         <p className="mt-1 text-xs text-[var(--text-3)]">Compared on the annual run-rate, so terms of different lengths line up</p>
+        {baselineError && (
+          <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
+            Could not load the baseline: {baselineError}
+          </p>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -1141,8 +1173,12 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                   {offers.map((offer) => {
                     const amount = getLineAmount(offer.id, scopeLineId)
                     const unitPrice = getLineUnitPrice(offer.id, scopeLineId)
-                    const baselineAmount = getBaselineLineAmount(scopeLineId)
-                    const savings = (baselineAmount && amount) ? baselineAmount - amount : null
+                    // Compared on the annual run-rate, like the Total row.
+                    // `!= null` rather than truthiness: a genuine zero is a real
+                    // figure, and treating it as missing blanked the comparison.
+                    const bAnnual = getBaselineLineAnnual(scopeLineId)
+                    const oAnnual = getLineAnnual(offer.id, scopeLineId)
+                    const savings = bAnnual != null && oAnnual != null ? bAnnual - oAnnual : null
                     return (
                       <td key={offer.id} className="px-4 py-3 text-right text-sm">
                         {amount !== null ? (
@@ -1150,10 +1186,10 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                             <div className="font-medium text-[var(--text)]">{formatCurrency(amount)}</div>
                             <div className="text-xs text-[var(--text-3)]">@ {formatCurrency(unitPrice || 0)}</div>
                             {savings !== null && savings > 0 && (
-                              <div className="text-xs font-medium text-green-600 dark:text-green-400">↓ {formatCurrency(savings)}</div>
+                              <div className="text-xs font-medium text-green-600 dark:text-green-400">↓ {formatCurrency(savings)}/yr</div>
                             )}
                             {savings !== null && savings < 0 && (
-                              <div className="text-xs font-medium text-red-600 dark:text-red-400">↑ {formatCurrency(Math.abs(savings))}</div>
+                              <div className="text-xs font-medium text-red-600 dark:text-red-400">↑ {formatCurrency(Math.abs(savings))}/yr</div>
                             )}
                           </div>
                         ) : (

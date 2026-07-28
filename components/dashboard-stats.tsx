@@ -1,6 +1,6 @@
 'use client'
 
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatReduction } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { DollarSign, Briefcase, ArrowDownRight, ArrowUpRight, TrendingUp } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -50,7 +50,7 @@ function StatCard({ card }: { card: CardDef }) {
 export function DashboardStats({ stats }: { stats: Stats }) {
   const savingsCards: CardDef[] = [
     { label: 'Total Savings', value: formatCurrency(stats.totalSavings), icon: DollarSign, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30', sub: 'Cost reduction + cost avoidance' },
-    { label: 'Cost Reduction', value: formatCurrency(stats.totalCostReduction), icon: ArrowDownRight, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30', sub: 'Actual bottom-line reduction — price went down' },
+    { label: 'Cost Reduction', value: formatReduction(stats.totalCostReduction), icon: ArrowDownRight, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30', sub: 'Actual bottom-line reduction — price went down' },
     { label: 'Cost Avoidance', value: formatCurrency(stats.totalCostAvoidance), icon: ArrowUpRight, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30', sub: 'Value not paid — negotiated below supplier proposal' },
   ]
 
