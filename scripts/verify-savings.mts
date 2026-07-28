@@ -29,6 +29,9 @@ import {
   portfolioByYear,
   portfolioRollup,
   yearOverYear,
+  baselineQuality,
+  chainWithBaselineQuality,
+  type ChainAnchors,
   type PeriodType,
   type ScheduleRates,
 } from '../lib/savings/index.ts'
@@ -602,6 +605,83 @@ section('14. Year on year')
   ])
   eq('a non-consecutive year has no prior', gapped[1].prior, null)
   eq('and no percentage', gapped[1].pct, null)
+}
+
+// ---------------------------------------------------------------------
+// 15. HARD vs SOFT BASELINES — the governing principle
+// ---------------------------------------------------------------------
+section('15. A soft baseline cannot book a hard reduction')
+{
+  eq('Current Contract is hard', baselineQuality('Current Contract').isHard, true)
+  eq('Prior 12-Month Actual is hard', baselineQuality('Prior 12-Month Actual').isHard, true)
+  eq('Should-Cost Model is hard', baselineQuality('Should-Cost Model').isHard, true)
+  eq('Approved Budget is SOFT', baselineQuality('Approved Budget').isHard, false)
+  eq('Supplier Renewal Quote is soft', baselineQuality('Supplier Renewal Quote').isHard, false)
+  eq('Competitive Bid Benchmark is soft', baselineQuality('Competitive Bid Benchmark').isHard, false)
+  eq('Market Index is soft', baselineQuality('Market Index').isHard, false)
+  eq('Initial Supplier Quote is soft', baselineQuality('Initial Supplier Quote').isHard, false)
+
+  // An unclassified type must fail SAFE — toward claiming less, not more.
+  eq('an unknown type is soft', baselineQuality('Something Invented').isHard, false)
+  eq('an empty type is soft', baselineQuality('').isHard, false)
+  eq('a null type is soft', baselineQuality(null).isHard, false)
+
+  // The override needs a real reason. The UI enforces it and so does a CHECK
+  // constraint; the rule itself must not be the weak link.
+  eq('override with no reason does not apply',
+    baselineQuality('Market Index', { enabled: true, reason: null }).isHard, false)
+  eq('override with a token reason does not apply',
+    baselineQuality('Market Index', { enabled: true, reason: 'ok' }).isHard, false)
+  eq('override with whitespace only does not apply',
+    baselineQuality('Market Index', { enabled: true, reason: '           ' }).isHard, false)
+  const ovr = baselineQuality('Market Index', {
+    enabled: true, reason: 'Invoices lost in the ERP migration; renewal quote matches AP records.',
+  })
+  eq('a justified override applies', ovr.isHard, true)
+  eq('and is marked as an override', ovr.byOverride, true)
+  eq('a genuinely hard type is never "by override"',
+    baselineQuality('Current Contract', { enabled: true, reason: 'x'.repeat(20) }).byOverride, false)
+}
+
+section('16. Reclassifying a baseline never changes the Total')
+{
+  // THE property that makes this safe to roll out. Whatever a baseline is
+  // classified as, the headline figure reported to the CFO is identical --
+  // only the split between the hard and soft lines moves.
+  const cases: [string, ChainAnchors][] = [
+    ['opening captured', { opening: 1_200_000, baseline: 1_000_000, final: 900_000 }],
+    ['NO opening captured', { opening: null, baseline: 1_000_000, final: 900_000 }],
+    ['final above baseline (a real increase)', { opening: 1_200_000, baseline: 1_000_000, final: 1_100_000 }],
+    ['no baseline at all', { opening: 500_000, baseline: null, final: 425_000 }],
+    ['reference deal', { opening: 3_600_000, baseline: 3_000_000, final: 2_700_000 }],
+  ]
+  for (const [label, anchors] of cases) {
+    const hard = chainWithBaselineQuality(anchors, true)
+    const soft = chainWithBaselineQuality(anchors, false)
+    near(`${label}: TOTAL is identical`, soft.total, hard.total)
+    eq(`${label}: soft reports reduction as n/a`, soft.reduction, null)
+    near(`${label}: soft total === reduction + avoidance`,
+      soft.total, (soft.reduction ?? 0) + soft.avoidance, 1e-6)
+    near(`${label}: hard total === reduction + avoidance`,
+      hard.total, (hard.reduction ?? 0) + hard.avoidance, 1e-6)
+  }
+
+  // The specific trap: with no Opening, a soft baseline must take its place.
+  // Discarding it would drop the whole deal to zero and the money would
+  // simply vanish from the report.
+  const noOpening = chainWithBaselineQuality(
+    { opening: null, baseline: 1_000_000, final: 900_000 }, false)
+  near('a soft baseline with no opening still books 100,000', noOpening.avoidance, 100_000)
+  near('and the total survives', noOpening.total, 100_000)
+
+  // Worked example from the brief: 1,200,000 / 1,000,000 / 900,000.
+  const h = chainWithBaselineQuality({ opening: 1_200_000, baseline: 1_000_000, final: 900_000 }, true)
+  const s = chainWithBaselineQuality({ opening: 1_200_000, baseline: 1_000_000, final: 900_000 }, false)
+  near('hard: reduction 100,000', h.reduction, 100_000)
+  near('hard: avoidance 200,000', h.avoidance, 200_000)
+  near('soft: avoidance absorbs all 300,000', s.avoidance, 300_000)
+  near('both total 300,000', h.total, 300_000)
+  near('both total 300,000', s.total, 300_000)
 }
 
 // ---------------------------------------------------------------------

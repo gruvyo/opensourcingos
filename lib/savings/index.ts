@@ -529,6 +529,123 @@ export function toSchedulePeriods(rows: SchedulePeriodRow[]): SchedulePeriod[] {
   }))
 }
 
+// ---- HARD vs SOFT BASELINES (the governing principle) -----------------
+// Ruled 2026-07-18: a HARD cost reduction requires a baseline grounded in
+// YOUR OWN SPEND, not in a vendor's ask or a market figure. Only a hard
+// reduction is bookable to the P&L, so this decides what may be claimed as
+// a bottom-line saving rather than as value not paid.
+//
+// Ruled 2026-07-28: Approved Budget is SOFT, not a third category. A
+// department's budget is an internal reference figure -- close to a market
+// index -- and not money that was actually paid.
+//
+// THE PROPERTY THAT MAKES THIS SAFE: reclassifying a baseline NEVER changes
+// the Total. It only moves money between the Reduction and Avoidance lines.
+// chainWithBaselineQuality() below guarantees that, and it is asserted.
+
+/**
+ * Which baseline types are grounded in your own spend.
+ *
+ * Unlisted types default to SOFT — deliberately. A type nobody has
+ * classified is a type nobody has defended, and the safe direction for an
+ * unknown is avoidance, which claims less.
+ */
+export const BASELINE_TYPE_IS_HARD: Record<string, boolean> = {
+  // Your own spend. What you actually paid, or are contractually paying.
+  'Current Contract': true,
+  'Prior 12-Month Actual': true,
+  // Your own analysis of what the thing should cost. Not a vendor's number
+  // and not the market's — ruled to qualify on 2026-07-18.
+  'Should-Cost Model': true,
+
+  // Reference figures. Real and useful, but nobody ever paid them.
+  'Approved Budget': false,          // finance's intention, not a payment
+  'Supplier Renewal Quote': false,   // the incumbent's ask
+  'Competitive Bid Benchmark': false,// other vendors' prices
+  'Market Index': false,             // the market's price
+  'Initial Supplier Quote': false,   // the vendor's opening ask
+}
+
+export interface BaselineQuality {
+  /** True when this baseline may drive a hard Cost Reduction. */
+  isHard: boolean
+  /** True when it only qualifies because a human overrode the type. */
+  byOverride: boolean
+  /** Short, user-facing reason this baseline is hard or soft. */
+  explanation: string
+}
+
+/**
+ * Decide whether a baseline may drive a hard Cost Reduction.
+ *
+ * `override` lets a buyer declare a soft baseline defensible anyway — the
+ * invoices for last year are gone, but the incumbent's renewal quote is
+ * known to match what was actually paid. It requires a written reason
+ * (enforced by a CHECK constraint, not merely by the UI) and is surfaced
+ * everywhere the number appears, because an override nobody can find later
+ * is not defensible.
+ */
+export function baselineQuality(
+  baselineType: string | null | undefined,
+  override?: { enabled?: boolean | null; reason?: string | null } | null,
+): BaselineQuality {
+  const type = (baselineType || '').trim()
+  const known = Object.prototype.hasOwnProperty.call(BASELINE_TYPE_IS_HARD, type)
+  const typeIsHard = known ? BASELINE_TYPE_IS_HARD[type] : false
+
+  if (typeIsHard) {
+    return { isHard: true, byOverride: false, explanation: `${type} is grounded in your own spend.` }
+  }
+
+  const reason = (override?.reason || '').trim()
+  if (override?.enabled && reason.length >= 10) {
+    return {
+      isHard: true,
+      byOverride: true,
+      explanation: `${type || 'This baseline'} is normally soft; booked as hard by override.`,
+    }
+  }
+
+  return {
+    isHard: false,
+    byOverride: false,
+    explanation: known
+      ? `${type} is a reference figure, not spend you incurred, so it cannot book a hard reduction.`
+      : `"${type || 'Unspecified'}" is not a classified baseline type, so it books as avoidance.`,
+  }
+}
+
+/**
+ * THE CHAIN, aware of whether the baseline may book a hard reduction.
+ *
+ * A hard baseline runs the chain unchanged. A SOFT baseline is not current
+ * spend, so there is nothing to reduce against: Cost Reduction becomes NOT
+ * APPLICABLE and the span books as avoidance instead.
+ *
+ * The subtlety worth understanding: when there is no Opening proposal, the
+ * soft baseline takes its place rather than being discarded. Discarding it
+ * would drop the deal's entire value to zero — the money would vanish from
+ * the report. It is a ceiling somebody quoted; that is exactly what an
+ * opening proposal is.
+ *
+ * Consequently TOTAL IS IDENTICAL either way. Only the split moves.
+ */
+export function chainWithBaselineQuality(
+  { opening, baseline, final }: ChainAnchors,
+  isHard: boolean,
+): ChainResult {
+  if (isHard) return chainSavings({ opening, baseline, final })
+
+  const present = (v: unknown) =>
+    v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v))
+
+  return chainSavings({
+    opening: present(opening) ? opening : (present(baseline) ? baseline : null),
+    baseline: null,
+    final,
+  })
+}
+
 // ---- Realized vs Accrued (ONE rule for the whole app) -----------------
 
 /**

@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X } from 'lucide-react'
 import { formatCurrency, formatReduction as money } from '@/lib/utils'
 import {
-  chainSavings, termRates, generateSchedule, scheduleTotals, scheduleByYear,
+  chainSavings, chainWithBaselineQuality, baselineQuality,
+  termRates, generateSchedule, scheduleTotals, scheduleByYear,
   toSchedulePeriods, defaultPeriodCount, periodMonths, monthName, addMonths,
   reportableSavingsPct,
   PERIOD_TYPES, type PeriodType, type ScheduleRates, type SchedulePeriod,
@@ -55,7 +56,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   const load = useCallback(async () => {
     const [bases, offers, calcs] = await Promise.all([
       supabase.from('baselines')
-        .select('id, baseline_total_amount, baseline_term_months, baseline_type, baseline_source, is_selected')
+        .select('id, baseline_total_amount, baseline_term_months, baseline_type, baseline_source, is_selected, hard_reduction_override, hard_reduction_override_reason')
         .eq('event_id', eventId),
       supabase.from('supplier_offers')
         .select('id, offer_total_amount, offer_term_months, offer_role')
@@ -98,6 +99,12 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   // The deal term is the Final offer's term — that is what was signed.
   const dealMonths = Number(final?.offer_term_months) || Number(baseline?.baseline_term_months) || 12
 
+  /** Whether this baseline may drive a hard Cost Reduction at all. */
+  const quality = useMemo(() => baselineQuality(baseline?.baseline_type, {
+    enabled: baseline?.hard_reduction_override,
+    reason: baseline?.hard_reduction_override_reason,
+  }), [baseline])
+
   // An anchor with an amount but NO TERM is not captured, not zero. termRates()
   // reports that with known:false; ignoring it published a baseline of $0 and a
   // Cost Reduction of minus the whole deal, with Total still correct so nothing
@@ -107,12 +114,19 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
       const r = termRates(amount, months)
       return r.known ? r.perMonth : null
     }
+    const b = baseline ? rate(baseline.baseline_total_amount, baseline.baseline_term_months) : null
+    const o = opening ? rate(opening.offer_total_amount, opening.offer_term_months) : null
+
+    // A SOFT baseline is a reference figure, not spend, so no period may book
+    // a hard reduction against it. Drop it out of the baseline slot -- and put
+    // it in the opening slot when nothing is there, or the deal's whole value
+    // would vanish from the schedule rather than moving to the avoidance line.
     return {
-      baselinePerMonth: baseline ? rate(baseline.baseline_total_amount, baseline.baseline_term_months) : null,
-      openingPerMonth: opening ? rate(opening.offer_total_amount, opening.offer_term_months) : null,
+      baselinePerMonth: quality.isHard ? b : null,
+      openingPerMonth: quality.isHard ? o : (o ?? b),
       finalPerMonth: final ? (rate(final.offer_total_amount, final.offer_term_months) ?? 0) : 0,
     }
-  }, [baseline, opening, final])
+  }, [baseline, opening, final, quality])
 
   /** The deal term is unknown without the Final offer's term; nothing derives. */
   const dealTermKnown = !!final && termRates(final.offer_total_amount, final.offer_term_months).known
@@ -126,6 +140,8 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
 
   // The whole deal, straight off the anchors. Every schedule must add back to
   // this — it is the same chain, just not sliced up.
+  // rates already reflect the baseline's quality, so the plain chain is right
+  // here -- running chainWithBaselineQuality again would demote it twice.
   const dealChain = chainSavings({
     baseline: rates.baselinePerMonth === null ? null : rates.baselinePerMonth * dealMonths,
     opening: rates.openingPerMonth === null ? null : rates.openingPerMonth * dealMonths,

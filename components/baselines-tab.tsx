@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Star, Trash2, ChevronDown, Pencil,
-  ChevronRight, AlertCircle, Shield, TrendingUp, Calculator
-} from 'lucide-react'
+  ChevronRight, AlertCircle, Shield, TrendingUp, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { termRates } from '@/lib/savings'
+import { termRates, baselineQuality } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,6 +28,10 @@ type Baseline = {
   official_for_hard_savings: boolean
   official_for_cost_avoidance: boolean
   official_for_demand_reduction: boolean
+  // A soft baseline declared defensible as own-spend, with a written reason.
+  hard_reduction_override: boolean
+  hard_reduction_override_reason: string | null
+  hard_reduction_override_at: string | null
 }
 
 type ScopeLine = {
@@ -178,9 +181,28 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
         <div className="flex items-start gap-3">
           <Shield className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
           <div>
-            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Baseline Defensibility Hierarchy</h4>
+            {/* This used to rank all eight types on a "defensibility" scale that
+                put Approved Budget above Should-Cost Model. That ranking now
+                contradicts the rule the numbers actually follow, which is not a
+                ranking at all but a line: is this money you paid, or a figure
+                somebody quoted? Two groups, not eight rungs. */}
+            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+              What makes a cost reduction hard
+            </h4>
             <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-              Most defensible → Least defensible: Current Contract → Prior 12-Month Actual → Approved Budget → Supplier Renewal Quote → Competitive Bid → Market Index → Should-Cost Model → Initial Supplier Quote
+              A <strong>hard</strong> Cost Reduction — the figure your CFO can book to the P&amp;L —
+              requires a baseline grounded in <strong>your own spend</strong>. Current Contract,
+              Prior 12-Month Actual and Should-Cost Model qualify.
+            </p>
+            <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
+              Approved Budget, Supplier Renewal Quote, Competitive Bid Benchmark, Market Index and
+              Initial Supplier Quote are reference figures — real and useful, but nobody ever paid
+              them. Their value books as <strong>Cost Avoidance</strong> instead.
+            </p>
+            <p className="mt-1 text-xs text-blue-700 dark:text-blue-300 opacity-90">
+              Either way the <strong>Total is the same</strong>. Only the split between the two
+              lines moves. Expand a baseline to record an override if a soft type genuinely does
+              reflect what you were paying.
             </p>
           </div>
         </div>
@@ -296,6 +318,38 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         Use as baseline
                       </button>
                     )}
+
+                    {/* Whether this type may book a HARD Cost Reduction. Shown on
+                        every baseline, not just the selected one, so the
+                        consequence of a choice is visible before it is made. */}
+                    {(() => {
+                      const q = baselineQuality(baseline.baseline_type, {
+                        enabled: baseline.hard_reduction_override,
+                        reason: baseline.hard_reduction_override_reason,
+                      })
+                      if (q.isHard && !q.byOverride) {
+                        return (
+                          <span className="flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            title={q.explanation}>
+                            <ShieldCheck className="h-3 w-3" /> Hard
+                          </span>
+                        )
+                      }
+                      if (q.byOverride) {
+                        return (
+                          <span className="flex items-center gap-1 rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            title={`Booked as hard by override: ${baseline.hard_reduction_override_reason}`}>
+                            <ShieldAlert className="h-3 w-3" /> Hard by override
+                          </span>
+                        )
+                      }
+                      return (
+                        <span className="flex items-center gap-1 rounded bg-[var(--surface-2)] px-2 py-1 text-xs font-medium text-[var(--text-2)]"
+                          title={q.explanation}>
+                          Soft — books as avoidance
+                        </span>
+                      )
+                    })()}
                     {/* The "Hard $" / "Avoid" / "Demand" badges lived here. They
                         rendered official_for_hard_savings and its two siblings,
                         which are only ever written at INSERT (true for the first
@@ -326,6 +380,14 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                       </button>
                     </div>
 
+                    {/* The hard/soft override. Only offered where it can matter:
+                        a type that does not already qualify on its own. */}
+                    <HardReductionOverride
+                      baseline={baseline}
+                      onChanged={fetchBaselines}
+                      onError={setActionError}
+                    />
+
                     {/* Baseline Lines Table */}
                     <BaselineLinesTable
                       baselineId={baseline.id}
@@ -340,6 +402,132 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
               </Card>
             )
           })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Declare a soft baseline defensible enough to book a HARD cost reduction.
+ *
+ * The governing principle is that a hard reduction needs a baseline grounded
+ * in your own spend. Real deals break that occasionally for honest reasons —
+ * the invoices are gone, but the incumbent's renewal quote is known to match
+ * what was actually being paid — so the rule bends rather than blocking work.
+ *
+ * It bends ON THE RECORD. The reason is mandatory (a CHECK constraint enforces
+ * it, not just this form), it is stamped with who and when, and it is shown on
+ * the Calculations tab, in reports and in the CSV. An override nobody can find
+ * later is not defensible; one that appears in every report is.
+ */
+function HardReductionOverride({
+  baseline,
+  onChanged,
+  onError,
+}: {
+  baseline: any
+  onChanged: () => void
+  onError: (m: string | null) => void
+}) {
+  const supabase = createClient()
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState(baseline.hard_reduction_override_reason || '')
+  const [busy, setBusy] = useState(false)
+
+  const q = baselineQuality(baseline.baseline_type, {
+    enabled: baseline.hard_reduction_override,
+    reason: baseline.hard_reduction_override_reason,
+  })
+
+  // A type that qualifies on its own has nothing to override.
+  if (q.isHard && !q.byOverride) return null
+
+  const MIN = 10
+
+  const apply = async (enable: boolean) => {
+    onError(null)
+    if (enable && reason.trim().length < MIN) return
+    setBusy(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('baselines').update(
+      enable
+        ? {
+            hard_reduction_override: true,
+            hard_reduction_override_reason: reason.trim(),
+            hard_reduction_override_by: user?.id ?? null,
+            hard_reduction_override_at: new Date().toISOString(),
+          }
+        : {
+            hard_reduction_override: false,
+            hard_reduction_override_reason: null,
+            hard_reduction_override_by: null,
+            hard_reduction_override_at: null,
+          },
+    ).eq('id', baseline.id)
+    setBusy(false)
+    if (error) { onError(error.message); return }
+    setOpen(false)
+    onChanged()
+  }
+
+  return (
+    <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+      {q.byOverride ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="text-xs text-amber-700 dark:text-amber-300">
+            <p className="font-semibold">Booked as a hard cost reduction by override</p>
+            <p className="mt-0.5 italic">&ldquo;{baseline.hard_reduction_override_reason}&rdquo;</p>
+            {baseline.hard_reduction_override_at && (
+              <p className="mt-0.5 text-[var(--text-3)]">
+                Recorded {formatDate(baseline.hard_reduction_override_at)}
+              </p>
+            )}
+          </div>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => apply(false)}>
+            {busy ? 'Working...' : 'Remove override'}
+          </Button>
+        </div>
+      ) : !open ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-[var(--text-2)]">
+            {q.explanation} Its value books as <strong>Cost Avoidance</strong> instead — the Total is
+            the same either way.
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+            Book as hard anyway
+          </Button>
+        </div>
+      ) : (
+        <div>
+          <label htmlFor={`ovr-${baseline.id}`} className="block text-xs font-medium text-[var(--text-2)]">
+            Why is this baseline defensible as your own spend?
+          </label>
+          <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+            This is shown on the Calculations tab and in every report that carries the number, so
+            write it for whoever asks about it a year from now.
+          </p>
+          <textarea
+            id={`ovr-${baseline.id}`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="e.g. Invoices lost in the ERP migration; this renewal quote matches the AP records we do have."
+            className="mt-2 w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <span className="mr-auto text-[11px] text-[var(--text-3)]">
+              {reason.trim().length < MIN
+                ? `${MIN - reason.trim().length} more characters needed`
+                : 'Ready'}
+            </span>
+            <Button size="sm" variant="secondary" onClick={() => { setOpen(false); setReason(baseline.hard_reduction_override_reason || '') }}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={busy || reason.trim().length < MIN} onClick={() => apply(true)}>
+              {busy ? 'Saving...' : 'Record override'}
+            </Button>
+          </div>
         </div>
       )}
     </div>

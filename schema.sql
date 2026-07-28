@@ -230,8 +230,13 @@ CREATE TABLE public.baselines (
     updated_by uuid,
     baseline_term_months numeric,
     is_selected boolean DEFAULT false NOT NULL,
+    hard_reduction_override boolean DEFAULT false NOT NULL,
+    hard_reduction_override_reason text,
+    hard_reduction_override_by uuid,
+    hard_reduction_override_at timestamp with time zone,
     CONSTRAINT baselines_baseline_lock_status_check CHECK ((baseline_lock_status = ANY (ARRAY['Draft'::text, 'Locked'::text, 'Submitted'::text, 'Approved'::text, 'Rejected'::text]))),
-    CONSTRAINT chk_baseline_lock_status CHECK ((baseline_lock_status = ANY (ARRAY['Draft'::text, 'Locked'::text, 'Submitted'::text, 'Approved'::text, 'Rejected'::text])))
+    CONSTRAINT chk_baseline_lock_status CHECK ((baseline_lock_status = ANY (ARRAY['Draft'::text, 'Locked'::text, 'Submitted'::text, 'Approved'::text, 'Rejected'::text]))),
+    CONSTRAINT chk_hard_reduction_override_reason CHECK (((hard_reduction_override = false) OR ((hard_reduction_override_reason IS NOT NULL) AND (length(btrim(hard_reduction_override_reason)) >= 10))))
 );
 
 ALTER TABLE ONLY public.baselines FORCE ROW LEVEL SECURITY;
@@ -249,6 +254,20 @@ COMMENT ON COLUMN public.baselines.baseline_term_months IS 'Term the baseline_to
 --
 
 COMMENT ON COLUMN public.baselines.is_selected IS 'True for the one baseline this project measures against. At most one per event.';
+
+
+--
+-- Name: COLUMN baselines.hard_reduction_override; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.baselines.hard_reduction_override IS 'True when a buyer has declared this baseline good enough to book a HARD cost reduction despite its type being classified as soft. Never changes the Total -- only moves money between the Reduction and Avoidance lines.';
+
+
+--
+-- Name: COLUMN baselines.hard_reduction_override_reason; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.baselines.hard_reduction_override_reason IS 'Why this baseline is defensible as own-spend despite its type. Required when the override is on, minimum 10 characters, enforced by CHECK.';
 
 
 --

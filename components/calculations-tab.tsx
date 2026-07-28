@@ -4,7 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { chainSavings, termRates, reportableSavingsPct, type RateBasis } from '@/lib/savings'
+import {
+  chainSavings, chainWithBaselineQuality, baselineQuality, termRates,
+  reportableSavingsPct, type RateBasis,
+} from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,7 +54,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const load = useCallback(async () => {
     const [{ data: bases }, { data: offers }, { data: calcs }, { data: ev }] = await Promise.all([
       supabase.from('baselines')
-        .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected')
+        .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected, hard_reduction_override, hard_reduction_override_reason')
         .eq('event_id', eventId),
       supabase.from('supplier_offers')
         .select('id, offer_total_amount, offer_term_months, offer_role, offer_type, offer_round, supplier:suppliers(supplier_name)')
@@ -103,11 +106,19 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       : basis === 'perYear' ? r.perYear
       : r.perMonth * dealMonths
 
-  const chain = chainSavings({
+  // Whether this baseline may drive a HARD Cost Reduction at all. A market
+  // index or a vendor's own quote is a reference figure, not spend you
+  // incurred, so it books as avoidance -- the Total is identical either way.
+  const quality = baselineQuality(baseline?.baseline_type, {
+    enabled: baseline?.hard_reduction_override,
+    reason: baseline?.hard_reduction_override_reason,
+  })
+
+  const chain = chainWithBaselineQuality({
     opening: pick(oRates, !!opening),
     baseline: pick(bRates, !!baseline),
     final: pick(fRates, !!final) ?? 0,
-  })
+  }, quality.isHard)
 
   const anchors: Anchor[] = [
     {
@@ -166,11 +177,11 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     // never agree with it.
     const overTerm = (r: ReturnType<typeof termRates>, present: boolean) =>
       present && r.known ? r.perMonth * dealMonths : null
-    const termChain = chainSavings({
+    const termChain = chainWithBaselineQuality({
       opening: overTerm(oRates, !!opening),
       baseline: overTerm(bRates, !!baseline),
       final: overTerm(fRates, !!final) ?? 0,
-    })
+    }, quality.isHard)
 
     // Denominator is BASELINE spend, never the opening ask. Null when there
     // is no baseline -- see reportableSavingsPct.
@@ -190,7 +201,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       gross_savings_amount: termChain.total,
       cost_reduction_amount: termChain.reduction,
       cost_avoidance_amount: termChain.avoidance,
-      savings_percentage: reportableSavingsPct(termChain.total, baselineOverTerm),
+      savings_percentage: reportableSavingsPct(termChain.total, quality.isHard ? baselineOverTerm : null),
       net_savings_amount: termChain.total,
       savings_start_date: startDate || null,
       savings_end_date: derivedEnd,
@@ -328,10 +339,27 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
               </div>
             </div>
 
-            {chain.reduction === null && (
+            {chain.reduction === null && !baseline && (
               <p className="mt-3 text-xs text-[var(--text-3)]">
                 No baseline selected, so the whole span books as avoidance and Cost Reduction is
                 not applicable.
+              </p>
+            )}
+            {/* A soft baseline is the other reason reduction reads n/a, and it is
+                far less obvious than having no baseline at all. Say which type
+                caused it, so nobody has to guess why the hard line is empty. */}
+            {chain.reduction === null && !!baseline && (
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                {quality.explanation} The whole span books as <strong>Cost Avoidance</strong> and the
+                Total is unchanged — only the hard line is empty. If this baseline really does
+                reflect what you were paying, record an override on the Baselines tab.
+              </p>
+            )}
+            {quality.byOverride && (
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                <strong>Booked as hard by override.</strong> {baseline?.baseline_type} does not
+                normally qualify. The reason on file is:{' '}
+                <span className="italic">&ldquo;{baseline?.hard_reduction_override_reason}&rdquo;</span>
               </p>
             )}
             {!opening && (
