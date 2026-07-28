@@ -102,23 +102,57 @@ export function SavingsByTypeChart({ data }: { data: { name: string; value: numb
   )
 }
 
-export function SavingsByYearChart({ data }: { data: { year: string; costReduction: number; costAvoidance: number; total: number }[] }) {
+/**
+ * Savings by fiscal year. Fed from portfolioByYear(), so it books whole months
+ * exactly like the Schedule tab — the two can no longer disagree.
+ *
+ * `selectedYear` dims the years that are filtered out rather than removing
+ * them, because a single bar with nothing beside it tells you nothing about
+ * whether that year was good.
+ */
+export function SavingsByYearChart({
+  data,
+  selectedYear,
+}: {
+  data: { year: number; reduction: number | null; avoidance: number; total: number }[]
+  selectedYear?: number | null
+}) {
   if (!data || data.length === 0) {
-    return <EmptyChart message="No savings by year data yet" />
+    return <EmptyChart message="No savings placed in a year yet" />
   }
+  const rows = data.map(d => ({
+    year: String(d.year),
+    // A null reduction means not applicable. Charting it as 0 is the honest
+    // option here — a bar cannot render "n/a" — and the table beside this
+    // chart carries the distinction.
+    reduction: d.reduction ?? 0,
+    avoidance: d.avoidance,
+    total: d.total,
+    dim: selectedYear != null && d.year !== selectedYear,
+  }))
+  const opacity = (i: number) => (rows[i].dim ? 0.25 : 1)
+
   return (
     <Card className="p-6">
-      <h3 className={titleClass}>Savings by Year</h3>
+      <h3 className={titleClass}>
+        Savings by Fiscal Year{selectedYear != null && <span className="ml-2 normal-case text-[var(--text-2)]">· FY{selectedYear} highlighted</span>}
+      </h3>
       <ResponsiveContainer width="100%" height={350}>
-        <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <BarChart data={rows} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#94a3b8' }} stroke={AXIS_STROKE} />
           <YAxis tick={AXIS_TICK} stroke={AXIS_STROKE} tickFormatter={compactFormatter} />
           <Tooltip formatter={currencyFormatter} contentStyle={TOOLTIP_STYLE} labelStyle={{ color: 'var(--text)' }} itemStyle={{ color: 'var(--text-2)' }} cursor={{ fill: 'rgba(148,163,184,0.12)' }} />
           <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-2)' }} />
-          <Bar dataKey="costReduction" name="Cost Reduction" fill="#ef4444" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="costAvoidance" name="Cost Avoidance" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="total" name="Total Savings" fill="#10b981" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="reduction" name="Cost Reduction" fill="#6366f1" radius={[4, 4, 0, 0]}>
+            {rows.map((_, i) => <Cell key={i} fillOpacity={opacity(i)} />)}
+          </Bar>
+          <Bar dataKey="avoidance" name="Cost Avoidance" fill="#f59e0b" radius={[4, 4, 0, 0]}>
+            {rows.map((_, i) => <Cell key={i} fillOpacity={opacity(i)} />)}
+          </Bar>
+          <Bar dataKey="total" name="Total Savings" fill="#10b981" radius={[4, 4, 0, 0]}>
+            {rows.map((_, i) => <Cell key={i} fillOpacity={opacity(i)} />)}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </Card>
