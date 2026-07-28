@@ -21,7 +21,14 @@ export function formatCurrency(
 
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '—'
-  return new Date(date).toLocaleDateString('en-US', {
+  // A bare 'YYYY-MM-DD' is parsed as UTC midnight, which renders as the DAY
+  // BEFORE anywhere west of Greenwich — a contract starting 2026-01-01 showed
+  // as Dec 31, 2025. These columns are dates, not instants, so pin them to
+  // local midnight. Timestamps (which carry a time or a zone) are left alone.
+  const localDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00` : date
+  const d = new Date(localDate)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
