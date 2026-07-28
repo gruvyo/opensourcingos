@@ -53,6 +53,87 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
+-- Name: clone_org_data(uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare
+  -- Dependency order matters for the INSERT pass because of foreign keys.
+  v_tables text[] := array[
+    'categories', 'business_units', 'cost_centers', 'suppliers',
+    'sourcing_events', 'event_scope_lines',
+    'baselines', 'baseline_lines',
+    'supplier_offers', 'supplier_offer_lines',
+    'savings_calculations', 'savings_periods'
+  ];
+  -- Columns pointing at a person rather than at a cloned row.
+  v_person_cols text[] := array['created_by', 'updated_by', 'procurement_owner_id',
+                                'hard_reduction_override_by', 'finance_validated_by'];
+  t         text;
+  v_cols    text;
+  v_total   integer := 0;
+  v_count   integer;
+begin
+  create temp table _idmap (old uuid primary key, new uuid not null) on commit drop;
+
+  -- Pass 1: allocate an id for every row we are about to copy.
+  foreach t in array v_tables loop
+    execute format(
+      'insert into _idmap (old, new) select id, gen_random_uuid() from public.%I where organization_id = $1',
+      t) using p_source;
+  end loop;
+
+  -- Pass 2: copy, rewriting ids as we go.
+  foreach t in array v_tables loop
+    select string_agg(
+             case
+               -- The row's own new identity.
+               when c.column_name = 'id'
+                 then '(select m.new from _idmap m where m.old = s.id)'
+               -- Land it in the new workspace.
+               when c.column_name = 'organization_id'
+                 then '$2'
+               -- Whoever signed up now owns everything in their copy.
+               when c.column_name = any(v_person_cols)
+                 then '$3'
+               -- Any other uuid is a reference. If it points at something we
+               -- cloned, repoint it; if it points at something we did not
+               -- (a retired awards row, say), NULL it rather than leave a
+               -- reference reaching into another workspace.
+               when c.data_type = 'uuid'
+                 then format('(select m.new from _idmap m where m.old = s.%I)', c.column_name)
+               else format('s.%I', c.column_name)
+             end,
+             ', ' order by c.ordinal_position)
+      into v_cols
+      from information_schema.columns c
+     where c.table_schema = 'public' and c.table_name = t;
+
+    execute format(
+      'insert into public.%I select %s from public.%I s where s.organization_id = $1',
+      t, v_cols, t) using p_source, p_target, p_owner;
+
+    get diagnostics v_count = row_count;
+    v_total := v_total + v_count;
+  end loop;
+
+  drop table _idmap;
+  return v_total;
+end
+$_$;
+
+
+--
+-- Name: FUNCTION clone_org_data(p_source uuid, p_target uuid, p_owner uuid); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) IS 'Copy every business row from one organization into another, allocating fresh ids and repointing references. Used to seed a new tester workspace.';
+
+
+--
 -- Name: current_org_id(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -70,17 +151,34 @@ $$;
 
 CREATE FUNCTION public.handle_new_user() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
     AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, full_name, organization_id)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
-    (SELECT id FROM public.organizations LIMIT 1)
-  );
-  RETURN NEW;
-END;
+declare
+  v_org      uuid;
+  v_template uuid;
+  v_name     text := coalesce(new.raw_user_meta_data->>'full_name', new.email);
+begin
+  insert into public.organizations (name)
+  values (v_name || ' (workspace)')
+  returning id into v_org;
+
+  insert into public.profiles (id, email, full_name, organization_id)
+  values (new.id, new.email, v_name, v_org);
+
+  -- Demo data is a convenience. If seeding breaks, the person still gets an
+  -- account -- raising here would abort the auth transaction and they could
+  -- not sign up at all.
+  begin
+    select id into v_template from public.organizations where is_demo_template limit 1;
+    if v_template is not null then
+      perform public.clone_org_data(v_template, v_org, new.id);
+    end if;
+  exception when others then
+    raise warning 'demo seed failed for %: %', new.email, sqlerrm;
+  end;
+
+  return new;
+end
 $$;
 
 
@@ -355,10 +453,18 @@ CREATE TABLE public.organizations (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    is_demo_template boolean DEFAULT false NOT NULL
 );
 
 ALTER TABLE ONLY public.organizations FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: COLUMN organizations.is_demo_template; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.is_demo_template IS 'True for the single frozen organization that new signups are seeded from. Not a tenant anyone logs into.';
 
 
 --
@@ -1200,6 +1306,13 @@ CREATE UNIQUE INDEX uq_offers_final ON public.supplier_offers USING btree (event
 --
 
 CREATE UNIQUE INDEX uq_offers_opening ON public.supplier_offers USING btree (event_id) WHERE (offer_role = 'opening'::text);
+
+
+--
+-- Name: uq_organizations_demo_template; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_organizations_demo_template ON public.organizations USING btree (is_demo_template) WHERE is_demo_template;
 
 
 --
@@ -2439,6 +2552,16 @@ GRANT USAGE ON SCHEMA public TO postgres;
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT USAGE ON SCHEMA public TO service_role;
+
+
+--
+-- Name: FUNCTION clone_org_data(p_source uuid, p_target uuid, p_owner uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) TO anon;
+GRANT ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) TO service_role;
 
 
 --
