@@ -30,16 +30,19 @@ function StatCard({ card }: { card: CardDef }) {
   const Icon = card.icon
   return (
     <Card className="p-6">
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-[var(--text-2)]">{card.label}</p>
-          <p className="mt-2 text-2xl font-bold text-[var(--text)]">{card.value}</p>
-          {card.sub && <p className="mt-1 text-xs text-[var(--text-3)]">{card.sub}</p>}
-        </div>
-        <div className={clsx('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg', card.bg)}>
-          <Icon className={clsx('h-6 w-6', card.color)} />
+      {/* Label and icon share the top row; the VALUE gets the full card width
+          below them. Previously the value sat beside the icon and overflowed
+          behind it on narrower viewports, clipping digits off a money figure. */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-[var(--text-2)]">{card.label}</p>
+        <div className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', card.bg)}>
+          <Icon className={clsx('h-5 w-5', card.color)} />
         </div>
       </div>
+      <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-[var(--text)]">
+        {card.value}
+      </p>
+      {card.sub && <p className="mt-1 text-xs text-[var(--text-3)]">{card.sub}</p>}
     </Card>
   )
 }
