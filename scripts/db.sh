@@ -5,6 +5,7 @@
 #   ./scripts/db.sh migration-p7-savings-schedule.sql   apply a migration
 #   ./scripts/db.sh --check                             connection + schema
 #   ./scripts/db.sh --query "select 1"                  ad-hoc read
+#   ./scripts/db.sh --dump                              schema -> schema.sql
 #
 # The connection string lives in .env.db.local, which .gitignore already
 # excludes via the `.env*.local` rule. It is never printed, never passed on
@@ -28,6 +29,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO/.env.db.local"
 PSQL="${PSQL_BIN:-/opt/homebrew/opt/libpq/bin/psql}"
+PGDUMP="${PGDUMP_BIN:-/opt/homebrew/opt/libpq/bin/pg_dump}"
 
 case "${1:-}" in
   '' | --help | -h)
@@ -86,6 +88,47 @@ case "${1:-}" in
   --query)
     [[ $# -ge 2 ]] || { echo "usage: $0 --query \"select ...\"" >&2; exit 1; }
     run -c "$2"
+    ;;
+  --dump)
+    # Pull the LIVE schema into git. Until this existed, every migration was
+    # written against a reconstructed guess at the schema -- P0 says so in its
+    # own header -- and there was no way to know what a DROP would really take
+    # with it. Structure only: no rows, no data, nothing confidential.
+    [[ -x "$PGDUMP" ]] || { echo "pg_dump not found at $PGDUMP. brew install libpq, or set PGDUMP_BIN." >&2; exit 1; }
+    OUT="${2:-$REPO/schema.sql}"
+    echo "Dumping public schema..."
+    {
+      echo "-- ====================================================================="
+      echo "-- schema.sql -- GENERATED. Do not edit by hand."
+      echo "--"
+      echo "--   regenerate:  ./scripts/db.sh --dump"
+      echo "--"
+      echo "-- The live structure of the public schema, pulled straight from the"
+      echo "-- hosted database. Structure only -- no rows. Read this before writing"
+      echo "-- a migration, and re-dump after applying one, so the repo and the"
+      echo "-- database cannot drift apart unnoticed."
+      echo "--"
+      echo "-- Supabase-managed schemas (auth, storage, realtime, ...) are excluded"
+      echo "-- deliberately: they are not ours to change."
+      echo "--"
+      echo "-- ONE CONSEQUENCE OF THAT EXCLUSION, so it is not mistaken for dead"
+      echo "-- code: public.handle_new_user() appears below with nothing calling it."
+      echo "-- It is fired by the trigger on_auth_user_created on auth.users, which"
+      echo "-- lives in an excluded schema. It is what creates a profiles row when"
+      echo "-- someone signs up. Dropping it would silently break registration."
+      echo "-- ====================================================================="
+      echo
+      # pg_dump 18 stamps a RANDOM token into \restrict / \unrestrict on every
+      # run. Left in, two dumps of an identical database differ, and the whole
+      # point of committing this file -- noticing real drift in a diff -- is
+      # lost in the noise. They are a psql restore-time guard; this file is a
+      # reference snapshot, not a restore artifact, so they are stripped to
+      # keep the output deterministic.
+      "$PGDUMP" "$SUPABASE_DB_URL" \
+        --schema-only --schema=public --no-owner --no-tablespaces \
+        | grep -vE '^\\(un)?restrict '
+    } > "$OUT"
+    echo "Wrote $OUT ($(wc -l < "$OUT" | tr -d ' ') lines)"
     ;;
   *)
     FILE="$1"
