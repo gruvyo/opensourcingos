@@ -363,6 +363,13 @@ section('9. A 4-month implementation project (term shorter than one period)')
   eq('one year bucket', byYear.length, 1)
   near('2026 total', byYear[0].total, 30_000)
   eq('last period is June 2026', `${monthly[3].month}/${monthly[3].year}`, '6/2026')
+
+  // The YEAR bucket must say n/a too, not a misleading $0. The whole app
+  // treats "not applicable" as distinct from zero; the fiscal-year report is
+  // not allowed to be the one place that quietly rounds it to a number.
+  eq('2026 reduction is n/a, not zero', byYear[0].reduction, null)
+  eq('annual year bucket is n/a too', scheduleByYear(annual)[0].reduction, null)
+  eq('one-time year bucket is n/a too', scheduleByYear(oneTime)[0].reduction, null)
 }
 
 section('10. An 18-month consulting contract (one and a half periods)')

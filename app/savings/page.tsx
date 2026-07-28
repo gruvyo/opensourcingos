@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatReduction, formatDate } from '@/lib/utils'
 import { portfolioRollup, reportedSavings, classifyRealization, getFirst } from '@/lib/savings'
 import { Calculator, ArrowRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -131,7 +131,7 @@ export default async function SavingsPage() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">
-                      {formatCurrency(calc.cost_reduction_amount)}
+                      {formatReduction(calc.cost_reduction_amount)}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-amber-600 dark:text-amber-400">
                       {formatCurrency(calc.cost_avoidance_amount)}

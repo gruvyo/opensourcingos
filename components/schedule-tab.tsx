@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatReduction as money } from '@/lib/utils'
 import {
   chainSavings, termRates, generateSchedule, scheduleTotals, scheduleByYear,
   toSchedulePeriods, defaultPeriodCount, periodMonths, monthName, addMonths,
@@ -435,7 +435,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                         <td className="py-2 pr-3 text-[var(--text)]">All years</td>
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{savedTotals.months}</td>
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">
-                          {savedTotals.reduction === null ? 'n/a' : money(savedTotals.reduction)}
+                          {money(savedTotals.reduction)}
                         </td>
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">{formatCurrency(savedTotals.avoidance)}</td>
                         <td className="py-2 text-right tabular-nums text-green-600 dark:text-green-400">{formatCurrency(savedTotals.total)}</td>
@@ -571,7 +571,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">{formatCurrency(savedTotals.opening)}</td>
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">{formatCurrency(savedTotals.final)}</td>
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">
-                          {savedTotals.reduction === null ? 'n/a' : money(savedTotals.reduction)}
+                          {money(savedTotals.reduction)}
                         </td>
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">{formatCurrency(savedTotals.avoidance)}</td>
                         <td className="py-2 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">{formatCurrency(savedTotals.total)}</td>
@@ -595,12 +595,6 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
 }
 
 // ---- helpers ----------------------------------------------------------
-
-/** Money, with n/a for a missing anchor and parentheses for a real increase. */
-function money(v: number | null): string {
-  if (v === null) return 'n/a'
-  return v < 0 ? `(${formatCurrency(Math.abs(v))})` : formatCurrency(v)
-}
 
 function lastPeriodLabel(rows: SchedulePeriod[]): string {
   const last = rows[rows.length - 1]

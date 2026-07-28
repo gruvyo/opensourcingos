@@ -421,7 +421,9 @@ export function scheduleTotals(rows: SchedulePeriod[]): ScheduleTotals {
 
 export interface ScheduleYearBucket {
   year: number
-  reduction: number
+  /** null means NOT APPLICABLE — no period in this year had a baseline anchor.
+   *  Distinct from zero, exactly as it is on a single period and on the total. */
+  reduction: number | null
   avoidance: number
   total: number
   /** How many of the deal's months fall in this calendar year. */
@@ -449,7 +451,7 @@ export function scheduleByYear(rows: SchedulePeriod[]): ScheduleYearBucket[] {
   const buckets = new Map<number, ScheduleYearBucket>()
   const ensure = (y: number): ScheduleYearBucket => {
     let b = buckets.get(y)
-    if (!b) { b = { year: y, reduction: 0, avoidance: 0, total: 0, months: 0 }; buckets.set(y, b) }
+    if (!b) { b = { year: y, reduction: null, avoidance: 0, total: 0, months: 0 }; buckets.set(y, b) }
     return b
   }
 
@@ -461,7 +463,7 @@ export function scheduleByYear(rows: SchedulePeriod[]): ScheduleYearBucket[] {
     // rather than dividing by zero or dropping it silently.
     if (span === 0) {
       const b = ensure(Math.round(num(r.year)))
-      b.reduction += num(r.reduction)
+      if (r.reduction !== null) b.reduction = num(b.reduction) + r.reduction
       b.avoidance += num(r.avoidance)
       b.total += num(r.total)
       continue
@@ -478,7 +480,9 @@ export function scheduleByYear(rows: SchedulePeriod[]): ScheduleYearBucket[] {
     for (let k = 0; k < span; k++) {
       const { year } = addMonths(r.month, r.year, k)
       const b = ensure(year)
-      if (perMonth.reduction !== null) b.reduction += perMonth.reduction
+      // Stays null while every period contributing to this year is null, so a
+      // year with no baseline reads "n/a" rather than a misleading zero.
+      if (perMonth.reduction !== null) b.reduction = num(b.reduction) + perMonth.reduction
       b.avoidance += perMonth.avoidance
       b.total += perMonth.total
       b.months += 1

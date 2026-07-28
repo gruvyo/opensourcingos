@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Download, DollarSign, Briefcase, TrendingUp, Filter } from 'lucide-react'
-import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
+import { formatCurrency, formatReduction, formatDate, statusColor } from '@/lib/utils'
 import { portfolioRollup, classifyRealization } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -139,7 +139,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
       const isRealized = classifyRealization(c as any, contractStartByEventId, now) === 'Realized'
       return [
         getFirst(c.event)?.event_name || '', c.calculation_name, c.savings_type,
-        (c.cost_reduction_amount || 0).toString(), (c.cost_avoidance_amount || 0).toString(),
+        c.cost_reduction_amount == null ? '' : c.cost_reduction_amount.toString(), (c.cost_avoidance_amount || 0).toString(),
         (c.gross_savings_amount || 0).toString(), c.savings_percentage?.toFixed(2) || '',
         c.calculation_status,
         c.savings_start_date || '', c.savings_end_date || '',
@@ -340,7 +340,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
                     <td className="px-4 py-3">
                       <Badge tone="neutral" className="rounded px-2 py-0.5">{c.savings_type}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{formatCurrency(c.cost_reduction_amount)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{formatReduction(c.cost_reduction_amount)}</td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-amber-600 dark:text-amber-400">{formatCurrency(c.cost_avoidance_amount)}</td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(c.gross_savings_amount)}</td>
                     <td className="px-4 py-3 text-sm text-[var(--text-2)]">

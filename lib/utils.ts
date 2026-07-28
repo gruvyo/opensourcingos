@@ -19,6 +19,30 @@ export function formatCurrency(
   }).format(value)
 }
 
+/**
+ * THE way to display a Cost Reduction. Two rules from the methodology that
+ * plain formatCurrency silently breaks:
+ *
+ *   null  -> "n/a"          NOT APPLICABLE (no baseline anchor). Rendering it
+ *                           as "$0" claims the deal saved nothing hard, when
+ *                           the truth is the question does not apply.
+ *   < 0   -> "($100,000)"   A real cost increase, in accounting parentheses.
+ *                           "-$100,000" reads as a typo; it is never
+ *                           sign-flipped and never relabelled as savings.
+ *
+ * Use this anywhere cost_reduction_amount is shown to a human.
+ */
+export function formatReduction(
+  amount: number | null | undefined,
+  currencyCode: string = 'USD',
+): string {
+  if (amount === null || amount === undefined) return 'n/a'
+  if (!Number.isFinite(amount)) return 'n/a'
+  return amount < 0
+    ? `(${formatCurrency(Math.abs(amount), currencyCode)})`
+    : formatCurrency(amount, currencyCode)
+}
+
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '—'
   // A bare 'YYYY-MM-DD' is parsed as UTC midnight, which renders as the DAY
