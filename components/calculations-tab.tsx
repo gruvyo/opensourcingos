@@ -147,27 +147,41 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     const { data: profile } = await supabase
       .from('profiles').select('organization_id').eq('id', user.id).single()
 
-    const denom = pick(bRates, !!baseline) ?? pick(oRates, !!opening) ?? 0
+    // WHAT GETS PUBLISHED IS ALWAYS THE WHOLE DEAL TERM, whatever basis is on
+    // screen. The basis switch is a lens for reading the numbers, not a claim
+    // about what the deal is worth: publishing the displayed basis meant the
+    // dashboard reported a different figure depending on where a dropdown had
+    // been left, and the savings schedule (whole-term by construction) could
+    // never agree with it.
+    const overTerm = (r: ReturnType<typeof termRates>, present: boolean) =>
+      present ? r.perMonth * dealMonths : null
+    const termChain = chainSavings({
+      opening: overTerm(oRates, !!opening),
+      baseline: overTerm(bRates, !!baseline),
+      final: overTerm(fRates, !!final) ?? 0,
+    })
+
+    const denom = overTerm(bRates, !!baseline) ?? overTerm(oRates, !!opening) ?? 0
     const payload: Record<string, any> = {
       event_id: eventId,
       baseline_id: baseline?.id ?? null,
-      calculation_name: `${basisLabel} savings`,
+      calculation_name: `${dealMonths}-month deal savings`,
       // Derived, never chosen. A negotiation produces BOTH legs; the label just
       // records which one carried the deal. The dashboard splits on the two
       // amount columns, not on this.
-      savings_type: (chain.reduction ?? 0) >= chain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
+      savings_type: (termChain.reduction ?? 0) >= termChain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
       calculation_status: status,
-      baseline_total_amount: pick(bRates, !!baseline),
-      opening_proposal_amount: pick(oRates, !!opening),
-      award_total_amount: pick(fRates, !!final) ?? 0,
-      gross_savings_amount: chain.total,
-      cost_reduction_amount: chain.reduction,
-      cost_avoidance_amount: chain.avoidance,
-      savings_percentage: denom > 0 ? Math.round((chain.total / denom) * 10000) / 100 : 0,
-      net_savings_amount: chain.total,
+      baseline_total_amount: overTerm(bRates, !!baseline),
+      opening_proposal_amount: overTerm(oRates, !!opening),
+      award_total_amount: overTerm(fRates, !!final) ?? 0,
+      gross_savings_amount: termChain.total,
+      cost_reduction_amount: termChain.reduction,
+      cost_avoidance_amount: termChain.avoidance,
+      savings_percentage: denom > 0 ? Math.round((termChain.total / denom) * 10000) / 100 : 0,
+      net_savings_amount: termChain.total,
       savings_start_date: startDate || null,
       savings_end_date: derivedEnd,
-      recognition_notes: `Derived from the selected anchors on a ${basisLabel} basis.`,
+      recognition_notes: `Derived from the selected anchors over the ${dealMonths}-month deal term.`,
       updated_by: user.id,
     }
 
@@ -216,7 +230,8 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-sm font-semibold text-[var(--text)]">Selected anchors</h4>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[var(--text-3)]">Compare on</span>
+            {/* A lens, not a decision — the saved figure is always whole-term. */}
+            <span className="text-xs text-[var(--text-3)]">View as</span>
             <Select value={basis} onChange={(e) => setBasis(e.target.value as RateBasis)}
               className="w-auto px-2 py-1 text-xs">
               <option value="perYear">Per year</option>
@@ -361,7 +376,9 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
               </Button>
             </div>
             <p className="mt-2 text-right text-[11px] text-[var(--text-3)]">
-              Saving publishes this figure to the dashboard, savings and reports.
+              Saving publishes the <strong>whole {dealMonths}-month term</strong> to the dashboard,
+              savings and reports — not the basis shown above. Use the Schedule tab to spread it
+              over periods and report it by year.
             </p>
           </Card>
         </>
