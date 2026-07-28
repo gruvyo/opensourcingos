@@ -21,7 +21,8 @@ export default async function ReportsPage() {
       calculation_status, cost_reduction_amount, cost_avoidance_amount, net_savings_amount,
       savings_start_date, savings_end_date, event_id,
       event:sourcing_events(event_name, contract_start_date),
-      baseline:baselines(baseline_name),
+      baseline:baselines(baseline_name, baseline_type, hard_reduction_override,
+                         hard_reduction_override_reason),
       award:awards(award_name)
     `).order('created_at', { ascending: false }),
   ])

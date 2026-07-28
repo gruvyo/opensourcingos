@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Download, DollarSign, Briefcase, TrendingUp, Filter } from 'lucide-react'
 import { formatCurrency, formatReduction, formatDate, statusColor } from '@/lib/utils'
-import { portfolioRollup, classifyRealization } from '@/lib/savings'
+import { portfolioRollup, classifyRealization, baselineQuality } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -140,12 +140,33 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
     downloadCSV('procurement_projects.csv', rows)
   }
 
+  /**
+   * How a row's Cost Reduction was justified. An override that does not follow
+   * the number into the report is the kind nobody finds a year later, so it
+   * travels with it -- on screen and in the CSV.
+   */
+  const reductionBasis = (c: any) => {
+    const b = getFirst(c.baseline)
+    if (!b) return { label: 'No baseline', reason: '', overridden: false }
+    const q = baselineQuality(b.baseline_type, {
+      enabled: b.hard_reduction_override,
+      reason: b.hard_reduction_override_reason,
+    })
+    return {
+      label: q.byOverride ? 'Hard by override' : q.isHard ? 'Hard' : 'Soft',
+      reason: q.byOverride ? (b.hard_reduction_override_reason || '') : '',
+      overridden: q.byOverride,
+      type: b.baseline_type || '',
+    }
+  }
+
   const exportSavings = () => {
-    const headers = ['Event', 'Calculation', 'Type', 'Cost Reduction', 'Cost Avoidance', 'Total Savings', 'Savings %', 'Status', 'Savings Start', 'Savings End', 'Classification']
+    const headers = ['Event', 'Calculation', 'Type', 'Baseline Type', 'Reduction Basis', 'Override Reason', 'Cost Reduction', 'Cost Avoidance', 'Total Savings', 'Savings %', 'Status', 'Savings Start', 'Savings End', 'Classification']
     const rows = [headers, ...sourcingSavingsCalcs.map(c => {
       const isRealized = classifyRealization(c as any, contractStartByEventId, now) === 'Realized'
       return [
         getFirst(c.event)?.event_name || '', c.calculation_name, c.savings_type,
+        reductionBasis(c).type || '', reductionBasis(c).label, reductionBasis(c).reason,
         c.cost_reduction_amount == null ? '' : c.cost_reduction_amount.toString(), (c.cost_avoidance_amount || 0).toString(),
         (c.gross_savings_amount || 0).toString(), c.savings_percentage?.toFixed(2) || '',
         c.calculation_status,
@@ -328,6 +349,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Event</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Type</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Basis</th>
               <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Cost Reduction</th>
               <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Cost Avoidance</th>
               <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Total</th>
@@ -346,6 +368,25 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
                     <td className="px-4 py-3 text-sm text-[var(--text)]">{getFirst(c.event)?.event_name || '—'}</td>
                     <td className="px-4 py-3">
                       <Badge tone="neutral" className="rounded px-2 py-0.5">{c.savings_type}</Badge>
+                    </td>
+                    {/* Whether the Cost Reduction beside this is bookable to the
+                        P&L, and if it only qualifies by override, the reason —
+                        so the justification travels with the number. */}
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const b = reductionBasis(c)
+                        const tone =
+                          b.label === 'Hard by override' ? 'text-amber-700 dark:text-amber-300'
+                            : b.label === 'Hard' ? 'text-blue-700 dark:text-blue-300'
+                            : 'text-[var(--text-3)]'
+                        return (
+                          <span className={`text-xs font-medium ${tone}`}
+                            title={b.overridden ? `Override reason: ${b.reason}` : b.type}>
+                            {b.label}
+                            {b.overridden && <span className="ml-1" aria-hidden="true">*</span>}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{formatReduction(c.cost_reduction_amount)}</td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-amber-600 dark:text-amber-400">{formatCurrency(c.cost_avoidance_amount)}</td>
