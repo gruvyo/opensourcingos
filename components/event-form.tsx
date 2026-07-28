@@ -18,12 +18,6 @@ const EVENT_TYPES = [
   'Productivity Improvement'
 ]
 
-const SOURCING_METHODS = [
-  'RFP', 'RFQ', 'RFI', 'Auction', 'Sole Source',
-  'Negotiated Renewal', 'Benchmark Negotiation', 'Contract Amendment',
-  'Catalog Optimization', 'Demand Management', 'Supplier Consolidation'
-]
-
 const SOURCING_STATUSES = [
   'Pipeline', 'Scoped', 'Baseline Pending', 'Baseline Approved',
   'In Market', 'Negotiation', 'Award Recommended', 'Award Approved',
@@ -69,7 +63,6 @@ export function EventForm({
     event_name: '',
     event_description: '',
     event_type: '',
-    sourcing_method: '',
     category_id: '',
     business_unit_id: '',
     cost_center_id: '',
@@ -91,7 +84,6 @@ export function EventForm({
       ...prev,
       event_status: type === 'Sourcing' ? 'Pipeline' : 'Not Started',
       event_type: '',
-      sourcing_method: '',
     }))
   }
 
@@ -124,7 +116,12 @@ export function EventForm({
       .insert({
         supplier_name: name,
         organization_id: profile.organization_id,
-        created_by: user.id,
+        // NOTE: the suppliers table has no created_by column (it carries only
+        // created_at/updated_at). Sending it made PostgREST reject the insert
+        // with 400 "column suppliers.created_by does not exist", so adding a
+        // new vendor inline always failed silently — and most new projects
+        // involve a first-time vendor.
+        supplier_status: 'Active',
       })
       .select('id, supplier_name')
       .single()
@@ -192,10 +189,6 @@ export function EventForm({
       incumbent_supplier_id: form.incumbent_supplier_id || null,
     }
 
-    // Sourcing-only field: sourcing method
-    if (!isSupport) {
-      eventData.sourcing_method = form.sourcing_method || null
-    }
 
     const { data, error: insertError } = await supabase
       .from('sourcing_events')
@@ -319,23 +312,8 @@ export function EventForm({
               ))}
             </Select>
           </div>
-          {projectType === 'Sourcing' && (
-            <div>
-              <label className={labelClass}>Sourcing Method</label>
-              <Select
-                value={form.sourcing_method}
-                onChange={(e) => handleChange('sourcing_method', e.target.value)}
-                className="mt-1"
-              >
-                <option value="">Select method...</option>
-                {SOURCING_METHODS.map((method) => (
-                  <option key={method} value={method}>{method}</option>
-                ))}
-              </Select>
-            </div>
-          )}
           <div>
-            <label className={labelClass}>IP Owner / Buyer</label>
+            <label className={labelClass}>Owner / Buyer</label>
             <Input
               type="text"
               value={form.buyer_name}

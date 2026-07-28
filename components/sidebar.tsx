@@ -10,7 +10,6 @@ import {
   BarChart3,
   Settings,
   Briefcase,
-  TrendingUp,
   LogOut,
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -21,7 +20,6 @@ const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Projects', href: '/events', icon: Briefcase },
   { label: 'Savings', href: '/savings', icon: Calculator },
-  { label: 'Realization', href: '/realization', icon: TrendingUp },
   { label: 'Suppliers', href: '/suppliers', icon: Users },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Settings', href: '/settings', icon: Settings },
@@ -32,6 +30,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const router = useRouter()
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [signOutError, setSignOutError] = useState<string | null>(null)
 
   useEffect(() => {
     const getUser = async () => {
@@ -55,8 +54,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     }
   }, [open, onClose])
 
+  // Signing out used to navigate to /login whether or not it worked. If the
+  // call fails the SESSION IS STILL LIVE, and showing the login page while the
+  // cookie is valid tells the user they are signed out when they are not --
+  // which on a shared machine is somebody else's problem to discover.
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    setSignOutError(null)
+    const { error } = await supabase.auth.signOut()
+    if (error) { setSignOutError(error.message); return }
     router.push('/login')
     router.refresh()
   }
@@ -110,6 +115,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <LogOut className="h-4 w-4" />
           Sign Out
         </button>
+        {signOutError && (
+          <p role="alert" className="mt-1 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
+            Sign out failed — <strong>you are still signed in</strong>. {signOutError}
+          </p>
+        )}
         <div className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--text-3)]">
           MVP • Beta Version
         </div>

@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Plus, Lock, FileCheck, Star, Trash2, ChevronDown,
-  ChevronRight, AlertCircle, Shield, TrendingUp, Calculator
-} from 'lucide-react'
+  Plus, Star, Trash2, ChevronDown, Pencil,
+  ChevronRight, AlertCircle, Shield, TrendingUp, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { termRates, baselineQuality } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,12 +20,18 @@ type Baseline = {
   baseline_period_start: string | null
   baseline_period_end: string | null
   baseline_total_amount: number
+  baseline_term_months: number | null
+  is_selected: boolean
   baseline_normalized_amount: number
   baseline_lock_status: string
   baseline_lock_date: string | null
   official_for_hard_savings: boolean
   official_for_cost_avoidance: boolean
   official_for_demand_reduction: boolean
+  // A soft baseline declared defensible as own-spend, with a written reason.
+  hard_reduction_override: boolean
+  hard_reduction_override_reason: string | null
+  hard_reduction_override_at: string | null
 }
 
 type ScopeLine = {
@@ -57,21 +63,42 @@ const BASELINE_TYPE_DEFENSIBILITY: Record<string, string> = {
   'Initial Supplier Quote': 'Medium-Low',
 }
 
-const LOCK_STATUS_COLORS: Record<string, string> = {
-  'Draft': 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
-  'Locked': 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-  'Submitted': 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-  'Approved': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-  'Rejected': 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-}
-
 export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLines: ScopeLine[] }) {
   const [baselines, setBaselines] = useState<Baseline[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [baselineLines, setBaselineLines] = useState<Record<string, any[]>>({})
+  const [editingBaseline, setEditingBaseline] = useState<Baseline | null>(null)
+  const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
+  const [editTotalValue, setEditTotalValue] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
   const supabase = createClient()
+
+  // Exactly one baseline per project is THE baseline. Clear the others first so
+  // the partial unique index can never be violated.
+  const selectBaseline = async (baselineId: string) => {
+    setActionError(null)
+    const clear = await supabase.from('baselines').update({ is_selected: false })
+      .eq('event_id', eventId).neq('id', baselineId)
+    if (clear.error) { setActionError(clear.error.message); return }
+    const set = await supabase.from('baselines').update({ is_selected: true }).eq('id', baselineId)
+    // Surface it. A failed write here used to do nothing at all on screen.
+    if (set.error) { setActionError(set.error.message); return }
+    fetchBaselines()
+  }
+
+  const saveTotal = async (baselineId: string) => {
+    const v = parseFloat(editTotalValue)
+    setEditingTotalId(null)
+    if (!Number.isFinite(v)) return
+    setActionError(null)
+    // MONEY write. Same failure mode as selectBaseline above: a discarded error here
+    // used to leave the screen showing a total that was never actually saved.
+    const { error } = await supabase.from('baselines').update({ baseline_total_amount: v }).eq('id', baselineId)
+    if (error) { setActionError(error.message); return }
+    fetchBaselines()
+  }
 
   const fetchBaselines = useCallback(async () => {
     const { data } = await supabase
@@ -109,41 +136,16 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
     }
   }
 
-  const updateLockStatus = async (baselineId: string, newStatus: string) => {
-    const updates: any = { baseline_lock_status: newStatus }
-    if (newStatus === 'Locked' || newStatus === 'Approved') {
-      updates.baseline_lock_date = new Date().toISOString()
-    }
-    if (newStatus === 'Approved') {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) updates.baseline_approved_by = user.id
-      updates.baseline_approval_date = new Date().toISOString()
-    }
 
-    await supabase.from('baselines').update(updates).eq('id', baselineId)
-    fetchBaselines()
-  }
-
-  const toggleOfficial = async (baseline: Baseline, field: 'official_for_hard_savings' | 'official_for_cost_avoidance' | 'official_for_demand_reduction') => {
-    // Only approved baselines can be marked official
-    if (baseline.baseline_lock_status !== 'Approved') return
-
-    // Only one baseline can be official for each type — unset others first
-    const others = baselines.filter(b => b.id !== baseline.id && b[field])
-    for (const other of others) {
-      await supabase.from('baselines').update({ [field]: false }).eq('id', other.id)
-    }
-
-    await supabase
-      .from('baselines')
-      .update({ [field]: !baseline[field] })
-      .eq('id', baseline.id)
-    fetchBaselines()
-  }
 
   const handleDelete = async (baselineId: string) => {
     if (!confirm('Delete this baseline and all its lines? This cannot be undone.')) return
-    await supabase.from('baselines').delete().eq('id', baselineId)
+    setActionError(null)
+    const { error } = await supabase.from('baselines').delete().eq('id', baselineId)
+    if (error) { setActionError(error.message); return }
+    // Only drop it from local state once the delete is confirmed. This used to be
+    // optimistic — the row vanished from screen even when RLS or a foreign-key
+    // constraint rejected the delete, so a "deleted" baseline was still in the database.
     setBaselines(baselines.filter(b => b.id !== baselineId))
   }
 
@@ -165,14 +167,42 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
         </Button>
       </div>
 
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <strong>Could not save:</strong> {actionError}
+          {actionError.includes('does not exist') && (
+            <span> — this usually means a database migration has not been run yet.</span>
+          )}
+        </div>
+      )}
+
       {/* Baseline Hierarchy Info */}
       <div className="mb-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 p-4">
         <div className="flex items-start gap-3">
           <Shield className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
           <div>
-            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Baseline Defensibility Hierarchy</h4>
+            {/* This used to rank all eight types on a "defensibility" scale that
+                put Approved Budget above Should-Cost Model. That ranking now
+                contradicts the rule the numbers actually follow, which is not a
+                ranking at all but a line: is this money you paid, or a figure
+                somebody quoted? Two groups, not eight rungs. */}
+            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+              What makes a cost reduction hard
+            </h4>
             <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-              Most defensible → Least defensible: Current Contract → Prior 12-Month Actual → Approved Budget → Supplier Renewal Quote → Competitive Bid → Market Index → Should-Cost Model → Initial Supplier Quote
+              A <strong>hard</strong> Cost Reduction — the figure your CFO can book to the P&amp;L —
+              requires a baseline grounded in <strong>your own spend</strong>. Current Contract,
+              Prior 12-Month Actual and Should-Cost Model qualify.
+            </p>
+            <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
+              Approved Budget, Supplier Renewal Quote, Competitive Bid Benchmark, Market Index and
+              Initial Supplier Quote are reference figures — real and useful, but nobody ever paid
+              them. Their value books as <strong>Cost Avoidance</strong> instead.
+            </p>
+            <p className="mt-1 text-xs text-blue-700 dark:text-blue-300 opacity-90">
+              Either way the <strong>Total is the same</strong>. Only the split between the two
+              lines moves. Expand a baseline to record an override if a soft type genuinely does
+              reflect what you were paying.
             </p>
           </div>
         </div>
@@ -183,8 +213,20 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
         <AddBaselineForm
           eventId={eventId}
           scopeLines={scopeLines}
+          isFirstBaseline={baselines.length === 0}
           onSaved={() => { setShowForm(false); fetchBaselines() }}
           onCancel={() => setShowForm(false)}
+        />
+      )}
+
+      {editingBaseline && (
+        <AddBaselineForm
+          eventId={eventId}
+          scopeLines={scopeLines}
+          isFirstBaseline={false}
+          existing={editingBaseline}
+          onSaved={() => { setEditingBaseline(null); fetchBaselines() }}
+          onCancel={() => setEditingBaseline(null)}
         />
       )}
 
@@ -225,108 +267,126 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                     )}
                   </div>
 
-                  {/* Total Amount */}
+                  {/* Total Amount — click to edit. Lines, when present, still recompute it. */}
                   <div className="text-right">
-                    <p className="text-xs text-[var(--text-3)]">Total Baseline</p>
-                    <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(baseline.baseline_total_amount)}</p>
+                    <p className="text-xs text-[var(--text-3)]">
+                      Total Baseline
+                      {baseline.baseline_term_months ? ` · ${baseline.baseline_term_months} mo` : ''}
+                    </p>
+                    {editingTotalId === baseline.id ? (
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Input type="number" step="0.01" autoFocus value={editTotalValue}
+                          onChange={(e) => setEditTotalValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveTotal(baseline.id) }
+                            if (e.key === 'Escape') setEditingTotalId(null)
+                          }}
+                          className="w-36 py-1 text-right text-sm" />
+                        <Button type="button" size="sm" onClick={() => saveTotal(baseline.id)}>Save</Button>
+                      </div>
+                    ) : (
+                      <button type="button" title="Click to edit"
+                        onClick={() => { setEditingTotalId(baseline.id); setEditTotalValue(String(baseline.baseline_total_amount ?? '')) }}
+                        className="text-lg font-bold text-[var(--text)] underline decoration-dotted underline-offset-4 hover:text-[var(--brand-ink)]">
+                        {formatCurrency(baseline.baseline_total_amount)}
+                      </button>
+                    )}
+                    {(() => {
+                      const r = termRates(baseline.baseline_total_amount, baseline.baseline_term_months)
+                      if (!r.known) return null
+                      return (
+                        <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+                          {formatCurrency(r.perMonth)}/mo · {formatCurrency(r.perYear)}/yr
+                        </p>
+                      )
+                    })()}
                   </div>
 
-                  {/* Lock Status Badge */}
-                  <span className={clsx('rounded-full px-2.5 py-1 text-xs font-medium', LOCK_STATUS_COLORS[baseline.baseline_lock_status])}>
-                    {baseline.baseline_lock_status}
-                  </span>
 
-                  {/* Official badges */}
+                  {/* Official badges. With a single baseline the per-category
+                      distinction is noise, so collapse to one "Official" chip. */}
                   <div className="flex gap-1">
-                    {baseline.official_for_hard_savings && (
-                      <span className="flex items-center gap-1 rounded bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300" title="Official for Hard Savings">
-                        <Star className="h-3 w-3 fill-current" /> Hard $
+                    {baseline.is_selected ? (
+                      <span className="flex items-center gap-1 rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                        title="This is the baseline the savings chain measures against">
+                        <Star className="h-3 w-3 fill-current" /> Baseline
                       </span>
+                    ) : (
+                      <button onClick={() => selectBaseline(baseline.id)}
+                        className="rounded border border-[var(--border-strong)] px-2 py-1 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                        title="Use this as the baseline for the savings chain">
+                        Use as baseline
+                      </button>
                     )}
-                    {baseline.official_for_cost_avoidance && (
-                      <span className="flex items-center gap-1 rounded bg-purple-100 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300" title="Official for Cost Avoidance">
-                        <Star className="h-3 w-3 fill-current" /> Avoid
-                      </span>
-                    )}
-                    {baseline.official_for_demand_reduction && (
-                      <span className="flex items-center gap-1 rounded bg-orange-100 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-300" title="Official for Demand Reduction">
-                        <Star className="h-3 w-3 fill-current" /> Demand
-                      </span>
-                    )}
+
+                    {/* Whether this type may book a HARD Cost Reduction. Shown on
+                        every baseline, not just the selected one, so the
+                        consequence of a choice is visible before it is made. */}
+                    {(() => {
+                      const q = baselineQuality(baseline.baseline_type, {
+                        enabled: baseline.hard_reduction_override,
+                        reason: baseline.hard_reduction_override_reason,
+                      })
+                      if (q.isHard && !q.byOverride) {
+                        return (
+                          <span className="flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            title={q.explanation}>
+                            <ShieldCheck className="h-3 w-3" /> Hard
+                          </span>
+                        )
+                      }
+                      if (q.byOverride) {
+                        return (
+                          <span className="flex items-center gap-1 rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            title={`Booked as hard by override: ${baseline.hard_reduction_override_reason}`}>
+                            <ShieldAlert className="h-3 w-3" /> Hard by override
+                          </span>
+                        )
+                      }
+                      return (
+                        <span className="flex items-center gap-1 rounded bg-[var(--surface-2)] px-2 py-1 text-xs font-medium text-[var(--text-2)]"
+                          title={q.explanation}>
+                          Soft — books as avoidance
+                        </span>
+                      )
+                    })()}
+                    {/* The "Hard $" / "Avoid" / "Demand" badges lived here. They
+                        rendered official_for_hard_savings and its two siblings,
+                        which are only ever written at INSERT (true for the first
+                        baseline) -- the "Mark Official" control that could change
+                        them was retired on 2026-07-26. So they pinned themselves
+                        to whichever baseline happened to be added first and then
+                        contradicted the "Selected" badge above forever after.
+                        The columns still exist; nothing reads them. */}
                   </div>
                 </div>
 
                 {/* Expanded View */}
                 {isExpanded && (
                   <div className="border-t border-[var(--border)] bg-[var(--surface-2)]">
-                    {/* Actions Bar */}
-                    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-                      <span className="text-xs font-medium text-[var(--text-3)]">Workflow:</span>
-                      {baseline.baseline_lock_status === 'Draft' && (
-                        <button onClick={() => updateLockStatus(baseline.id, 'Locked')}
-                          className="flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:bg-blue-900/30">
-                          <Lock className="h-3 w-3" /> Lock Baseline
-                        </button>
-                      )}
-                      {baseline.baseline_lock_status === 'Locked' && (
-                        <button onClick={() => updateLockStatus(baseline.id, 'Submitted')}
-                          className="flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:bg-amber-900/30">
-                          <FileCheck className="h-3 w-3" /> Submit for Approval
-                        </button>
-                      )}
-                      {baseline.baseline_lock_status === 'Submitted' && (
-                        <>
-                          <button onClick={() => updateLockStatus(baseline.id, 'Approved')}
-                            className="flex items-center gap-1 rounded bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:bg-green-900/30">
-                            <FileCheck className="h-3 w-3" /> Approve
-                          </button>
-                          <button onClick={() => updateLockStatus(baseline.id, 'Rejected')}
-                            className="flex items-center gap-1 rounded bg-red-50 dark:bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:bg-red-900/30">
-                            Reject
-                          </button>
-                        </>
-                      )}
-                      {baseline.baseline_lock_status === 'Approved' && (
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-medium text-[var(--text-3)]">Mark Official:</span>
-                          <button onClick={() => toggleOfficial(baseline, 'official_for_hard_savings')}
-                            className={clsx(
-                              'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                              baseline.official_for_hard_savings
-                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                                : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
-                            )}>
-                            <Star className="h-3 w-3" /> Hard Savings
-                          </button>
-                          <button onClick={() => toggleOfficial(baseline, 'official_for_cost_avoidance')}
-                            className={clsx(
-                              'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                              baseline.official_for_cost_avoidance
-                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
-                            )}>
-                            <Star className="h-3 w-3" /> Cost Avoidance
-                          </button>
-                          <button onClick={() => toggleOfficial(baseline, 'official_for_demand_reduction')}
-                            className={clsx(
-                              'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                              baseline.official_for_demand_reduction
-                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                                : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
-                            )}>
-                            <Star className="h-3 w-3" /> Demand Reduction
-                          </button>
-                        </div>
-                      )}
-                      <div className="ml-auto">
-                        {baseline.baseline_lock_status === 'Draft' && (
-                          <button onClick={() => handleDelete(baseline.id)}
-                            className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
+                    {/* Actions. The Lock -> Submit -> Approve -> Reject workflow and the
+                        per-category "Mark Official" toggles were removed: the real process has
+                        no baseline-approval concept, and the savings calculation no longer
+                        depends on which baseline is flagged official. Baselines stay editable. */}
+                    <div className="flex items-center justify-end gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+                      <button onClick={() => setEditingBaseline(baseline)}
+                        className="flex items-center gap-1 text-xs font-medium text-[var(--brand-ink)] hover:underline">
+                        <Pencil className="h-3.5 w-3.5" /> Edit baseline
+                      </button>
+                      <button onClick={() => handleDelete(baseline.id)}
+                        title="Delete this baseline"
+                        className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
+
+                    {/* The hard/soft override. Only offered where it can matter:
+                        a type that does not already qualify on its own. */}
+                    <HardReductionOverride
+                      baseline={baseline}
+                      onChanged={fetchBaselines}
+                      onError={setActionError}
+                    />
 
                     {/* Baseline Lines Table */}
                     <BaselineLinesTable
@@ -348,24 +408,155 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   )
 }
 
+/**
+ * Declare a soft baseline defensible enough to book a HARD cost reduction.
+ *
+ * The governing principle is that a hard reduction needs a baseline grounded
+ * in your own spend. Real deals break that occasionally for honest reasons —
+ * the invoices are gone, but the incumbent's renewal quote is known to match
+ * what was actually being paid — so the rule bends rather than blocking work.
+ *
+ * It bends ON THE RECORD. The reason is mandatory (a CHECK constraint enforces
+ * it, not just this form), it is stamped with who and when, and it is shown on
+ * the Calculations tab, in reports and in the CSV. An override nobody can find
+ * later is not defensible; one that appears in every report is.
+ */
+function HardReductionOverride({
+  baseline,
+  onChanged,
+  onError,
+}: {
+  baseline: any
+  onChanged: () => void
+  onError: (m: string | null) => void
+}) {
+  const supabase = createClient()
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState(baseline.hard_reduction_override_reason || '')
+  const [busy, setBusy] = useState(false)
+
+  const q = baselineQuality(baseline.baseline_type, {
+    enabled: baseline.hard_reduction_override,
+    reason: baseline.hard_reduction_override_reason,
+  })
+
+  // A type that qualifies on its own has nothing to override.
+  if (q.isHard && !q.byOverride) return null
+
+  const MIN = 10
+
+  const apply = async (enable: boolean) => {
+    onError(null)
+    if (enable && reason.trim().length < MIN) return
+    setBusy(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('baselines').update(
+      enable
+        ? {
+            hard_reduction_override: true,
+            hard_reduction_override_reason: reason.trim(),
+            hard_reduction_override_by: user?.id ?? null,
+            hard_reduction_override_at: new Date().toISOString(),
+          }
+        : {
+            hard_reduction_override: false,
+            hard_reduction_override_reason: null,
+            hard_reduction_override_by: null,
+            hard_reduction_override_at: null,
+          },
+    ).eq('id', baseline.id)
+    setBusy(false)
+    if (error) { onError(error.message); return }
+    setOpen(false)
+    onChanged()
+  }
+
+  return (
+    <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+      {q.byOverride ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="text-xs text-amber-700 dark:text-amber-300">
+            <p className="font-semibold">Booked as a hard cost reduction by override</p>
+            <p className="mt-0.5 italic">&ldquo;{baseline.hard_reduction_override_reason}&rdquo;</p>
+            {baseline.hard_reduction_override_at && (
+              <p className="mt-0.5 text-[var(--text-3)]">
+                Recorded {formatDate(baseline.hard_reduction_override_at)}
+              </p>
+            )}
+          </div>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => apply(false)}>
+            {busy ? 'Working...' : 'Remove override'}
+          </Button>
+        </div>
+      ) : !open ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-[var(--text-2)]">
+            {q.explanation} Its value books as <strong>Cost Avoidance</strong> instead — the Total is
+            the same either way.
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+            Book as hard anyway
+          </Button>
+        </div>
+      ) : (
+        <div>
+          <label htmlFor={`ovr-${baseline.id}`} className="block text-xs font-medium text-[var(--text-2)]">
+            Why is this baseline defensible as your own spend?
+          </label>
+          <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+            This is shown on the Calculations tab and in every report that carries the number, so
+            write it for whoever asks about it a year from now.
+          </p>
+          <textarea
+            id={`ovr-${baseline.id}`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="e.g. Invoices lost in the ERP migration; this renewal quote matches the AP records we do have."
+            className="mt-2 w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <span className="mr-auto text-[11px] text-[var(--text-3)]">
+              {reason.trim().length < MIN
+                ? `${MIN - reason.trim().length} more characters needed`
+                : 'Ready'}
+            </span>
+            <Button size="sm" variant="secondary" onClick={() => { setOpen(false); setReason(baseline.hard_reduction_override_reason || '') }}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={busy || reason.trim().length < MIN} onClick={() => apply(true)}>
+              {busy ? 'Saving...' : 'Record override'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ============================================
 // Add Baseline Form
 // ============================================
-function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
+function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, existing, onSaved, onCancel }: {
   eventId: string
   scopeLines: ScopeLine[]
+  isFirstBaseline: boolean
+  /** When set, the form edits this baseline instead of creating a new one. */
+  existing?: Baseline | null
   onSaved: () => void
   onCancel: () => void
 }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isEdit = !!existing
   const [form, setForm] = useState({
-    baseline_name: '',
-    baseline_type: '',
-    baseline_source: '',
-    baseline_period_start: '',
-    baseline_period_end: '',
+    baseline_type: existing?.baseline_type ?? '',
+    baseline_source: existing?.baseline_source ?? '',
+    baseline_period_start: existing?.baseline_period_start ?? '',
+    baseline_period_end: existing?.baseline_period_end ?? '',
+    baseline_total_amount: existing ? String(existing.baseline_total_amount ?? '') : '',
+    baseline_term_months: existing ? String(existing.baseline_term_months ?? '12') : '12',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -382,16 +573,40 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
       .eq('id', user!.id)
       .single()
 
+    // baseline_name is NOT NULL in the schema but is redundant on screen: the
+    // type plus the source already identify a baseline. Derive it.
+    const derivedName = [form.baseline_type, form.baseline_source].filter(Boolean).join(' - ')
+
+    const payload: Record<string, any> = {
+      baseline_name: derivedName || form.baseline_type || 'Baseline',
+      baseline_type: form.baseline_type,
+      baseline_source: form.baseline_source || null,
+      baseline_period_start: form.baseline_period_start || null,
+      baseline_period_end: form.baseline_period_end || null,
+      baseline_total_amount: form.baseline_total_amount === '' ? 0 : parseFloat(form.baseline_total_amount),
+      baseline_term_months: form.baseline_term_months === '' ? null : parseFloat(form.baseline_term_months),
+    }
+
+    if (isEdit) {
+      const { error: updateError } = await supabase
+        .from('baselines').update(payload).eq('id', existing!.id)
+      if (updateError) { setError(updateError.message); setLoading(false); return }
+      onSaved()
+      return
+    }
+
     const { error: insertError } = await supabase
       .from('baselines')
       .insert({
+        ...payload,
         organization_id: profile?.organization_id,
         event_id: eventId,
-        baseline_name: form.baseline_name,
-        baseline_type: form.baseline_type,
-        baseline_source: form.baseline_source || null,
-        baseline_period_start: form.baseline_period_start || null,
-        baseline_period_end: form.baseline_period_end || null,
+        // First baseline on an event is the official one for every category. The
+        // manual Mark-Official step was removed; nothing in the savings math reads
+        // these now, but the offers-tab comparison still uses them.
+        official_for_hard_savings: isFirstBaseline,
+        official_for_cost_avoidance: isFirstBaseline,
+        official_for_demand_reduction: isFirstBaseline,
         created_by: user.id,
       })
 
@@ -408,15 +623,9 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
-      <h4 className="mb-4 font-medium text-[var(--text)]">New Baseline</h4>
+      <h4 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Baseline' : 'New Baseline'}</h4>
       {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label className={labelClass}>Baseline Name *</label>
-          <Input type="text" required value={form.baseline_name}
-            onChange={(e) => setForm({ ...form, baseline_name: e.target.value })}
-            className="mt-1" placeholder="e.g. Current Contract Baseline" />
-        </div>
         <div>
           <label className={labelClass}>Baseline Type *</label>
           <Select required value={form.baseline_type}
@@ -433,6 +642,30 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
           <Input type="text" value={form.baseline_source}
             onChange={(e) => setForm({ ...form, baseline_source: e.target.value })}
             className="mt-1" placeholder="e.g. Existing contract rate card" />
+        </div>
+        <div>
+          <label className={labelClass}>Baseline Total ($) *</label>
+          <Input type="number" step="0.01" required value={form.baseline_total_amount}
+            onChange={(e) => setForm({ ...form, baseline_total_amount: e.target.value })}
+            className="mt-1" placeholder="e.g. 1000000" />
+        </div>
+        <div>
+          <label className={labelClass}>Term (months) *</label>
+          <Input type="number" step="1" min="1" required value={form.baseline_term_months}
+            onChange={(e) => setForm({ ...form, baseline_term_months: e.target.value })}
+            className="mt-1" placeholder="12" />
+        </div>
+        <div className="md:col-span-2 -mt-1">
+          {(() => {
+            const r = termRates(form.baseline_total_amount, form.baseline_term_months)
+            return (
+              <p className="text-xs text-[var(--text-3)]">
+                {r.known
+                  ? <>That is <strong className="text-[var(--text-2)]">{formatCurrency(r.perMonth)}/month</strong> · <strong className="text-[var(--text-2)]">{formatCurrency(r.perYear)}/year</strong>. The term lets a 12-month baseline be compared with, say, a 36-month offer.</>
+                  : <>Enter the total and the number of months it covers. Line detail is optional.</>}
+              </p>
+            )
+          })()}
         </div>
         <div>
           <label className={labelClass}>Period Start</label>
@@ -452,7 +685,7 @@ function AddBaselineForm({ eventId, scopeLines, onSaved, onCancel }: {
           Cancel
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? 'Creating...' : 'Create Baseline'}
+          {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Baseline'}
         </Button>
       </div>
     </form>
@@ -473,6 +706,9 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   const supabase = createClient()
   const [lines, setLines] = useState(initialLines)
   const [showAddLine, setShowAddLine] = useState(false)
+  // Surfaces errors from the insert/delete/total writes below, same pattern as
+  // actionError in the parent BaselinesTab component.
+  const [error, setError] = useState<string | null>(null)
   const [newLine, setNewLine] = useState({
     scope_line_id: '',
     baseline_unit_price: '',
@@ -493,8 +729,33 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     return (extended * 12) / termMonths
   }
 
+  // Re-query baseline_lines (same shape as the parent's fetchBaselineLines) and total
+  // from THOSE rows, not from the `lines` React state. `lines` is only ever as fresh as
+  // the last render — reading it right after an insert/delete `await` chain can still see
+  // the pre-update value, which used to total (and WRITE, as the baseline total) a stale
+  // array: the first line added wrote a total of 0, and a delete left the removed amount
+  // in. Two rapid clicks raced the same way. Always total off what the database actually
+  // has, and refresh local state from the same fetch so the two can never disagree.
+  const refreshLinesAndTotal = async () => {
+    const { data: freshLines, error: fetchError } = await supabase
+      .from('baseline_lines')
+      .select(`
+        *,
+        scope_line:event_scope_lines(item_service_name, uom)
+      `)
+      .eq('baseline_id', baselineId)
+      .order('line_number', { ascending: true })
+
+    if (fetchError) { setError(fetchError.message); return }
+
+    const freshRows = freshLines || []
+    setLines(freshRows)
+    await updateBaselineTotal(freshRows)
+  }
+
   const handleAddLine = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
 
     const unitPrice = parseFloat(newLine.baseline_unit_price) || 0
     const qty = parseFloat(newLine.baseline_quantity) || 0
@@ -513,7 +774,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
 
     const lineNumber = lines.length + 1
 
-    const { data, error } = await supabase
+    const { data, error: insertError } = await supabase
       .from('baseline_lines')
       .insert({
         organization_id: profile?.organization_id,
@@ -538,30 +799,36 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       `)
       .single()
 
-    if (!error && data) {
-      setLines([...lines, data])
-      setNewLine({
-        scope_line_id: '', baseline_unit_price: '', baseline_quantity: '',
-        baseline_term_months: '12', baseline_recurring_amount: '', baseline_one_time_amount: '',
-      })
-      setShowAddLine(false)
-      onLinesChanged()
-      // Update baseline total
-      updateBaselineTotal()
+    // This used to be gated on `if (!error && data)` with no else branch — the error
+    // was checked but never shown anywhere, so a rejected insert just silently did nothing.
+    if (insertError || !data) {
+      setError(insertError?.message || 'Could not add the line.')
+      return
     }
+
+    setNewLine({
+      scope_line_id: '', baseline_unit_price: '', baseline_quantity: '',
+      baseline_term_months: '12', baseline_recurring_amount: '', baseline_one_time_amount: '',
+    })
+    setShowAddLine(false)
+    onLinesChanged()
+    await refreshLinesAndTotal()
   }
 
   const handleDeleteLine = async (lineId: string) => {
     if (!confirm('Delete this baseline line? This cannot be undone.')) return
-    await supabase.from('baseline_lines').delete().eq('id', lineId)
-    setLines(lines.filter(l => l.id !== lineId))
+    setError(null)
+    const { error: deleteError } = await supabase.from('baseline_lines').delete().eq('id', lineId)
+    if (deleteError) { setError(deleteError.message); return }
     onLinesChanged()
-    updateBaselineTotal()
+    await refreshLinesAndTotal()
   }
 
-  const updateBaselineTotal = async () => {
-    const total = lines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
-    await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
+  const updateBaselineTotal = async (currentLines: any[]) => {
+    const total = currentLines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
+    // MONEY write — this total is the minuend of every savings calculation downstream.
+    const { error: updateError } = await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
+    if (updateError) setError(updateError.message)
   }
 
   const labelClass = 'block text-xs font-medium text-[var(--text-3)] mb-1'
@@ -572,7 +839,13 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   return (
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h5 className="text-sm font-medium text-[var(--text-2)]">Baseline Lines</h5>
+        <div>
+          <h5 className="text-sm font-medium text-[var(--text-2)]">Line detail (optional)</h5>
+          <p className="text-xs text-[var(--text-3)]">
+            Only if you want item-level breakdown. Adding lines replaces the total above with
+            their sum. Most deals just need the total.
+          </p>
+        </div>
         {!isLocked && (
           <button onClick={() => setShowAddLine(!showAddLine)}
             className="flex items-center gap-1 rounded bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
@@ -580,6 +853,12 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
 
       {/* Add Line Form */}
       {showAddLine && !isLocked && (

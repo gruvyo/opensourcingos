@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react'
 export default async function EventsPage() {
   const supabase = await createClient()
 
-  const { data: events } = await supabase
+  const { data: events, error: eventsError } = await supabase
     .from('sourcing_events')
     .select(`
       *,
@@ -16,6 +16,10 @@ export default async function EventsPage() {
       awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(supplier_name)
     `)
     .order('created_at', { ascending: false })
+
+  // A failed query here would render as "no projects", which is indistinguishable
+  // from a genuinely empty list. Say which one it is.
+  const loadError = eventsError?.message || null
 
   return (
     <div className="p-8">
@@ -34,6 +38,13 @@ export default async function EventsPage() {
           New Project
         </Link>
       </div>
+
+      {loadError && (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
+          <strong>These figures are incomplete.</strong> A query failed: {loadError}. Do not report
+          from this page until it loads cleanly.
+        </div>
+      )}
 
       <EventsList events={events || []} />
     </div>

@@ -6,12 +6,22 @@ import { ArrowLeft } from 'lucide-react'
 export default async function NewEventPage() {
   const supabase = await createClient()
 
-  const [{ data: categories }, { data: businessUnits }, { data: costCenters }, { data: suppliers }] = await Promise.all([
+  const [
+    { data: categories, error: categoriesError },
+    { data: businessUnits, error: businessUnitsError },
+    { data: costCenters, error: costCentersError },
+    { data: suppliers, error: suppliersError },
+  ] = await Promise.all([
     supabase.from('categories').select('id, category_name').order('category_name'),
     supabase.from('business_units').select('id, business_unit_name').order('business_unit_name'),
     supabase.from('cost_centers').select('id, cost_center_name, business_unit_id').order('cost_center_name'),
     supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
   ])
+
+  // A failed query here would render as an empty dropdown, which is indistinguishable
+  // from a genuinely empty list. Say which one it is.
+  const loadError = categoriesError?.message || businessUnitsError?.message
+    || costCentersError?.message || suppliersError?.message || null
 
   return (
     <div className="p-8">
@@ -23,6 +33,14 @@ export default async function NewEventPage() {
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
         Create a new sourcing event or support project
       </p>
+
+      {loadError && (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
+          <strong>These figures are incomplete.</strong> A query failed: {loadError}. Do not report
+          from this page until it loads cleanly.
+        </div>
+      )}
+
       <EventForm
         categories={categories || []}
         businessUnits={businessUnits || []}

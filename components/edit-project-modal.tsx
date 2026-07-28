@@ -8,12 +8,6 @@ import { Input, Select } from '@/components/ui/input'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string }
 
-const SOURCING_METHODS = [
-  'RFP', 'RFQ', 'RFI', 'Auction', 'Sole Source',
-  'Negotiated Renewal', 'Benchmark Negotiation', 'Contract Amendment',
-  'Catalog Optimization', 'Demand Management', 'Supplier Consolidation'
-]
-
 const SOURCING_STATUSES = [
   'Pipeline', 'Scoped', 'Baseline Pending', 'Baseline Approved',
   'In Market', 'Negotiation', 'Award Recommended', 'Award Approved',
@@ -97,7 +91,6 @@ export function EditProjectModal({
     event_name: project.event_name || '',
     event_description: project.event_description || '',
     event_type: project.event_type || '',
-    sourcing_method: project.sourcing_method || '',
     event_status: project.event_status || 'Pipeline',
     buyer_name: project.buyer_name || '',
     category_id: project.category_id || '',
@@ -106,6 +99,11 @@ export function EditProjectModal({
     incumbent_supplier_id: project.incumbent_supplier_id || '',
     event_start_date: project.event_start_date || '',
     event_close_date: project.event_close_date || '',
+    // The contract start is what "Savings start" defaults from on the
+    // Calculations tab, which in turn seeds the savings schedule. It was
+    // readable on the Projects list but not editable anywhere.
+    contract_start_date: project.contract_start_date || '',
+    contract_end_date: project.contract_end_date || '',
     notes: project.notes || '',
   })
 
@@ -125,6 +123,8 @@ export function EditProjectModal({
       buyer_name: form.buyer_name || null,
       event_start_date: form.event_start_date || null,
       event_close_date: form.event_close_date || null,
+      contract_start_date: form.contract_start_date || null,
+      contract_end_date: form.contract_end_date || null,
       category_id: form.category_id || null,
       business_unit_id: form.business_unit_id || null,
       cost_center_id: form.cost_center_id || null,
@@ -133,9 +133,6 @@ export function EditProjectModal({
       updated_at: new Date().toISOString(),
     }
 
-    if (!isSupport) {
-      updates.sourcing_method = form.sourcing_method || null
-    }
 
     const { error: updateError } = await supabase
       .from('sourcing_events')
@@ -223,17 +220,8 @@ export function EditProjectModal({
               <label htmlFor="ep-type" className={labelClass}>Event Type</label>
               <Input id="ep-type" type="text" value={form.event_type} onChange={(e) => handleChange('event_type', e.target.value)} />
             </div>
-            {!isSupport && (
-              <div>
-                <label htmlFor="ep-method" className={labelClass}>Sourcing Method</label>
-                <Select id="ep-method" value={form.sourcing_method} onChange={(e) => handleChange('sourcing_method', e.target.value)}>
-                  <option value="">Select method...</option>
-                  {SOURCING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                </Select>
-              </div>
-            )}
             <div>
-              <label htmlFor="ep-buyer" className={labelClass}>IP Owner / Buyer</label>
+              <label htmlFor="ep-buyer" className={labelClass}>Owner / Buyer</label>
               <Input id="ep-buyer" type="text" value={form.buyer_name} onChange={(e) => handleChange('buyer_name', e.target.value)} placeholder="e.g. Jane Smith" />
             </div>
           </div>
@@ -279,6 +267,25 @@ export function EditProjectModal({
               <Input id="ep-close" type="date" value={form.event_close_date} onChange={(e) => handleChange('event_close_date', e.target.value)} />
             </div>
           </div>
+
+          {!isSupport && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="ep-cstart" className={labelClass}>Contract Start Date</label>
+                <Input id="ep-cstart" type="date" value={form.contract_start_date} onChange={(e) => handleChange('contract_start_date', e.target.value)} />
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                  Savings start defaults from this, and the schedule starts from that.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="ep-cend" className={labelClass}>Contract End Date</label>
+                <Input id="ep-cend" type="date" value={form.contract_end_date} onChange={(e) => handleChange('contract_end_date', e.target.value)} />
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                  The contract&apos;s own end. The savings window comes from the deal term instead.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div>
             <label htmlFor="ep-notes" className={labelClass}>Notes</label>

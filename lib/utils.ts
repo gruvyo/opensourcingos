@@ -19,9 +19,40 @@ export function formatCurrency(
   }).format(value)
 }
 
+/**
+ * THE way to display a Cost Reduction. Two rules from the methodology that
+ * plain formatCurrency silently breaks:
+ *
+ *   null  -> "n/a"          NOT APPLICABLE (no baseline anchor). Rendering it
+ *                           as "$0" claims the deal saved nothing hard, when
+ *                           the truth is the question does not apply.
+ *   < 0   -> "($100,000)"   A real cost increase, in accounting parentheses.
+ *                           "-$100,000" reads as a typo; it is never
+ *                           sign-flipped and never relabelled as savings.
+ *
+ * Use this anywhere cost_reduction_amount is shown to a human.
+ */
+export function formatReduction(
+  amount: number | null | undefined,
+  currencyCode: string = 'USD',
+): string {
+  if (amount === null || amount === undefined) return 'n/a'
+  if (!Number.isFinite(amount)) return 'n/a'
+  return amount < 0
+    ? `(${formatCurrency(Math.abs(amount), currencyCode)})`
+    : formatCurrency(amount, currencyCode)
+}
+
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '—'
-  return new Date(date).toLocaleDateString('en-US', {
+  // A bare 'YYYY-MM-DD' is parsed as UTC midnight, which renders as the DAY
+  // BEFORE anywhere west of Greenwich — a contract starting 2026-01-01 showed
+  // as Dec 31, 2025. These columns are dates, not instants, so pin them to
+  // local midnight. Timestamps (which carry a time or a zone) are left alone.
+  const localDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00` : date
+  const d = new Date(localDate)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

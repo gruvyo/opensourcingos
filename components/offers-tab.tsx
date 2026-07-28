@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, CheckCircle, XCircle,
-  Award, GitCompare, Users, FileText
+  Award, GitCompare, Users, FileText, Pencil
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { grossSavings, savingsPct as savingsPctOf } from '@/lib/savings'
+import { grossSavings, savingsPct as savingsPctOf, termRates } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,8 @@ type Offer = {
   offer_round: number
   offer_date: string | null
   offer_total_amount: number
+  offer_term_months: number | null
+  offer_role: string | null
   offer_valid_until: string | null
   compliant_bid_flag: boolean
   selected_for_award_flag: boolean
@@ -61,7 +63,59 @@ export function OffersTab({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [offerLines, setOfferLines] = useState<Record<string, any[]>>({})
   const [selectedForAward, setSelectedForAward] = useState<string | null>(null)
+  const [editingOffer, setEditingOffer] = useState<any | null>(null)
+  const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
+  const [editTotalValue, setEditTotalValue] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
   const supabase = createClient()
+  // The `suppliers` prop is a server-render snapshot from page load. A supplier
+  // created inline must show up in the next dropdown without a page refresh, so
+  // the tab owns the list and refetches on demand.
+  const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers)
+  useEffect(() => { setSupplierList(suppliers) }, [suppliers])
+
+  const refreshSuppliers = useCallback(async () => {
+    const { data } = await supabase
+      .from('suppliers').select('id, supplier_name').order('supplier_name')
+    if (data) setSupplierList(data as Supplier[])
+  }, [supabase])
+
+  // An offer's role IS the decision: marking one 'final' replaces the whole
+  // award ceremony. At most one of each role per project.
+  const setRole = async (offerId: string, role: 'opening' | 'final' | null) => {
+    setActionError(null)
+    if (role) {
+      const clearRes = await supabase.from('supplier_offers').update({ offer_role: null })
+        .eq('event_id', eventId).eq('offer_role', role).neq('id', offerId)
+      if (clearRes.error) { setActionError(clearRes.error.message); return }
+    }
+    const res = await supabase.from('supplier_offers').update({ offer_role: role }).eq('id', offerId)
+    if (res.error) { setActionError(res.error.message); return }
+
+    // Marking an offer Final IS the award decision, so record who won on the
+    // project. sourcing_events.awarded_supplier_id is read by the Projects list,
+    // event detail, Reports and Suppliers; the retired award flow used to be the
+    // only thing that set it.
+    if (role === 'final') {
+      const won = offers.find(o => o.id === offerId)
+      if (won?.supplier_id) {
+        const awardRes = await supabase.from('sourcing_events')
+          .update({ awarded_supplier_id: won.supplier_id }).eq('id', eventId)
+        if (awardRes.error) { setActionError(awardRes.error.message); return }
+      }
+    }
+    fetchOffers()
+  }
+
+  const saveOfferTotal = async (offerId: string) => {
+    const v = parseFloat(editTotalValue)
+    setEditingTotalId(null)
+    if (!Number.isFinite(v)) return
+    setActionError(null)
+    const { error } = await supabase.from('supplier_offers').update({ offer_total_amount: v }).eq('id', offerId)
+    if (error) { setActionError(error.message); return }
+    fetchOffers()
+  }
 
   const fetchOffers = useCallback(async () => {
     const { data } = await supabase
@@ -103,10 +157,12 @@ export function OffersTab({
   }
 
   const toggleCompliance = async (offer: Offer) => {
-    await supabase
+    setActionError(null)
+    const { error } = await supabase
       .from('supplier_offers')
       .update({ compliant_bid_flag: !offer.compliant_bid_flag })
       .eq('id', offer.id)
+    if (error) { setActionError(error.message); return }
     fetchOffers()
   }
 
@@ -159,6 +215,16 @@ export function OffersTab({
       .select('id')
       .single()
 
+    if (!error && award) {
+      // Record WHO won on the project itself. sourcing_events.awarded_supplier_id is
+      // read by the Projects list, event detail, Reports and Suppliers, but nothing
+      // ever wrote it — so every post-award screen kept showing the incumbent.
+      await supabase
+        .from('sourcing_events')
+        .update({ awarded_supplier_id: offer.supplier_id })
+        .eq('id', eventId)
+    }
+
     if (!error && award && lines) {
       // Create award lines from offer lines
       for (const line of lines) {
@@ -189,7 +255,11 @@ export function OffersTab({
 
   const handleDelete = async (offerId: string) => {
     if (!confirm('Delete this offer and all its lines?')) return
-    await supabase.from('supplier_offers').delete().eq('id', offerId)
+    setActionError(null)
+    const { error } = await supabase.from('supplier_offers').delete().eq('id', offerId)
+    if (error) { setActionError(error.message); return }
+    // Only drop it from local state once the delete is confirmed — otherwise a
+    // delete rejected by RLS or a foreign key still looks successful.
     setOffers(offers.filter(o => o.id !== offerId))
   }
 
@@ -222,20 +292,42 @@ export function OffersTab({
         </div>
       </div>
 
-      {/* Add Offer Form */}
-      {showForm && (
-        <AddOfferForm
-          eventId={eventId}
-          scopeLines={scopeLines}
-          suppliers={suppliers}
-          onSaved={() => { setShowForm(false); fetchOffers() }}
-          onCancel={() => setShowForm(false)}
-        />
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <strong>Could not save:</strong> {actionError}
+          {actionError.includes('does not exist') && (
+            <span> — this usually means a database migration has not been run yet.</span>
+          )}
+        </div>
       )}
 
       {/* Comparison View */}
       {showCompare && offers.length >= 2 && (
         <ComparisonView offers={offers} offerLines={offerLines} fetchOfferLines={fetchOfferLines} eventId={eventId} />
+      )}
+
+      {/* Add Offer Form */}
+      {showForm && (
+        <AddOfferForm
+          eventId={eventId}
+          scopeLines={scopeLines}
+          suppliers={supplierList}
+          onSupplierAdded={refreshSuppliers}
+          onSaved={() => { setShowForm(false); fetchOffers() }}
+          onCancel={() => setShowForm(false)}
+        />
+      )}
+
+      {editingOffer && (
+        <AddOfferForm
+          eventId={eventId}
+          scopeLines={scopeLines}
+          suppliers={supplierList}
+          onSupplierAdded={refreshSuppliers}
+          existing={editingOffer}
+          onSaved={() => { setEditingOffer(null); fetchOffers() }}
+          onCancel={() => setEditingOffer(null)}
+        />
       )}
 
       {/* Offers List */}
@@ -250,7 +342,13 @@ export function OffersTab({
           {offers.map((offer) => {
             const isExpanded = expandedId === offer.id
             const lines = offerLines[offer.id] || []
-            const isLowest = offers.length > 1 && offer.offer_total_amount === Math.min(...offers.map(o => o.offer_total_amount))
+            // Rank on the annual run-rate, never the raw total: a 36-month deal
+            // has a bigger total than a 12-month one while being cheaper per year.
+            const annualOf = (o: Offer) => termRates(o.offer_total_amount, o.offer_term_months).perYear
+            const comparable = offers.filter(o => termRates(o.offer_total_amount, o.offer_term_months).known)
+            const isLowest = comparable.length > 1
+              && termRates(offer.offer_total_amount, offer.offer_term_months).known
+              && annualOf(offer) === Math.min(...comparable.map(annualOf))
 
             return (
               <Card key={offer.id} className="overflow-hidden">
@@ -268,10 +366,11 @@ export function OffersTab({
                       {isLowest && (
                         <Badge tone="success">Lowest Bid</Badge>
                       )}
-                      {offer.selected_for_award_flag && (
-                        <Badge tone="warning">
-                          <Award className="h-3 w-3" /> Selected for Award
-                        </Badge>
+                      {offer.offer_role === 'opening' && (
+                        <Badge tone="info">Opening proposal</Badge>
+                      )}
+                      {offer.offer_role === 'final' && (
+                        <Badge tone="success"><Award className="h-3 w-3" /> Final offer</Badge>
                       )}
                     </div>
                     <p className="mt-1 text-xs text-[var(--text-3)]">
@@ -281,10 +380,38 @@ export function OffersTab({
                     </p>
                   </div>
 
-                  {/* Total */}
+                  {/* Total — click to edit. */}
                   <div className="text-right">
-                    <p className="text-xs text-[var(--text-3)]">Total Offer</p>
-                    <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(offer.offer_total_amount)}</p>
+                    <p className="text-xs text-[var(--text-3)]">
+                      Total Offer{offer.offer_term_months ? ` · ${offer.offer_term_months} mo` : ''}
+                    </p>
+                    {editingTotalId === offer.id ? (
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Input type="number" step="0.01" autoFocus value={editTotalValue}
+                          onChange={(e) => setEditTotalValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveOfferTotal(offer.id) }
+                            if (e.key === 'Escape') setEditingTotalId(null)
+                          }}
+                          className="w-36 py-1 text-right text-sm" />
+                        <Button type="button" size="sm" onClick={() => saveOfferTotal(offer.id)}>Save</Button>
+                      </div>
+                    ) : (
+                      <button type="button" title="Click to edit"
+                        onClick={() => { setEditingTotalId(offer.id); setEditTotalValue(String(offer.offer_total_amount ?? '')) }}
+                        className="text-lg font-bold text-[var(--text)] underline decoration-dotted underline-offset-4 hover:text-[var(--brand-ink)]">
+                        {formatCurrency(offer.offer_total_amount)}
+                      </button>
+                    )}
+                    {(() => {
+                      const r = termRates(offer.offer_total_amount, offer.offer_term_months)
+                      if (!r.known) return null
+                      return (
+                        <p className="mt-0.5 text-[11px] text-[var(--text-3)]">
+                          {formatCurrency(r.perMonth)}/mo · {formatCurrency(r.perYear)}/yr
+                        </p>
+                      )
+                    })()}
                   </div>
 
                   {/* Compliance Badge */}
@@ -302,6 +429,10 @@ export function OffersTab({
                   </button>
 
                   {/* Delete */}
+                  <button onClick={() => setEditingOffer(offer)} title="Edit offer"
+                    className="text-[var(--text-3)] hover:text-[var(--brand-ink)]">
+                    <Pencil className="h-4 w-4" />
+                  </button>
                   <button onClick={() => handleDelete(offer.id)} className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -310,26 +441,28 @@ export function OffersTab({
                 {/* Expanded View */}
                 {isExpanded && (
                   <div className="border-t border-[var(--border)] bg-[var(--surface-2)]">
-                    {/* Actions */}
+                    {/* Role in the savings chain. Marking an offer 'Final' IS the
+                        award decision - it replaces the old two-step ceremony. */}
                     <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-                      <button
-                        onClick={() => selectForAward(offer)}
-                        className={clsx(
-                          'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium',
-                          offer.selected_for_award_flag
-                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                            : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-gray-200'
-                        )}
-                      >
-                        <Award className="h-3 w-3" />
-                        {offer.selected_for_award_flag ? 'Selected for Award' : 'Select for Award'}
-                      </button>
-                      <button
-                        onClick={() => createAward(offer)}
-                        className="flex items-center gap-1 rounded bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
-                      >
-                        <FileText className="h-3 w-3" /> Create Award from Offer
-                      </button>
+                      <span className="text-xs font-medium text-[var(--text-3)]">Role in savings chain:</span>
+                      {([
+                        { role: 'opening' as const, label: 'Opening proposal', hint: 'The vendor first ask. Drives Cost Avoidance.' },
+                        { role: 'final' as const, label: 'Final offer', hint: 'What was signed. Drives Cost Reduction.' },
+                      ]).map(({ role, label, hint }) => (
+                        <button key={role} title={hint}
+                          onClick={() => setRole(offer.id, offer.offer_role === role ? null : role)}
+                          className={clsx(
+                            'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                            offer.offer_role === role
+                              ? 'bg-[var(--brand-soft)] text-[var(--brand-ink)]'
+                              : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--border)]'
+                          )}>
+                          {offer.offer_role === role ? `\u2713 ${label}` : label}
+                        </button>
+                      ))}
+                      <span className="ml-auto text-[11px] text-[var(--text-3)]">
+                        Marking an offer Final is the award decision.
+                      </span>
                     </div>
 
                     {/* Offer Lines Table */}
@@ -354,23 +487,68 @@ export function OffersTab({
 // ============================================
 // Add Offer Form
 // ============================================
-function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
+function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSupplierAdded, onSaved, onCancel }: {
   eventId: string
   scopeLines: ScopeLine[]
   suppliers: Supplier[]
+  onSupplierAdded?: () => void
+  /** When set, the form edits this offer instead of creating a new one. */
+  existing?: any | null
   onSaved: () => void
   onCancel: () => void
 }) {
+  const isEdit = !!existing
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Most projects involve a first-time vendor, so a supplier must be creatable
+  // right here rather than only on the New Project screen.
+  const [localSuppliers, setLocalSuppliers] = useState<Supplier[]>(suppliers)
+  const [showNewSupplier, setShowNewSupplier] = useState(false)
+  const [newSupplierName, setNewSupplierName] = useState('')
+  const [addingSupplier, setAddingSupplier] = useState(false)
+
+  useEffect(() => { setLocalSuppliers(suppliers) }, [suppliers])
+
+  const handleAddSupplier = async () => {
+    const name = newSupplierName.trim()
+    if (!name) return
+    setAddingSupplier(true)
+    setError(null)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles').select('organization_id').eq('id', user!.id).single()
+
+    const { data, error: insertError } = await supabase
+      .from('suppliers')
+      .insert({
+        supplier_name: name,
+        organization_id: profile?.organization_id,
+        supplier_status: 'Active',
+      })
+      .select('id, supplier_name')
+      .single()
+
+    setAddingSupplier(false)
+    if (insertError) { setError(insertError.message); return }
+
+    setLocalSuppliers(prev => [...prev, data as Supplier])
+    setForm(prev => ({ ...prev, supplier_id: data.id }))
+    setNewSupplierName('')
+    setShowNewSupplier(false)
+    onSupplierAdded?.()   // keep the tab-level list in step
+  }
+
   const [form, setForm] = useState({
-    supplier_id: '',
-    offer_type: 'Initial',
-    offer_round: '1',
-    offer_date: '',
-    offer_valid_until: '',
-    notes: '',
+    supplier_id: existing?.supplier_id ?? '',
+    offer_type: existing?.offer_type ?? 'Initial',
+    offer_round: existing ? String(existing.offer_round ?? '1') : '1',
+    offer_date: existing?.offer_date ?? '',
+    offer_valid_until: existing?.offer_valid_until ?? '',
+    notes: existing?.notes ?? '',
+    offer_total_amount: existing ? String(existing.offer_total_amount ?? '') : '',
+    offer_term_months: existing ? String(existing.offer_term_months ?? '12') : '12',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -387,17 +565,33 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
       .eq('id', user!.id)
       .single()
 
+    const payload: Record<string, any> = {
+      supplier_id: form.supplier_id,
+      offer_type: form.offer_type,
+      offer_round: parseInt(form.offer_round) || 1,
+      offer_date: form.offer_date || null,
+      offer_valid_until: form.offer_valid_until || null,
+      notes: form.notes || null,
+      // Direct total entry (primary path). Offer lines are optional detail
+      // and recompute this when present.
+      offer_total_amount: form.offer_total_amount === '' ? 0 : parseFloat(form.offer_total_amount),
+      offer_term_months: form.offer_term_months === '' ? null : parseFloat(form.offer_term_months),
+    }
+
+    if (isEdit) {
+      const { error: updateError } = await supabase
+        .from('supplier_offers').update(payload).eq('id', existing.id)
+      if (updateError) { setError(updateError.message); setLoading(false); return }
+      onSaved()
+      return
+    }
+
     const { error: insertError } = await supabase
       .from('supplier_offers')
       .insert({
+        ...payload,
         organization_id: profile?.organization_id,
         event_id: eventId,
-        supplier_id: form.supplier_id,
-        offer_type: form.offer_type,
-        offer_round: parseInt(form.offer_round) || 1,
-        offer_date: form.offer_date || null,
-        offer_valid_until: form.offer_valid_until || null,
-        notes: form.notes || null,
         created_by: user.id,
       })
 
@@ -414,19 +608,60 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
-      <h4 className="mb-4 font-medium text-[var(--text)]">New Supplier Offer</h4>
+      <h4 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Supplier Offer' : 'New Supplier Offer'}</h4>
       {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
-          <label className={labelClass}>Supplier *</label>
-          <Select required value={form.supplier_id}
-            onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
-            className="mt-1">
-            <option value="">Select supplier...</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.supplier_name}</option>
-            ))}
-          </Select>
+          <div className="flex items-center justify-between">
+            <label className={labelClass}>Supplier *</label>
+            <button type="button" onClick={() => setShowNewSupplier(v => !v)}
+              className="text-xs font-medium text-[var(--brand-ink)] hover:underline">
+              {showNewSupplier ? 'Cancel' : '+ New supplier'}
+            </button>
+          </div>
+          {showNewSupplier ? (
+            <div className="mt-1 flex gap-2">
+              <Input type="text" value={newSupplierName} autoFocus
+                onChange={(e) => setNewSupplierName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSupplier() } }}
+                placeholder="New supplier name" />
+              <Button type="button" size="sm" disabled={addingSupplier || !newSupplierName.trim()}
+                onClick={handleAddSupplier}>
+                {addingSupplier ? 'Adding...' : 'Add'}
+              </Button>
+            </div>
+          ) : (
+            <Select required value={form.supplier_id}
+              onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+              className="mt-1">
+              <option value="">Select supplier...</option>
+              {localSuppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.supplier_name}</option>
+              ))}
+            </Select>
+          )}
+        </div>
+        <div>
+          <label className={labelClass}>Offer Total ($) *</label>
+          <Input type="number" step="0.01" required value={form.offer_total_amount}
+            onChange={(e) => setForm({ ...form, offer_total_amount: e.target.value })}
+            className="mt-1" placeholder="e.g. 1200000" />
+        </div>
+        <div>
+          <label className={labelClass}>Term (months) *</label>
+          <Input type="number" step="1" min="1" required value={form.offer_term_months}
+            onChange={(e) => setForm({ ...form, offer_term_months: e.target.value })}
+            className="mt-1" placeholder="12" />
+          {(() => {
+            const r = termRates(form.offer_total_amount, form.offer_term_months)
+            return r.known ? (
+              <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                {formatCurrency(r.perMonth)}/mo · {formatCurrency(r.perYear)}/yr
+              </p>
+            ) : (
+              <p className="mt-1 text-[11px] text-[var(--text-3)]">Price any escalator into the total.</p>
+            )
+          })()}
         </div>
         <div>
           <label className={labelClass}>Offer Type</label>
@@ -466,7 +701,7 @@ function AddOfferForm({ eventId, scopeLines, suppliers, onSaved, onCancel }: {
           Cancel
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? 'Creating...' : 'Create Offer'}
+          {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Offer'}
         </Button>
       </div>
     </form>
@@ -485,6 +720,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
 }) {
   const supabase = createClient()
   const [lines, setLines] = useState(initialLines)
+  const [lineError, setLineError] = useState<string | null>(null)
   const [showAddLine, setShowAddLine] = useState(false)
   const [newLine, setNewLine] = useState({
     scope_line_id: '',
@@ -503,8 +739,24 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     return (extended * 12) / termMonths
   }
 
+  // Re-query rather than trust local `lines`: two rapid adds/deletes can
+  // otherwise total a stale array and write the wrong number to the DB.
+  const refetchLines = async () => {
+    const { data, error } = await supabase
+      .from('supplier_offer_lines')
+      .select(`
+        *,
+        scope_line:event_scope_lines(item_service_name, uom)
+      `)
+      .eq('offer_id', offerId)
+      .order('line_number', { ascending: true })
+    if (error) { setLineError(error.message); return null }
+    return data || []
+  }
+
   const handleAddLine = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLineError(null)
     const unitPrice = parseFloat(newLine.offer_unit_price) || 0
     const qty = parseFloat(newLine.offer_quantity) || 0
     const termMonths = parseFloat(newLine.offer_term_months) || 12
@@ -544,29 +796,45 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
       `)
       .single()
 
-    if (!error && data) {
-      setLines([...lines, data])
-      setNewLine({
-        scope_line_id: '', offer_unit_price: '', offer_quantity: '',
-        offer_term_months: '12', offer_one_time_amount: '', compliance_status: 'Compliant',
-      })
-      setShowAddLine(false)
-      onLinesChanged()
-      updateOfferTotal()
+    if (error || !data) {
+      setLineError(error?.message || 'Could not add offer line.')
+      return
+    }
+
+    setNewLine({
+      scope_line_id: '', offer_unit_price: '', offer_quantity: '',
+      offer_term_months: '12', offer_one_time_amount: '', compliance_status: 'Compliant',
+    })
+    setShowAddLine(false)
+    onLinesChanged()
+    // Same stale-closure fix as baselines-tab: total the FRESHLY FETCHED rows, not
+    // React state, which two rapid adds could read before it catches up.
+    const freshLines = await refetchLines()
+    if (freshLines) {
+      setLines(freshLines)
+      updateOfferTotal(freshLines)
     }
   }
 
   const handleDeleteLine = async (lineId: string) => {
     if (!confirm('Delete this offer line? This cannot be undone.')) return
-    await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
-    setLines(lines.filter(l => l.id !== lineId))
+    setLineError(null)
+    const { error } = await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
+    if (error) { setLineError(error.message); return }
     onLinesChanged()
-    updateOfferTotal()
+    // Re-query rather than filter local state: two rapid deletes could otherwise
+    // total a stale array and write the wrong number to the DB.
+    const freshLines = await refetchLines()
+    if (freshLines) {
+      setLines(freshLines)
+      updateOfferTotal(freshLines)
+    }
   }
 
-  const updateOfferTotal = async () => {
-    const total = lines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
-    await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
+  const updateOfferTotal = async (currentLines: any[]) => {
+    const total = currentLines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
+    const { error } = await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
+    if (error) setLineError(error.message)
   }
 
   const labelClass = 'block text-xs font-medium text-[var(--text-3)] mb-1'
@@ -583,6 +851,15 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
           <Plus className="h-3 w-3" /> Add Line
         </button>
       </div>
+
+      {lineError && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <strong>Error:</strong> {lineError}
+          {lineError.includes('does not exist') && (
+            <span> — this usually means a database migration has not been run yet.</span>
+          )}
+        </div>
+      )}
 
       {showAddLine && (
         <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 dark:border-indigo-800 bg-[var(--surface)] p-4">
@@ -741,16 +1018,27 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
 }) {
   const supabase = createClient()
   const [baselines, setBaselines] = useState<any[]>([])
+  const [baselineError, setBaselineError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch the official baseline for comparison
+    // THE baseline is the one marked is_selected -- the same one the chain, the
+    // Calculations tab and the Schedule tab all measure against.
+    //
+    // This used to query official_for_hard_savings instead. That column is only
+    // ever written at insert (true for the first baseline) and the UI that could
+    // change it -- "Mark Official" -- was deliberately removed, so nothing could
+    // move it afterwards. Add a second, more accurate baseline and click "Use as
+    // baseline", and this comparison silently kept measuring against the first
+    // one: two different verdicts about the same offer, on two tabs, with no way
+    // to reconcile them.
     const fetchBaseline = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('baselines')
         .select('*, baseline_lines(*)')
         .eq('event_id', eventId)
-        .eq('official_for_hard_savings', true)
+        .eq('is_selected', true)
         .maybeSingle()
+      if (error) { setBaselineError(error.message); return }
       if (data) setBaselines([data])
     }
     fetchBaseline()
@@ -791,11 +1079,32 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
 
   // Calculate savings vs baseline for each offer
   const baselineTotal = baselines[0]?.baseline_total_amount || 0
+  // Compare on the annual run-rate so unlike terms are not subtracted from each
+  // other. Before this, a 36-month offer looked ~3x more expensive than a
+  // 12-month baseline purely because it covered three times the period.
+  const baselineRates = termRates(baselineTotal, baselines[0]?.baseline_term_months)
+  const baselineAnnual = baselineRates.known ? baselineRates.perYear : 0
   const baselineLines = baselines[0]?.baseline_lines || []
 
   const getBaselineLineAmount = (scopeLineId: string) => {
     const line = baselineLines.find((l: any) => l.scope_line_id === scopeLineId)
     return line ? line.baseline_extended_amount : null
+  }
+
+  // The ANNUAL run-rate for a line, which is what a line-level comparison has
+  // to use. Subtracting raw extended amounts made a 36-month offer line look
+  // 1.7m worse than a 12-month baseline line while the Total row directly
+  // beneath it -- correctly annualized -- called the same offer 100k cheaper.
+  // Same column, opposite verdicts. Both tables already store the annualized
+  // figure; only the row comparison was ignoring it.
+  const getBaselineLineAnnual = (scopeLineId: string) => {
+    const line = baselineLines.find((l: any) => l.scope_line_id === scopeLineId)
+    return line ? (line.annualized_baseline_amount ?? null) : null
+  }
+
+  const getLineAnnual = (offerId: string, scopeLineId: string) => {
+    const line = (offerLines[offerId] || []).find((l: any) => l.scope_line_id === scopeLineId)
+    return line ? (line.annualized_offer_amount ?? null) : null
   }
 
   return (
@@ -805,7 +1114,12 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
           <GitCompare className="h-4 w-4" />
           Side-by-Side Offer Comparison
         </h4>
-        <p className="mt-1 text-xs text-[var(--text-3)]">Compare all supplier offers line by line</p>
+        <p className="mt-1 text-xs text-[var(--text-3)]">Compared on the annual run-rate, so terms of different lengths line up</p>
+        {baselineError && (
+          <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
+            Could not load the baseline: {baselineError}
+          </p>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -822,7 +1136,9 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                 </th>
               )}
               {offers.map((offer) => {
-                const isLowest = offer.offer_total_amount === Math.min(...offers.map(o => o.offer_total_amount))
+                const annualOf2 = (o: any) => termRates(o.offer_total_amount, o.offer_term_months).perYear
+                const cmp2 = offers.filter((o: any) => termRates(o.offer_total_amount, o.offer_term_months).known)
+                const isLowest = cmp2.length > 0 && annualOf2(offer) === Math.min(...cmp2.map(annualOf2))
                 return (
                   <th key={offer.id} className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">
                     <div className="flex items-center justify-end gap-1">
@@ -857,8 +1173,12 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                   {offers.map((offer) => {
                     const amount = getLineAmount(offer.id, scopeLineId)
                     const unitPrice = getLineUnitPrice(offer.id, scopeLineId)
-                    const baselineAmount = getBaselineLineAmount(scopeLineId)
-                    const savings = (baselineAmount && amount) ? baselineAmount - amount : null
+                    // Compared on the annual run-rate, like the Total row.
+                    // `!= null` rather than truthiness: a genuine zero is a real
+                    // figure, and treating it as missing blanked the comparison.
+                    const bAnnual = getBaselineLineAnnual(scopeLineId)
+                    const oAnnual = getLineAnnual(offer.id, scopeLineId)
+                    const savings = bAnnual != null && oAnnual != null ? bAnnual - oAnnual : null
                     return (
                       <td key={offer.id} className="px-4 py-3 text-right text-sm">
                         {amount !== null ? (
@@ -866,10 +1186,10 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                             <div className="font-medium text-[var(--text)]">{formatCurrency(amount)}</div>
                             <div className="text-xs text-[var(--text-3)]">@ {formatCurrency(unitPrice || 0)}</div>
                             {savings !== null && savings > 0 && (
-                              <div className="text-xs font-medium text-green-600 dark:text-green-400">↓ {formatCurrency(savings)}</div>
+                              <div className="text-xs font-medium text-green-600 dark:text-green-400">↓ {formatCurrency(savings)}/yr</div>
                             )}
                             {savings !== null && savings < 0 && (
-                              <div className="text-xs font-medium text-red-600 dark:text-red-400">↑ {formatCurrency(Math.abs(savings))}</div>
+                              <div className="text-xs font-medium text-red-600 dark:text-red-400">↑ {formatCurrency(Math.abs(savings))}/yr</div>
                             )}
                           </div>
                         ) : (
@@ -887,15 +1207,24 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
               <td className="sticky left-0 bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--text)]">Total</td>
               {baselines[0] && (
                 <td className="px-4 py-3 text-right text-sm text-[var(--text)]">
-                  {formatCurrency(baselineTotal)}
+                  {formatCurrency(baselineAnnual)}<span className="text-[var(--text-3)]">/yr</span>
+                  <div className="text-[11px] font-normal text-[var(--text-3)]">
+                    {formatCurrency(baselineTotal)} over {baselines[0]?.baseline_term_months ?? '?'} mo
+                  </div>
                 </td>
               )}
               {offers.map((offer) => {
-                const savings = baselineTotal ? grossSavings(baselineTotal, offer.offer_total_amount) : null
-                const savingsPct = baselineTotal ? savingsPctOf(savings!, baselineTotal) : null
+                const r = termRates(offer.offer_total_amount, offer.offer_term_months)
+                const offerAnnual = r.known ? r.perYear : 0
+                const comparable = baselineAnnual > 0 && r.known
+                const savings = comparable ? grossSavings(baselineAnnual, offerAnnual) : null
+                const savingsPct = comparable ? savingsPctOf(savings!, baselineAnnual) : null
                 return (
                   <td key={offer.id} className="px-4 py-3 text-right text-sm">
-                    <div className="text-[var(--text)]">{formatCurrency(offer.offer_total_amount)}</div>
+                    <div className="text-[var(--text)]">{formatCurrency(offerAnnual)}<span className="text-[var(--text-3)]">/yr</span></div>
+                    <div className="text-[11px] text-[var(--text-3)]">
+                      {formatCurrency(offer.offer_total_amount)} over {offer.offer_term_months ?? '?'} mo
+                    </div>
                     {savings !== null && savings > 0 && (
                       <div className="text-xs font-medium text-green-600 dark:text-green-400">
                         ↓ {formatCurrency(savings)} ({savingsPct?.toFixed(1)}%)

@@ -10,6 +10,10 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    // scripts/verify-savings.mts is run by node directly (node strips the
+    // types), and node's ESM resolver requires the real .ts extension on the
+    // import. Safe here because noEmit is on.
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,

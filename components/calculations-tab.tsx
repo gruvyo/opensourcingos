@@ -2,485 +2,433 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 import {
-  Calculator, Plus, Trash2, ChevronDown, ChevronRight,
-  FileCheck, TrendingDown,
-} from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+  chainSavings, chainWithBaselineQuality, baselineQuality, termRates,
+  reportableSavingsPct, type RateBasis,
+} from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 
-const SAVINGS_TYPES = [
-  'Cost Reduction', 'Cost Avoidance', 'Demand Reduction',
-  'TCO Improvement', 'Working Capital',
+const CALC_STATUSES = [
+  { value: 'identified', label: 'Identified' },
+  { value: 'negotiated', label: 'Negotiated' },
+  { value: 'contracted', label: 'Contracted' },
+  { value: 'realized', label: 'Realized' },
 ]
 
-const CALC_STATUS_COLORS: Record<string, string> = {
-  'identified': 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
-  'negotiated': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  'contracted': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-  'realized': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+type Anchor = {
+  label: string
+  amount: number | null
+  months: number | null
+  detail: string
+  missing: boolean
 }
 
+/**
+ * The savings calculation is DERIVED from three selected anchors, never typed:
+ *   Opening -> Baseline -> Final
+ * You pick which baseline and which offers play those roles on their own tabs;
+ * this tab shows the resulting arithmetic and saves it as the project's one
+ * savings record (which is what every dashboard and report reads).
+ */
 export function CalculationsTab({ eventId }: { eventId: string }) {
-  const [calculations, setCalculations] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [calcLines, setCalcLines] = useState<Record<string, any[]>>({})
-  const [baselines, setBaselines] = useState<any[]>([])
-  const [awards, setAwards] = useState<any[]>([])
   const supabase = createClient()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
 
-  const fetchCalculations = useCallback(async () => {
-    const { data } = await supabase
-      .from('savings_calculations')
-      .select(`*, baseline:baselines(baseline_name), award:awards(award_name)`)
-      .eq('event_id', eventId)
-      .order('created_at', { ascending: true })
-    setCalculations(data || [])
+  const [baseline, setBaseline] = useState<any | null>(null)
+  const [opening, setOpening] = useState<any | null>(null)
+  const [final, setFinal] = useState<any | null>(null)
+  const [existing, setExisting] = useState<any | null>(null)
+
+  const [basis, setBasis] = useState<RateBasis>('perYear')
+  const [status, setStatus] = useState('identified')
+  const [startDate, setStartDate] = useState('')
+
+  const load = useCallback(async () => {
+    const [{ data: bases }, { data: offers }, { data: calcs }, { data: ev }] = await Promise.all([
+      supabase.from('baselines')
+        .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected, hard_reduction_override, hard_reduction_override_reason')
+        .eq('event_id', eventId),
+      supabase.from('supplier_offers')
+        .select('id, offer_total_amount, offer_term_months, offer_role, offer_type, offer_round, supplier:suppliers(supplier_name)')
+        .eq('event_id', eventId),
+      supabase.from('savings_calculations').select('*').eq('event_id', eventId)
+        .order('created_at', { ascending: true }),
+      supabase.from('sourcing_events').select('contract_start_date, contract_end_date').eq('id', eventId).maybeSingle(),
+    ])
+
+    setBaseline((bases || []).find((b: any) => b.is_selected) ?? null)
+    setOpening((offers || []).find((o: any) => o.offer_role === 'opening') ?? null)
+    setFinal((offers || []).find((o: any) => o.offer_role === 'final') ?? null)
+
+    const calc = (calcs || [])[0] ?? null
+    setExisting(calc)
+    if (calc) {
+      setStatus(calc.calculation_status || 'identified')
+      setStartDate(calc.savings_start_date || '')
+      setSavedAt(calc.updated_at || calc.created_at || null)
+    } else {
+      setStartDate(ev?.contract_start_date || '')
+    }
     setLoading(false)
   }, [eventId, supabase])
 
-  const fetchBaselinesAndAwards = useCallback(async () => {
-    const [{ data: baseData }, { data: awardData }] = await Promise.all([
-      supabase.from('baselines').select('id, baseline_name, baseline_total_amount, official_for_hard_savings, official_for_cost_avoidance, baseline_lock_status').eq('event_id', eventId),
-      supabase.from('awards').select('id, award_name, award_total_amount, award_status, contract_start_date, contract_end_date').eq('event_id', eventId),
-    ])
-    setBaselines(baseData || [])
-    setAwards(awardData || [])
-  }, [eventId, supabase])
+  useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    fetchCalculations()
-    fetchBaselinesAndAwards()
-  }, [fetchCalculations, fetchBaselinesAndAwards])
+  const supplierName = (o: any) =>
+    (Array.isArray(o?.supplier) ? o.supplier[0] : o?.supplier)?.supplier_name || 'Supplier'
 
-  const fetchCalcLines = async (calcId: string) => {
-    if (calcLines[calcId]) return
-    const { data } = await supabase
-      .from('savings_calculation_lines')
-      .select(`*, scope_line:event_scope_lines(item_service_name, uom)`)
-      .eq('savings_calculation_id', calcId)
-      .order('line_number', { ascending: true })
-    setCalcLines(prev => ({ ...prev, [calcId]: data || [] }))
-  }
+  const bRates = termRates(baseline?.baseline_total_amount, baseline?.baseline_term_months)
+  const oRates = termRates(opening?.offer_total_amount, opening?.offer_term_months)
+  const fRates = termRates(final?.offer_total_amount, final?.offer_term_months)
 
-  const toggleExpand = (calcId: string) => {
-    if (expandedId === calcId) {
-      setExpandedId(null)
-    } else {
-      setExpandedId(calcId)
-      fetchCalcLines(calcId)
+  // The deal's term is the Final offer's term - that is what was signed. On a
+  // "whole term" basis every anchor is extended to it, otherwise a 12-month
+  // baseline would be subtracted from a 36-month final, which is the exact
+  // apples-to-oranges error the monthly rate exists to prevent.
+  const dealMonths = Number(final?.offer_term_months) || Number(baseline?.baseline_term_months) || 12
+
+  // An anchor whose TERM was never captured is NOT CAPTURED, not zero.
+  // termRates() returns perMonth 0 with known:false in that case; treating that
+  // as a real zero used to publish a baseline of $0 and a Cost Reduction of
+  // minus the entire deal, while leaving Total correct so no invariant fired.
+  // `known` exists precisely so callers show "—" instead of "0".
+  const pick = (r: ReturnType<typeof termRates>, present: boolean) =>
+    !present || !r.known ? null
+      : basis === 'perMonth' ? r.perMonth
+      : basis === 'perYear' ? r.perYear
+      : r.perMonth * dealMonths
+
+  // Whether this baseline may drive a HARD Cost Reduction at all. A market
+  // index or a vendor's own quote is a reference figure, not spend you
+  // incurred, so it books as avoidance -- the Total is identical either way.
+  const quality = baselineQuality(baseline?.baseline_type, {
+    enabled: baseline?.hard_reduction_override,
+    reason: baseline?.hard_reduction_override_reason,
+  })
+
+  const chain = chainWithBaselineQuality({
+    opening: pick(oRates, !!opening),
+    baseline: pick(bRates, !!baseline),
+    final: pick(fRates, !!final) ?? 0,
+  }, quality.isHard)
+
+  const anchors: Anchor[] = [
+    {
+      label: 'Opening proposal', amount: opening?.offer_total_amount ?? null,
+      months: opening?.offer_term_months ?? null,
+      detail: opening ? `${supplierName(opening)} · ${opening.offer_type} · round ${opening.offer_round}` : 'Mark an offer as “Opening proposal” on the Supplier Offers tab',
+      missing: !opening,
+    },
+    {
+      label: 'Baseline (current spend)', amount: baseline?.baseline_total_amount ?? null,
+      months: baseline?.baseline_term_months ?? null,
+      detail: baseline ? [baseline.baseline_type, baseline.baseline_source].filter(Boolean).join(' · ') : 'Choose “Use as baseline” on the Baselines tab',
+      missing: !baseline,
+    },
+    {
+      label: 'Final offer', amount: final?.offer_total_amount ?? null,
+      months: final?.offer_term_months ?? null,
+      detail: final ? `${supplierName(final)} · ${final.offer_type} · round ${final.offer_round}` : 'Mark an offer as “Final offer” on the Supplier Offers tab',
+      missing: !final,
+    },
+  ]
+
+  // The end date is not a separate fact: the deal term already says how long
+  // the savings run. Derive it so it can never contradict the term.
+  const derivedEnd = (() => {
+    if (!startDate) return null
+    const d = new Date(startDate + 'T00:00:00')
+    if (isNaN(d.getTime())) return null
+    d.setMonth(d.getMonth() + dealMonths)
+    d.setDate(d.getDate() - 1)          // inclusive of the final day
+    return d.toISOString().slice(0, 10)
+  })()
+
+  const basisLabel = basis === 'perMonth' ? 'per month' : basis === 'perYear' ? 'per year' : `over the ${dealMonths}-month term`
+
+  const save = async () => {
+    if (!final) { setError('Select a Final offer before saving.'); return }
+    // Without the Final offer's term there is no deal term, so nothing here is
+    // derivable. Refuse rather than publish a figure built on a guessed 12.
+    if (!fRates.known) {
+      setError('The Final offer has no term in months, so the deal term is unknown. Set it on the Supplier Offers tab.')
+      return
     }
-  }
+    setSaving(true); setError(null)
 
-  const updateStatus = async (calcId: string, newStatus: string) => {
-    await supabase.from('savings_calculations').update({ calculation_status: newStatus }).eq('id', calcId)
-    fetchCalculations()
-  }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setError('Not logged in'); setSaving(false); return }
+    const { data: profile } = await supabase
+      .from('profiles').select('organization_id').eq('id', user.id).single()
 
-  const handleDelete = async (calcId: string) => {
-    if (!confirm('Delete this savings calculation?')) return
-    await supabase.from('savings_calculations').delete().eq('id', calcId)
-    setCalculations(calculations.filter(c => c.id !== calcId))
+    // WHAT GETS PUBLISHED IS ALWAYS THE WHOLE DEAL TERM, whatever basis is on
+    // screen. The basis switch is a lens for reading the numbers, not a claim
+    // about what the deal is worth: publishing the displayed basis meant the
+    // dashboard reported a different figure depending on where a dropdown had
+    // been left, and the savings schedule (whole-term by construction) could
+    // never agree with it.
+    const overTerm = (r: ReturnType<typeof termRates>, present: boolean) =>
+      present && r.known ? r.perMonth * dealMonths : null
+    const termChain = chainWithBaselineQuality({
+      opening: overTerm(oRates, !!opening),
+      baseline: overTerm(bRates, !!baseline),
+      final: overTerm(fRates, !!final) ?? 0,
+    }, quality.isHard)
+
+    // Denominator is BASELINE spend, never the opening ask. Null when there
+    // is no baseline -- see reportableSavingsPct.
+    const baselineOverTerm = overTerm(bRates, !!baseline)
+    const payload: Record<string, any> = {
+      event_id: eventId,
+      baseline_id: baseline?.id ?? null,
+      calculation_name: `${dealMonths}-month deal savings`,
+      // Derived, never chosen. A negotiation produces BOTH legs; the label just
+      // records which one carried the deal. The dashboard splits on the two
+      // amount columns, not on this.
+      savings_type: (termChain.reduction ?? 0) >= termChain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
+      calculation_status: status,
+      baseline_total_amount: overTerm(bRates, !!baseline),
+      opening_proposal_amount: overTerm(oRates, !!opening),
+      award_total_amount: overTerm(fRates, !!final) ?? 0,
+      gross_savings_amount: termChain.total,
+      cost_reduction_amount: termChain.reduction,
+      cost_avoidance_amount: termChain.avoidance,
+      savings_percentage: reportableSavingsPct(termChain.total, quality.isHard ? baselineOverTerm : null),
+      net_savings_amount: termChain.total,
+      savings_start_date: startDate || null,
+      savings_end_date: derivedEnd,
+      recognition_notes: `Derived from the selected anchors over the ${dealMonths}-month deal term.`,
+      updated_by: user.id,
+    }
+
+    const res = existing
+      ? await supabase.from('savings_calculations').update(payload).eq('id', existing.id)
+      : await supabase.from('savings_calculations')
+          .insert({ ...payload, organization_id: profile?.organization_id, created_by: user.id })
+
+    setSaving(false)
+    if (res.error) { setError(res.error.message); return }
+    setSavedAt(new Date().toISOString())
+    load()
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-[var(--text-3)]">Loading calculations...</div>
+    return <div className="p-8 text-center text-sm text-[var(--text-3)]">Loading calculation...</div>
   }
+
+  const ready = !!final && (!!baseline || !!opening)
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">Savings Calculations</h3>
-          <p className="text-sm text-[var(--text-2)]">Cost reduction and cost avoidance calculations</p>
-        </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          <Plus className="h-4 w-4" />
-          Add Calculation
-        </Button>
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-[var(--text)]">Savings Calculation</h3>
+        <p className="text-sm text-[var(--text-2)]">
+          Derived from the anchors you selected. Nothing here is typed by hand.
+        </p>
       </div>
 
+      {/* The methodology, stated correctly. */}
       <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
         <div className="flex items-start gap-3">
-          <Calculator className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
-          <div>
-            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Savings Formula</h4>
-            <p className="mt-1 text-xs text-blue-700 dark:text-blue-400">
-              <strong>Gross Savings</strong> = Baseline − Award Amount<br/>
-              <strong>Savings %</strong> = (Gross Savings / Baseline) × 100<br/>
-              <strong>Cost Reduction</strong> = Actual bottom-line reduction (price went down)<br/>
-              <strong>Cost Avoidance</strong> = Value received at no cost (e.g. extra licenses included)
-            </p>
+          <Calculator className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+          <div className="text-xs text-blue-700 dark:text-blue-300">
+            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">The chain</p>
+            <p className="mt-1"><strong>Cost Reduction</strong> = Baseline − Final. Hard, hits the P&amp;L. Can be negative, shown in parentheses.</p>
+            <p><strong>Cost Avoidance</strong> = Opening − Baseline. Soft, the increase you held off.</p>
+            <p><strong>Total procurement performance</strong> = Opening − Final = Reduction + Avoidance, counted once.</p>
+            <p className="mt-1 opacity-80">All figures are pre-tax. Procurement does not negotiate tax, and the savings percentage is the same either way.</p>
           </div>
         </div>
       </div>
 
-      {showForm && (
-        <AddCalculationForm
-          eventId={eventId}
-          baselines={baselines}
-          awards={awards}
-          onSaved={() => { setShowForm(false); fetchCalculations() }}
-          onCancel={() => setShowForm(false)}
-        />
-      )}
+      {/* The three anchors */}
+      <Card className="mb-4 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-sm font-semibold text-[var(--text)]">Selected anchors</h4>
+          <div className="flex items-center gap-2">
+            {/* A lens, not a decision — the saved figure is always whole-term. */}
+            <span className="text-xs text-[var(--text-3)]">View as</span>
+            <Select value={basis} onChange={(e) => setBasis(e.target.value as RateBasis)}
+              className="w-auto px-2 py-1 text-xs">
+              <option value="perYear">Per year</option>
+              <option value="perMonth">Per month</option>
+              <option value="perTerm">{`Whole term (${dealMonths} mo)`}</option>
+            </Select>
+          </div>
+        </div>
 
-      {calculations.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Calculator className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
-          <h3 className="text-sm font-medium text-[var(--text)]">No savings calculations yet</h3>
-          <p className="mt-1 text-sm text-[var(--text-3)]">Click &quot;Add Calculation&quot; to calculate savings.</p>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {calculations.map((calc) => {
-            const isExpanded = expandedId === calc.id
-            const lines = calcLines[calc.id] || []
-            const isNegative = (calc.gross_savings_amount || 0) < 0
-
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {anchors.map((a, i) => {
+            const r = termRates(a.amount, a.months)
+            const shown = a.missing ? null : basis === 'perMonth' ? r.perMonth : basis === 'perYear' ? r.perYear : r.perMonth * dealMonths
             return (
-              <Card key={calc.id} className="overflow-hidden">
-                <div className="flex items-center gap-4 p-4">
-                  <button onClick={() => toggleExpand(calc.id)} className="text-[var(--text-3)] hover:text-[var(--text-2)]">
-                    {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-                  </button>
-
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-[var(--text)]">{calc.calculation_name}</h4>
-                      <span className={clsx('rounded px-2 py-0.5 text-xs font-medium',
-                        calc.savings_type === 'Cost Reduction' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                        calc.savings_type === 'Cost Avoidance' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
-                        calc.savings_type === 'Demand Reduction' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
-                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      )}>
-                        {calc.savings_type}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-[var(--text-3)]">
-                      Baseline: {calc.baseline?.baseline_name || '—'} • Award: {calc.award?.award_name || '—'}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-xs text-[var(--text-3)]">Gross Savings</p>
-                    <p className={clsx('text-lg font-bold', isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
-                      {isNegative ? '-' : ''}{formatCurrency(Math.abs(calc.gross_savings_amount || 0))}
-                    </p>
-                    <p className="text-xs text-[var(--text-3)]">{calc.savings_percentage?.toFixed(1)}%</p>
-                  </div>
-
-                  <span className={clsx('rounded-full px-2.5 py-1 text-xs font-medium',
-                    CALC_STATUS_COLORS[calc.calculation_status] || 'bg-gray-100 text-gray-700'
-                  )}>
-                    {calc.calculation_status}
-                  </span>
+              <div key={a.label} className={clsx(
+                'rounded-lg border p-3',
+                a.missing ? 'border-dashed border-[var(--border-strong)] bg-[var(--surface-2)]' : 'border-[var(--border)] bg-[var(--surface)]'
+              )}>
+                <div className="flex items-center gap-1 text-xs text-[var(--text-3)]">
+                  {a.label}
+                  {i < 2 && <ArrowRight className="ml-auto h-3 w-3" />}
                 </div>
-
-                {isExpanded && (
-                  <div className="border-t border-[var(--border)] bg-[var(--surface-2)]">
-                    <div className="grid grid-cols-4 gap-px border-b border-[var(--border)] bg-[var(--border)]">
-                      <div className="bg-[var(--surface)] px-4 py-3">
-                        <p className="text-xs text-[var(--text-3)]">Baseline Total</p>
-                        <p className="text-sm font-semibold text-[var(--text)]">{formatCurrency(calc.baseline_total_amount)}</p>
-                      </div>
-                      <div className="bg-[var(--surface)] px-4 py-3">
-                        <p className="text-xs text-[var(--text-3)]">Award Total</p>
-                        <p className="text-sm font-semibold text-[var(--text)]">{formatCurrency(calc.award_total_amount)}</p>
-                      </div>
-                      <div className="bg-[var(--surface)] px-4 py-3">
-                        <p className="text-xs text-[var(--text-3)]">Gross Savings</p>
-                        <p className={clsx('text-sm font-semibold', isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}>
-                          {formatCurrency(calc.gross_savings_amount)}
-                        </p>
-                      </div>
-                      <div className="bg-[var(--surface)] px-4 py-3">
-                        <p className="text-xs text-[var(--text-3)]">Savings Period</p>
-                        <p className="text-sm font-semibold text-[var(--text)]">
-                          {calc.savings_start_date ? formatDate(calc.savings_start_date) : '—'} – {calc.savings_end_date ? formatDate(calc.savings_end_date) : '—'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-                      <span className="text-xs font-medium text-[var(--text-3)]">Workflow:</span>
-                      <Select
-                        value={calc.calculation_status || 'identified'}
-                        onChange={(e) => updateStatus(calc.id, e.target.value)}
-                        className="px-2.5 py-1 text-xs font-medium"
-                      >
-                        <option value="identified">Identified</option>
-                        <option value="negotiated">Negotiated</option>
-                        <option value="contracted">Contracted</option>
-                        <option value="realized">Realized</option>
-                      </Select>
-                      <button onClick={() => handleDelete(calc.id)}
-                        className="ml-auto text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="p-4">
-                      <h5 className="mb-3 text-sm font-medium text-[var(--text-2)]">Line-Level Savings Breakdown</h5>
-                      {lines.length === 0 ? (
-                        <p className="py-6 text-center text-xs text-[var(--text-3)]">
-                          No line-level breakdown available. Add savings calculation lines for detailed tracking.
-                        </p>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--text-3)]">
-                                <th className="px-2 py-2">#</th>
-                                <th className="px-2 py-2">Scope Line</th>
-                                <th className="px-2 py-2 text-right">Baseline Unit Price</th>
-                                <th className="px-2 py-2 text-right">Baseline Ext.</th>
-                                <th className="px-2 py-2 text-right">Award Unit Price</th>
-                                <th className="px-2 py-2 text-right">Award Ext.</th>
-                                <th className="px-2 py-2 text-right">Savings</th>
-                                <th className="px-2 py-2 text-right">Savings %</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--border)]">
-                              {lines.map((line) => (
-                                <tr key={line.id} className="hover:bg-[var(--surface-2)]">
-                                  <td className="px-2 py-2 text-xs text-[var(--text-3)]">{line.line_number}</td>
-                                  <td className="px-2 py-2 text-xs font-medium text-[var(--text)]">
-                                    {line.scope_line?.item_service_name || '—'}
-                                  </td>
-                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.baseline_unit_price)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.baseline_extended_amount)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.awarded_unit_price)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{formatCurrency(line.awarded_extended_amount)}</td>
-                                  <td className={clsx('px-2 py-2 text-right text-xs font-medium',
-                                    line.savings_amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                                  )}>{formatCurrency(line.savings_amount)}</td>
-                                  <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{line.savings_percentage?.toFixed(1)}%</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)] font-medium">
-                                <td colSpan={6} className="px-2 py-2 text-right text-xs text-[var(--text-2)]">Total Savings:</td>
-                                <td className={clsx('px-2 py-2 text-right text-xs font-bold',
-                                  isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                                )}>{formatCurrency(calc.gross_savings_amount)}</td>
-                                <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">{calc.savings_percentage?.toFixed(1)}%</td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                {a.missing ? (
+                  <>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-3)]">not selected</p>
+                    <p className="mt-1 text-[11px] text-[var(--text-3)]">{a.detail}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 text-lg font-bold text-[var(--text)]">
+                      {r.known ? formatCurrency(shown ?? 0) : '—'}
+                    </p>
+                    <p className={clsx('text-[11px]',
+                      r.known ? 'text-[var(--text-3)]' : 'text-amber-600 dark:text-amber-400')}>
+                      {r.known
+                        ? `${formatCurrency(a.amount ?? 0)} over ${a.months} mo`
+                        : `${formatCurrency(a.amount ?? 0)}, term not captured — cannot be compared`}
+                    </p>
+                    <p className="mt-1 truncate text-[11px] text-[var(--text-3)]" title={a.detail}>{a.detail}</p>
+                  </>
                 )}
-              </Card>
+              </div>
             )
           })}
         </div>
-      )}
-    </div>
-  )
-}
+      </Card>
 
-// ============================================
-// Add Calculation Form
-// ============================================
-function AddCalculationForm({ eventId, baselines, awards, onSaved, onCancel }: {
-  eventId: string
-  baselines: any[]
-  awards: any[]
-  onSaved: () => void
-  onCancel: () => void
-}) {
-  const supabase = createClient()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    calculation_name: '',
-    savings_type: 'Cost Reduction',
-    baseline_id: '',
-    award_id: '',
-    cost_reduction_amount: '',
-    cost_avoidance_amount: '',
-    savings_start_date: '',
-    savings_end_date: '',
-  })
-
-  const selectedBaseline = baselines.find(b => b.id === form.baseline_id)
-  const selectedAward = awards.find(a => a.id === form.award_id)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Not logged in'); setLoading(false); return }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user!.id)
-      .single()
-
-    const baseline = baselines.find(b => b.id === form.baseline_id)
-    const award = awards.find(a => a.id === form.award_id)
-    const baselineAmount = baseline?.baseline_total_amount || 0
-    const awardAmount = award?.award_total_amount || 0
-    const grossSavings = baselineAmount - awardAmount
-    const savingsPct = baselineAmount > 0 ? (grossSavings / baselineAmount) * 100 : 0
-
-    // Use manually entered amounts, or fall back to gross savings
-    const costReduction = form.cost_reduction_amount ? parseFloat(form.cost_reduction_amount) : (form.savings_type === 'Cost Reduction' ? grossSavings : 0)
-    const costAvoidance = form.cost_avoidance_amount ? parseFloat(form.cost_avoidance_amount) : (form.savings_type === 'Cost Avoidance' ? grossSavings : 0)
-
-    // If award has contract dates, use them as defaults for savings period
-    const savingsStart = form.savings_start_date || award?.contract_start_date || null
-    const savingsEnd = form.savings_end_date || award?.contract_end_date || null
-
-    const { error: insertError } = await supabase
-      .from('savings_calculations')
-      .insert({
-        organization_id: profile?.organization_id,
-        event_id: eventId,
-        baseline_id: form.baseline_id || null,
-        award_id: form.award_id || null,
-        calculation_name: form.calculation_name,
-        savings_type: form.savings_type,
-        baseline_total_amount: baselineAmount,
-        award_total_amount: awardAmount,
-        gross_savings_amount: grossSavings,
-        savings_percentage: Math.round(savingsPct * 100) / 100,
-        net_savings_amount: grossSavings,
-        cost_reduction_amount: costReduction,
-        cost_avoidance_amount: costAvoidance,
-        savings_start_date: savingsStart,
-        savings_end_date: savingsEnd,
-        calculation_status: 'identified',
-        created_by: user.id,
-      })
-
-    if (insertError) {
-      setError(insertError.message)
-      setLoading(false)
-      return
-    }
-    onSaved()
-  }
-
-  const labelClass = 'block text-xs font-medium text-[var(--text-2)]'
-
-  return (
-    <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-800 dark:bg-indigo-900/20">
-      <h4 className="mb-4 font-medium text-[var(--text)]">New Savings Calculation</h4>
-      {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">{error}</div>}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label className={labelClass}>Calculation Name *</label>
-          <Input type="text" required value={form.calculation_name}
-            onChange={(e) => setForm({ ...form, calculation_name: e.target.value })}
-            className="mt-1" placeholder="e.g. Cost Reduction — Unit Price Negotiation" />
-        </div>
-        <div>
-          <label className={labelClass}>Savings Type</label>
-          <Select value={form.savings_type}
-            onChange={(e) => setForm({ ...form, savings_type: e.target.value })}
-            className="mt-1">
-            {SAVINGS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </Select>
-        </div>
-        <div>
-          <label className={labelClass}>Official Baseline *</label>
-          <Select required value={form.baseline_id}
-            onChange={(e) => setForm({ ...form, baseline_id: e.target.value })}
-            className="mt-1">
-            <option value="">Select baseline...</option>
-            {baselines.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.baseline_name} ({formatCurrency(b.baseline_total_amount)})
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <label className={labelClass}>Award</label>
-          <Select value={form.award_id}
-            onChange={(e) => setForm({ ...form, award_id: e.target.value })}
-            className="mt-1">
-            <option value="">Select award...</option>
-            {awards.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.award_name} ({formatCurrency(a.award_total_amount)})
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <label className={labelClass}>Cost Reduction Amount ($)</label>
-          <Input type="number" step="0.01" value={form.cost_reduction_amount}
-            onChange={(e) => setForm({ ...form, cost_reduction_amount: e.target.value })}
-            className="mt-1" placeholder="Auto-calculated if empty" />
-        </div>
-        <div>
-          <label className={labelClass}>Cost Avoidance Amount ($)</label>
-          <Input type="number" step="0.01" value={form.cost_avoidance_amount}
-            onChange={(e) => setForm({ ...form, cost_avoidance_amount: e.target.value })}
-            className="mt-1" placeholder="Auto-calculated if empty" />
-        </div>
-        <div>
-          <label className={labelClass}>Savings Start Date</label>
-          <Input type="date" value={form.savings_start_date}
-            onChange={(e) => setForm({ ...form, savings_start_date: e.target.value })}
-            className="mt-1" />
-        </div>
-        <div>
-          <label className={labelClass}>Savings End Date</label>
-          <Input type="date" value={form.savings_end_date}
-            onChange={(e) => setForm({ ...form, savings_end_date: e.target.value })}
-            className="mt-1" />
-        </div>
-        {form.baseline_id && form.award_id && (
-          <div className="md:col-span-2 rounded-lg bg-[var(--surface)] p-4">
-            <div className="flex items-center justify-around text-center">
+      {!ready ? (
+        <Card className="p-8 text-center">
+          <AlertCircle className="mx-auto mb-3 h-8 w-8 text-[var(--text-3)]" />
+          <p className="text-sm font-medium text-[var(--text)]">Select your anchors to see the savings</p>
+          <p className="mt-1 text-sm text-[var(--text-3)]">
+            A Final offer is required. Add a Baseline for Cost Reduction, and an Opening proposal
+            for Cost Avoidance.
+          </p>
+        </Card>
+      ) : (
+        <>
+          <Card className="mb-4 p-4">
+            <div className="grid grid-cols-1 gap-4 text-center md:grid-cols-3">
               <div>
-                <p className="text-xs text-[var(--text-3)]">Baseline</p>
-                <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(selectedBaseline?.baseline_total_amount || 0)}</p>
+                <p className="text-xs text-[var(--text-3)]">Cost Reduction</p>
+                <p className={clsx('text-xl font-bold',
+                  chain.reduction === null ? 'text-[var(--text-3)]'
+                    : chain.reduction < 0 ? 'text-red-600 dark:text-red-400' : 'text-[var(--text)]')}>
+                  {chain.reduction === null ? 'n/a'
+                    : chain.reduction < 0 ? `(${formatCurrency(Math.abs(chain.reduction))})`
+                    : formatCurrency(chain.reduction)}
+                </p>
+                <p className="text-[11px] text-[var(--text-3)]">Baseline − Final · {basisLabel}</p>
               </div>
-              <TrendingDown className="h-6 w-6 text-[var(--text-3)]" />
               <div>
-                <p className="text-xs text-[var(--text-3)]">Award</p>
-                <p className="text-lg font-bold text-[var(--text)]">
-                  {formatCurrency(selectedAward?.award_total_amount || 0)}
+                <p className="text-xs text-[var(--text-3)]">Cost Avoidance</p>
+                <p className="text-xl font-bold text-[var(--text)]">{formatCurrency(chain.avoidance)}</p>
+                <p className="text-[11px] text-[var(--text-3)]">Opening − Baseline · {basisLabel}</p>
+              </div>
+              <div className="rounded-lg bg-[var(--surface-2)] p-2">
+                <p className="text-xs text-[var(--text-3)]">Total procurement performance</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(chain.total)}</p>
+                <p className="text-[11px] text-[var(--text-3)]">Opening − Final · {basisLabel}</p>
+              </div>
+            </div>
+
+            {chain.reduction === null && !baseline && (
+              <p className="mt-3 text-xs text-[var(--text-3)]">
+                No baseline selected, so the whole span books as avoidance and Cost Reduction is
+                not applicable.
+              </p>
+            )}
+            {/* A soft baseline is the other reason reduction reads n/a, and it is
+                far less obvious than having no baseline at all. Say which type
+                caused it, so nobody has to guess why the hard line is empty. */}
+            {chain.reduction === null && !!baseline && (
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                {quality.explanation} The whole span books as <strong>Cost Avoidance</strong> and the
+                Total is unchanged — only the hard line is empty. If this baseline really does
+                reflect what you were paying, record an override on the Baselines tab.
+              </p>
+            )}
+            {quality.byOverride && (
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                <strong>Booked as hard by override.</strong> {baseline?.baseline_type} does not
+                normally qualify. The reason on file is:{' '}
+                <span className="italic">&ldquo;{baseline?.hard_reduction_override_reason}&rdquo;</span>
+              </p>
+            )}
+            {!opening && (
+              <p className="mt-3 text-xs text-[var(--text-3)]">
+                No opening proposal selected, so the total collapses to Cost Reduction.
+              </p>
+            )}
+            {chain.reduction !== null && chain.reduction < 0 && (
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                This is a genuine cost increase against the baseline, shown in parentheses. It is
+                not relabelled as savings.
+              </p>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <h4 className="mb-1 text-sm font-semibold text-[var(--text)]">Reporting</h4>
+            <p className="mb-3 text-xs text-[var(--text-3)]">
+              How this figure is reported. The savings type is derived from the chain, and the end
+              date from the {dealMonths}-month term, so neither can contradict the numbers above.
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-2)]">Stage</label>
+                <Select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1">
+                  {CALC_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </Select>
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                  Identified/Negotiated report as forecast; Contracted/Realized as booked.
                 </p>
               </div>
-              <div className="text-2xl font-bold text-[var(--text-3)]">=</div>
               <div>
-                <p className="text-xs text-[var(--text-3)]">Gross Savings</p>
-                <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                  {formatCurrency(
-                    (selectedBaseline?.baseline_total_amount || 0) -
-                    (selectedAward?.award_total_amount || 0)
-                  )}
+                <label className="block text-xs font-medium text-[var(--text-2)]">Savings start</label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1" />
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">When the new pricing takes effect.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-2)]">Savings end</label>
+                <div className="mt-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-2)]">
+                  {derivedEnd ?? 'set a start date'}
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                  Start + {dealMonths} months, from the Final offer term.
                 </p>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-      <div className="mt-4 flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Creating...' : 'Create Calculation'}
-        </Button>
-      </div>
-    </form>
+
+            {error && (
+              <div className="mt-3 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>
+            )}
+
+            <div className="mt-4 flex items-center justify-end gap-3">
+              {savedAt && !saving && (
+                <span className="flex items-center gap-1 text-xs text-[var(--text-3)]">
+                  <Check className="h-3.5 w-3.5" /> Saved
+                </span>
+              )}
+              <Button onClick={save} disabled={saving}>
+                {saving ? 'Saving...' : existing ? 'Update savings record' : 'Save savings record'}
+              </Button>
+            </div>
+            <p className="mt-2 text-right text-[11px] text-[var(--text-3)]">
+              Saving publishes the <strong>whole {dealMonths}-month term</strong> to the dashboard,
+              savings and reports — not the basis shown above. Use the Schedule tab to spread it
+              over periods and report it by year.
+            </p>
+          </Card>
+        </>
+      )}
+    </div>
   )
 }
