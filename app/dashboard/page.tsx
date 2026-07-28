@@ -155,6 +155,15 @@ export default async function DashboardPage({
           </Link>
         </div>
         <div className="space-y-2">
+          {eventList.length === 0 && (
+            <p className="py-6 text-center text-sm text-[var(--text-3)]">
+              No projects yet.{' '}
+              <Link href="/events/new" className="font-medium text-[var(--brand-ink)] hover:underline">
+                Create the first one
+              </Link>
+              .
+            </p>
+          )}
           {eventList.slice(0, 5).map((event: any) => (
             <Link key={event.id} href={`/events/${event.id}`}
               className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3 transition-colors hover:bg-[var(--surface-2)]">

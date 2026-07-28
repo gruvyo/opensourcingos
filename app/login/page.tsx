@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
@@ -16,6 +16,21 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  // /auth/callback bounces a failed code exchange back here with ?error=.
+  // Without this the redirect would look like an ordinary visit to the login
+  // page and the reason for it would be lost.
+  //
+  // Read from window rather than useSearchParams deliberately: this page is
+  // statically prerendered, and useSearchParams would force a Suspense
+  // boundary around it for the sake of a one-shot message.
+  // Only a known CODE is honoured, and the wording is ours. The URL never gets
+  // to choose what this page says -- see the comment in app/auth/callback.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('error') === 'auth') {
+      setError('That sign-in link could not be completed. Please sign in again.')
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

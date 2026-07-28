@@ -89,7 +89,11 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
     const v = parseFloat(editTotalValue)
     setEditingTotalId(null)
     if (!Number.isFinite(v)) return
-    await supabase.from('baselines').update({ baseline_total_amount: v }).eq('id', baselineId)
+    setActionError(null)
+    // MONEY write. Same failure mode as selectBaseline above: a discarded error here
+    // used to leave the screen showing a total that was never actually saved.
+    const { error } = await supabase.from('baselines').update({ baseline_total_amount: v }).eq('id', baselineId)
+    if (error) { setActionError(error.message); return }
     fetchBaselines()
   }
 
@@ -133,7 +137,12 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 
   const handleDelete = async (baselineId: string) => {
     if (!confirm('Delete this baseline and all its lines? This cannot be undone.')) return
-    await supabase.from('baselines').delete().eq('id', baselineId)
+    setActionError(null)
+    const { error } = await supabase.from('baselines').delete().eq('id', baselineId)
+    if (error) { setActionError(error.message); return }
+    // Only drop it from local state once the delete is confirmed. This used to be
+    // optimistic — the row vanished from screen even when RLS or a foreign-key
+    // constraint rejected the delete, so a "deleted" baseline was still in the database.
     setBaselines(baselines.filter(b => b.id !== baselineId))
   }
 
@@ -516,6 +525,9 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   const supabase = createClient()
   const [lines, setLines] = useState(initialLines)
   const [showAddLine, setShowAddLine] = useState(false)
+  // Surfaces errors from the insert/delete/total writes below, same pattern as
+  // actionError in the parent BaselinesTab component.
+  const [error, setError] = useState<string | null>(null)
   const [newLine, setNewLine] = useState({
     scope_line_id: '',
     baseline_unit_price: '',
@@ -536,8 +548,33 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     return (extended * 12) / termMonths
   }
 
+  // Re-query baseline_lines (same shape as the parent's fetchBaselineLines) and total
+  // from THOSE rows, not from the `lines` React state. `lines` is only ever as fresh as
+  // the last render — reading it right after an insert/delete `await` chain can still see
+  // the pre-update value, which used to total (and WRITE, as the baseline total) a stale
+  // array: the first line added wrote a total of 0, and a delete left the removed amount
+  // in. Two rapid clicks raced the same way. Always total off what the database actually
+  // has, and refresh local state from the same fetch so the two can never disagree.
+  const refreshLinesAndTotal = async () => {
+    const { data: freshLines, error: fetchError } = await supabase
+      .from('baseline_lines')
+      .select(`
+        *,
+        scope_line:event_scope_lines(item_service_name, uom)
+      `)
+      .eq('baseline_id', baselineId)
+      .order('line_number', { ascending: true })
+
+    if (fetchError) { setError(fetchError.message); return }
+
+    const freshRows = freshLines || []
+    setLines(freshRows)
+    await updateBaselineTotal(freshRows)
+  }
+
   const handleAddLine = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
 
     const unitPrice = parseFloat(newLine.baseline_unit_price) || 0
     const qty = parseFloat(newLine.baseline_quantity) || 0
@@ -556,7 +593,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
 
     const lineNumber = lines.length + 1
 
-    const { data, error } = await supabase
+    const { data, error: insertError } = await supabase
       .from('baseline_lines')
       .insert({
         organization_id: profile?.organization_id,
@@ -581,35 +618,36 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       `)
       .single()
 
-    if (!error && data) {
-      const nextLines = [...lines, data]
-      setLines(nextLines)
-      setNewLine({
-        scope_line_id: '', baseline_unit_price: '', baseline_quantity: '',
-        baseline_term_months: '12', baseline_recurring_amount: '', baseline_one_time_amount: '',
-      })
-      setShowAddLine(false)
-      onLinesChanged()
-      // Total the NEXT array, not React state. setLines() is async, so reading `lines`
-      // here saw the pre-update value — the first line added wrote a total of 0, and a
-      // delete left the removed amount in. This total is the minuend of every savings
-      // calculation, so the error propagated straight into the headline number.
-      updateBaselineTotal(nextLines)
+    // This used to be gated on `if (!error && data)` with no else branch — the error
+    // was checked but never shown anywhere, so a rejected insert just silently did nothing.
+    if (insertError || !data) {
+      setError(insertError?.message || 'Could not add the line.')
+      return
     }
+
+    setNewLine({
+      scope_line_id: '', baseline_unit_price: '', baseline_quantity: '',
+      baseline_term_months: '12', baseline_recurring_amount: '', baseline_one_time_amount: '',
+    })
+    setShowAddLine(false)
+    onLinesChanged()
+    await refreshLinesAndTotal()
   }
 
   const handleDeleteLine = async (lineId: string) => {
     if (!confirm('Delete this baseline line? This cannot be undone.')) return
-    await supabase.from('baseline_lines').delete().eq('id', lineId)
-    const nextLines = lines.filter(l => l.id !== lineId)
-    setLines(nextLines)
+    setError(null)
+    const { error: deleteError } = await supabase.from('baseline_lines').delete().eq('id', lineId)
+    if (deleteError) { setError(deleteError.message); return }
     onLinesChanged()
-    updateBaselineTotal(nextLines)
+    await refreshLinesAndTotal()
   }
 
   const updateBaselineTotal = async (currentLines: any[]) => {
     const total = currentLines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
-    await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
+    // MONEY write — this total is the minuend of every savings calculation downstream.
+    const { error: updateError } = await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
+    if (updateError) setError(updateError.message)
   }
 
   const labelClass = 'block text-xs font-medium text-[var(--text-3)] mb-1'
@@ -634,6 +672,12 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
 
       {/* Add Line Form */}
       {showAddLine && !isLocked && (

@@ -85,8 +85,9 @@ export function OffersTab({
   const setRole = async (offerId: string, role: 'opening' | 'final' | null) => {
     setActionError(null)
     if (role) {
-      await supabase.from('supplier_offers').update({ offer_role: null })
+      const clearRes = await supabase.from('supplier_offers').update({ offer_role: null })
         .eq('event_id', eventId).eq('offer_role', role).neq('id', offerId)
+      if (clearRes.error) { setActionError(clearRes.error.message); return }
     }
     const res = await supabase.from('supplier_offers').update({ offer_role: role }).eq('id', offerId)
     if (res.error) { setActionError(res.error.message); return }
@@ -98,8 +99,9 @@ export function OffersTab({
     if (role === 'final') {
       const won = offers.find(o => o.id === offerId)
       if (won?.supplier_id) {
-        await supabase.from('sourcing_events')
+        const awardRes = await supabase.from('sourcing_events')
           .update({ awarded_supplier_id: won.supplier_id }).eq('id', eventId)
+        if (awardRes.error) { setActionError(awardRes.error.message); return }
       }
     }
     fetchOffers()
@@ -109,7 +111,9 @@ export function OffersTab({
     const v = parseFloat(editTotalValue)
     setEditingTotalId(null)
     if (!Number.isFinite(v)) return
-    await supabase.from('supplier_offers').update({ offer_total_amount: v }).eq('id', offerId)
+    setActionError(null)
+    const { error } = await supabase.from('supplier_offers').update({ offer_total_amount: v }).eq('id', offerId)
+    if (error) { setActionError(error.message); return }
     fetchOffers()
   }
 
@@ -153,10 +157,12 @@ export function OffersTab({
   }
 
   const toggleCompliance = async (offer: Offer) => {
-    await supabase
+    setActionError(null)
+    const { error } = await supabase
       .from('supplier_offers')
       .update({ compliant_bid_flag: !offer.compliant_bid_flag })
       .eq('id', offer.id)
+    if (error) { setActionError(error.message); return }
     fetchOffers()
   }
 
@@ -249,7 +255,11 @@ export function OffersTab({
 
   const handleDelete = async (offerId: string) => {
     if (!confirm('Delete this offer and all its lines?')) return
-    await supabase.from('supplier_offers').delete().eq('id', offerId)
+    setActionError(null)
+    const { error } = await supabase.from('supplier_offers').delete().eq('id', offerId)
+    if (error) { setActionError(error.message); return }
+    // Only drop it from local state once the delete is confirmed — otherwise a
+    // delete rejected by RLS or a foreign key still looks successful.
     setOffers(offers.filter(o => o.id !== offerId))
   }
 
@@ -710,6 +720,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
 }) {
   const supabase = createClient()
   const [lines, setLines] = useState(initialLines)
+  const [lineError, setLineError] = useState<string | null>(null)
   const [showAddLine, setShowAddLine] = useState(false)
   const [newLine, setNewLine] = useState({
     scope_line_id: '',
@@ -728,8 +739,24 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     return (extended * 12) / termMonths
   }
 
+  // Re-query rather than trust local `lines`: two rapid adds/deletes can
+  // otherwise total a stale array and write the wrong number to the DB.
+  const refetchLines = async () => {
+    const { data, error } = await supabase
+      .from('supplier_offer_lines')
+      .select(`
+        *,
+        scope_line:event_scope_lines(item_service_name, uom)
+      `)
+      .eq('offer_id', offerId)
+      .order('line_number', { ascending: true })
+    if (error) { setLineError(error.message); return null }
+    return data || []
+  }
+
   const handleAddLine = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLineError(null)
     const unitPrice = parseFloat(newLine.offer_unit_price) || 0
     const qty = parseFloat(newLine.offer_quantity) || 0
     const termMonths = parseFloat(newLine.offer_term_months) || 12
@@ -769,32 +796,45 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
       `)
       .single()
 
-    if (!error && data) {
-      const nextLines = [...lines, data]
-      setLines(nextLines)
-      setNewLine({
-        scope_line_id: '', offer_unit_price: '', offer_quantity: '',
-        offer_term_months: '12', offer_one_time_amount: '', compliance_status: 'Compliant',
-      })
-      setShowAddLine(false)
-      onLinesChanged()
-      // Same stale-closure fix as baselines-tab: total the NEXT array, not React state.
-      updateOfferTotal(nextLines)
+    if (error || !data) {
+      setLineError(error?.message || 'Could not add offer line.')
+      return
+    }
+
+    setNewLine({
+      scope_line_id: '', offer_unit_price: '', offer_quantity: '',
+      offer_term_months: '12', offer_one_time_amount: '', compliance_status: 'Compliant',
+    })
+    setShowAddLine(false)
+    onLinesChanged()
+    // Same stale-closure fix as baselines-tab: total the FRESHLY FETCHED rows, not
+    // React state, which two rapid adds could read before it catches up.
+    const freshLines = await refetchLines()
+    if (freshLines) {
+      setLines(freshLines)
+      updateOfferTotal(freshLines)
     }
   }
 
   const handleDeleteLine = async (lineId: string) => {
     if (!confirm('Delete this offer line? This cannot be undone.')) return
-    await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
-    const nextLines = lines.filter(l => l.id !== lineId)
-    setLines(nextLines)
+    setLineError(null)
+    const { error } = await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
+    if (error) { setLineError(error.message); return }
     onLinesChanged()
-    updateOfferTotal(nextLines)
+    // Re-query rather than filter local state: two rapid deletes could otherwise
+    // total a stale array and write the wrong number to the DB.
+    const freshLines = await refetchLines()
+    if (freshLines) {
+      setLines(freshLines)
+      updateOfferTotal(freshLines)
+    }
   }
 
   const updateOfferTotal = async (currentLines: any[]) => {
     const total = currentLines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
-    await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
+    const { error } = await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
+    if (error) setLineError(error.message)
   }
 
   const labelClass = 'block text-xs font-medium text-[var(--text-3)] mb-1'
@@ -811,6 +851,15 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
           <Plus className="h-3 w-3" /> Add Line
         </button>
       </div>
+
+      {lineError && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <strong>Error:</strong> {lineError}
+          {lineError.includes('does not exist') && (
+            <span> — this usually means a database migration has not been run yet.</span>
+          )}
+        </div>
+      )}
 
       {showAddLine && (
         <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 dark:border-indigo-800 bg-[var(--surface)] p-4">

@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<any>(null)
   const [org, setOrg] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -19,20 +20,29 @@ export default function SettingsPage() {
       if (!user) { setLoading(false); return }
       setUser(user)
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
-      
+
+      // .single() legitimately errors (PGRST116) when there's no row yet —
+      // that's not a load failure, just an empty profile.
+      if (profileError && profileError.code !== 'PGRST116') {
+        setLoadError((prev) => prev || profileError.message)
+      }
+
       if (profile) {
         setProfile(profile)
         if (profile.organization_id) {
-          const { data: org } = await supabase
+          const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('*')
             .eq('id', profile.organization_id)
             .single()
+          if (orgError && orgError.code !== 'PGRST116') {
+            setLoadError((prev) => prev || orgError.message)
+          }
           if (org) setOrg(org)
         }
       }
@@ -61,6 +71,13 @@ export default function SettingsPage() {
           Account and organization settings
         </p>
       </div>
+
+      {loadError && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
+          <strong>These figures are incomplete.</strong> A query failed: {loadError}. Do not report
+          from this page until it loads cleanly.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Profile */}

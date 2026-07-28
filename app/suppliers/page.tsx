@@ -6,7 +6,7 @@ import { SuppliersView } from '@/components/suppliers-view'
 export default async function SuppliersPage() {
   const supabase = await createClient()
 
-  const { data: suppliers } = await supabase
+  const { data: suppliers, error: suppliersError } = await supabase
     .from('suppliers')
     .select(`
       id, supplier_name, created_at,
@@ -14,6 +14,10 @@ export default async function SuppliersPage() {
       events_as_awarded:sourcing_events!sourcing_events_awarded_supplier_id_fkey(id)
     `)
     .order('supplier_name', { ascending: true })
+
+  // A failed query here would render as "0 suppliers", which is indistinguishable
+  // from a genuinely empty directory. Say which one it is.
+  const loadError = suppliersError?.message || null
 
   // Count events per supplier
   const suppliersWithCounts = (suppliers || []).map((s: any) => {
@@ -42,6 +46,13 @@ export default async function SuppliersPage() {
           Add via New Project
         </Link>
       </div>
+
+      {loadError && (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
+          <strong>These figures are incomplete.</strong> A query failed: {loadError}. Do not report
+          from this page until it loads cleanly.
+        </div>
+      )}
 
       <SuppliersView suppliers={suppliersWithCounts} />
     </div>

@@ -10,8 +10,8 @@ export default async function SavingsPage() {
   const supabase = await createClient()
 
   const [
-    { data: savingsCalcs },
-    { data: events },
+    { data: savingsCalcs, error: savingsCalcsError },
+    { data: events, error: eventsError },
   ] = await Promise.all([
     supabase.from('savings_calculations').select(`
       id, calculation_name, savings_type, gross_savings_amount, savings_percentage,
@@ -25,6 +25,10 @@ export default async function SavingsPage() {
     `).order('created_at', { ascending: false }),
     supabase.from('sourcing_events').select('id, contract_start_date'),
   ])
+
+  // A failed query here would render as "$0 savings", which is indistinguishable
+  // from a genuinely empty portfolio. Say which one it is.
+  const loadError = savingsCalcsError?.message || eventsError?.message || null
 
   const calcs = savingsCalcs || []
   const eventList = events || []
@@ -45,6 +49,13 @@ export default async function SavingsPage() {
           All savings across sourcing projects — cost reduction, cost avoidance, and total savings
         </p>
       </div>
+
+      {loadError && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
+          <strong>These figures are incomplete.</strong> A query failed: {loadError}. Do not report
+          from this page until it loads cleanly.
+        </div>
+      )}
 
       {/* Summary cards — 3 cards only */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
