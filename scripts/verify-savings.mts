@@ -23,6 +23,11 @@ import {
   scheduleTotals,
   scheduleByYear,
   defaultPeriodCount,
+  prorateByYear,
+  monthSpan,
+  calcToPeriods,
+  portfolioByYear,
+  yearOverYear,
   type PeriodType,
   type ScheduleRates,
 } from '../lib/savings/index.ts'
@@ -431,6 +436,147 @@ section('10. An 18-month consulting contract (one and a half periods)')
   // rate exists to prevent. Every slicing gives the same fiscal-year answer.
   assertSameYearBuckets('18mo annual vs monthly', scheduleByYear(annual), byYear)
   assertSameYearBuckets('18mo one-time vs monthly', scheduleByYear(oneTime), byYear)
+}
+
+// ---------------------------------------------------------------------
+// 11-13. THE PORTFOLIO FISCAL YEAR (Step 4)
+// ---------------------------------------------------------------------
+section('11. Month spans, and synthesising periods for an unscheduled deal')
+{
+  eq('36-month deal', monthSpan('2026-01-01', '2028-12-31'), 36)
+  eq('4-month consulting project', monthSpan('2026-03-01', '2026-06-30'), 4)
+  eq('18-month contract over a leap year', monthSpan('2026-09-01', '2028-02-29'), 18)
+  eq('single month', monthSpan('2026-05-01', '2026-05-31'), 1)
+  eq('missing end date', monthSpan('2026-05-01', null), 0)
+  eq('missing start date', monthSpan(null, '2026-05-31'), 0)
+  eq('inverted range', monthSpan('2027-01-01', '2026-01-01'), 0)
+
+  // A calculation with no real schedule still books month by month.
+  const calc = {
+    id: 'c1',
+    gross_savings_amount: 900_000,
+    cost_reduction_amount: 300_000,
+    cost_avoidance_amount: 600_000,
+    savings_start_date: '2026-08-01',
+    savings_end_date: '2029-07-31',
+  }
+  const synth = calcToPeriods(calc)
+  eq('synthesised 36 monthly periods', synth.length, 36)
+  eq('first period is August 2026', `${synth[0].month}/${synth[0].year}`, '8/2026')
+  near('periods sum back to the calculation', scheduleTotals(synth).total, 900_000)
+  near('reduction survives the split', scheduleTotals(synth).reduction, 300_000)
+
+  // A calc with no dates cannot be placed in a year — it must not be invented.
+  eq('no dates yields no periods', calcToPeriods({ gross_savings_amount: 5_000 }).length, 0)
+
+  // A null reduction stays null through synthesis.
+  const noBase = calcToPeriods({
+    gross_savings_amount: 30_000, cost_reduction_amount: null, cost_avoidance_amount: 30_000,
+    savings_start_date: '2026-03-01', savings_end_date: '2026-06-30',
+  })
+  eq('null reduction is preserved, not zeroed', noBase.every(p => p.reduction === null), true)
+  eq('and the total stays n/a', scheduleTotals(noBase).reduction, null)
+}
+
+section('12. One method: a synthesised deal matches its own real schedule')
+{
+  // THE POINT OF STEP 4. The dashboard used to weight each calendar year by
+  // DAYS (prorateByYear), which disagrees with the schedule's whole months --
+  // up to 912 apart on this very deal while both still summed to 900,000.
+  // Routing both through scheduleByYear removes the discrepancy by construction.
+  const real = schedule('monthly', 36)                     // the actual schedule
+  const synth = calcToPeriods({                            // the same deal, undated fallback
+    gross_savings_amount: GRAND.total,
+    cost_reduction_amount: GRAND.reduction,
+    cost_avoidance_amount: GRAND.avoidance,
+    savings_start_date: '2026-08-01',
+    savings_end_date: '2029-07-31',
+  })
+  assertSameYearBuckets('synthesised vs real schedule', scheduleByYear(synth), scheduleByYear(real))
+
+  // And the old day-count method really did differ, so this is not theatre.
+  const { byYear: dayBased } = prorateByYear([{
+    gross_savings_amount: GRAND.total,
+    cost_reduction_amount: GRAND.reduction,
+    cost_avoidance_amount: GRAND.avoidance,
+    savings_start_date: '2026-08-01',
+    savings_end_date: '2029-07-31',
+  }])
+  const monthBased = scheduleByYear(synth)
+  const worstDrift = Math.max(...monthBased.map((m, i) => Math.abs(m.total - dayBased[i].total)))
+  eq('the day-count method genuinely disagreed (>100 on one year)', worstDrift > 100, true)
+  near('both still summed to the same portfolio total',
+    dayBased.reduce((s, y) => s + y.total, 0), monthBased.reduce((s, y) => s + y.total, 0))
+}
+
+section('13. Portfolio rollup: exact, estimated, and unplaceable')
+{
+  const scheduled = { id: 'sched', gross_savings_amount: GRAND.total,
+    cost_reduction_amount: GRAND.reduction, cost_avoidance_amount: GRAND.avoidance,
+    savings_start_date: '2026-08-01', savings_end_date: '2029-07-31' }
+  const datedOnly = { id: 'dated', gross_savings_amount: 120_000,
+    cost_reduction_amount: 120_000, cost_avoidance_amount: 0,
+    savings_start_date: '2027-01-01', savings_end_date: '2027-12-31' }
+  const undated = { id: 'undated', gross_savings_amount: 55_000,
+    cost_reduction_amount: 55_000, cost_avoidance_amount: 0 }
+
+  const periods = new Map([['sched', schedule('monthly', 36)]])
+  const p = portfolioByYear([scheduled, datedOnly, undated], periods)
+
+  eq('one project counted as scheduled', p.scheduledProjects, 1)
+  eq('one project estimated from its dates', p.estimatedProjects, 1)
+  eq('one project cannot be placed in a year', p.unscheduledProjects, 1)
+  near('exact total', p.exactTotal, GRAND.total)
+  near('estimated total', p.estimatedTotal, 120_000)
+  near('unscheduled is surfaced, not dropped', p.unscheduled, 55_000)
+  eq('year buckets reconcile', p.reconciles, true)
+
+  // 2027 mixes both sources; the split must be reported, not blended away.
+  // The scheduled deal is the spreadsheet's (850,000 over 36 months), so a full
+  // calendar year of it is 12/36 of the total, not a round 300,000.
+  const y2027 = p.years.find(y => y.year === 2027)!
+  near('2027 exact portion', y2027.exact, (GRAND.total / 36) * 12)
+  near('2027 estimated portion', y2027.estimated, 120_000)
+  near('2027 total is the sum of both', y2027.total, y2027.exact + y2027.estimated)
+  near('every year: exact + estimated === total',
+    p.years.reduce((s, y) => s + Math.abs(y.total - (y.exact + y.estimated)), 0), 0)
+
+  // Nothing is invented and nothing vanishes.
+  near('placed + unscheduled === the portfolio',
+    p.years.reduce((s, y) => s + y.total, 0) + p.unscheduled,
+    GRAND.total + 120_000 + 55_000)
+}
+
+section('14. Year on year')
+{
+  const rows = yearOverYear([
+    { year: 2026, total: 100_000, reduction: 40_000, avoidance: 60_000 },
+    { year: 2027, total: 150_000, reduction: 60_000, avoidance: 90_000 },
+    { year: 2028, total: 75_000, reduction: 30_000, avoidance: 45_000 },
+  ])
+  eq('first year has no prior', rows[0].prior, null)
+  eq('first year has no delta', rows[0].delta, null)
+  eq('first year has no percentage', rows[0].pct, null)
+  near('2027 delta', rows[1].delta, 50_000)
+  near('2027 percentage', rows[1].pct, 50)
+  near('2028 delta is negative', rows[2].delta, -75_000)
+  near('2028 percentage is negative', rows[2].pct, -50)
+
+  // Growth from nothing is not a percentage. Infinity in a CFO report is a lie.
+  const fromZero = yearOverYear([
+    { year: 2026, total: 0, reduction: 0, avoidance: 0 },
+    { year: 2027, total: 90_000, reduction: 0, avoidance: 90_000 },
+  ])
+  near('delta from zero is still real', fromZero[1].delta, 90_000)
+  eq('but the percentage is n/a, not Infinity', fromZero[1].pct, null)
+
+  // A gap in the years is a gap, not an implied zero.
+  const gapped = yearOverYear([
+    { year: 2026, total: 100_000, reduction: 0, avoidance: 100_000 },
+    { year: 2029, total: 200_000, reduction: 0, avoidance: 200_000 },
+  ])
+  eq('a non-consecutive year has no prior', gapped[1].prior, null)
+  eq('and no percentage', gapped[1].pct, null)
 }
 
 // ---------------------------------------------------------------------

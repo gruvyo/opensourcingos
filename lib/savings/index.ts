@@ -734,6 +734,185 @@ export function prorateByYear(calcs: SavingsCalcRow[]): { byYear: YearBucket[]; 
   return { byYear, unscheduled }
 }
 
+// ---- THE PORTFOLIO FISCAL YEAR (Step 4) -------------------------------
+// The Schedule tab answers "when does THIS deal save?". The CFO asks it of the
+// whole portfolio, and there the awkward fact is that only some projects have
+// been scheduled. The rest carry nothing but a savings_calculation with a start
+// and an end date.
+//
+// The old answer was prorateByYear(), which weights each calendar year by the
+// number of DAYS it holds. That disagrees with the schedule, which books whole
+// months — on the reference deal (900,000 over 36 months from August 2026) the
+// two differ by up to 912 in a single year while both summing to 900,000. Two
+// screens, same deal, different fiscal-year numbers. That is exactly the drift
+// this module exists to prevent.
+//
+// So there is ONE path: every calculation becomes schedule periods, real ones
+// where they exist and synthesised monthly ones where they do not, and
+// scheduleByYear() produces every year figure in the app. What differs between
+// the two sources is CONFIDENCE, not method — so confidence is reported
+// separately rather than blended silently into the total.
+
+/**
+ * Months spanned by a start and end date, inclusive, counted in whole months.
+ * 2026-01-01 to 2028-12-31 is 36. Returns 0 if either date is missing or the
+ * range is inverted. Deliberately month arithmetic, never day arithmetic.
+ */
+export function monthSpan(startISO?: string | null, endISO?: string | null): number {
+  if (!startISO || !endISO) return 0
+  const s = new Date(String(startISO).slice(0, 10) + 'T00:00:00')
+  const e = new Date(String(endISO).slice(0, 10) + 'T00:00:00')
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0
+  const months = (e.getFullYear() * 12 + e.getMonth()) - (s.getFullYear() * 12 + s.getMonth()) + 1
+  return months > 0 ? months : 0
+}
+
+/**
+ * Synthesise monthly schedule periods for a calculation that has no real ones,
+ * so it can go through exactly the same year grouping as a scheduled deal.
+ * Returns [] when the calc has no usable dates — those are `unscheduled` and
+ * are surfaced, never silently dropped.
+ */
+export function calcToPeriods(c: SavingsCalcRow): SchedulePeriod[] {
+  const months = monthSpan(c.savings_start_date, c.savings_end_date)
+  if (months <= 0) return []
+  const start = new Date(String(c.savings_start_date).slice(0, 10) + 'T00:00:00')
+
+  const total = num(c.gross_savings_amount)
+  const avoidance = num(c.cost_avoidance_amount)
+  // null stays null all the way through — not applicable is not zero.
+  const reduction = c.cost_reduction_amount === null || c.cost_reduction_amount === undefined
+    ? null : num(c.cost_reduction_amount)
+
+  const rows: SchedulePeriod[] = []
+  for (let i = 0; i < months; i++) {
+    const { month, year } = addMonths(start.getMonth() + 1, start.getFullYear(), i)
+    rows.push({
+      periodNumber: i + 1,
+      month,
+      year,
+      months: 1,
+      baseline: null,
+      opening: null,
+      final: 0,
+      reduction: reduction === null ? null : reduction / months,
+      avoidance: avoidance / months,
+      total: total / months,
+    })
+  }
+  return rows
+}
+
+export interface PortfolioYear extends ScheduleYearBucket {
+  /** Of this year's total, how much came from real schedule rows. */
+  exact: number
+  /** How much was derived from a calculation's start and end dates instead. */
+  estimated: number
+}
+
+export interface PortfolioByYear {
+  years: PortfolioYear[]
+  /** Portfolio totals, split by how much can be trusted to the month. */
+  exactTotal: number
+  estimatedTotal: number
+  /** Savings on calculations with no usable dates — cannot be placed in a year. */
+  unscheduled: number
+  scheduledProjects: number
+  estimatedProjects: number
+  unscheduledProjects: number
+  /** True when every year bucket adds back to the calculations' own total. */
+  reconciles: boolean
+}
+
+/**
+ * THE portfolio fiscal-year rollup. Pass every savings calculation plus the
+ * schedule periods that exist, keyed by savings_calculation_id.
+ *
+ * A calculation with real periods uses them (exact to the month, and edited
+ * rows are honoured). One without falls back to synthesised monthly periods
+ * from its own dates (right method, weaker input). One with neither is counted
+ * in `unscheduled` and reported, because a savings figure that silently fails
+ * to appear in any year is the worst outcome available.
+ */
+export function portfolioByYear(
+  calcs: SavingsCalcRow[],
+  periodsByCalcId: Map<string, SchedulePeriod[]>,
+): PortfolioByYear {
+  const buckets = new Map<number, PortfolioYear>()
+  let exactTotal = 0, estimatedTotal = 0, unscheduled = 0
+  let scheduledProjects = 0, estimatedProjects = 0, unscheduledProjects = 0
+
+  const add = (rows: SchedulePeriod[], exact: boolean) => {
+    for (const y of scheduleByYear(rows)) {
+      let b = buckets.get(y.year)
+      if (!b) {
+        b = { year: y.year, reduction: null, avoidance: 0, total: 0, months: 0, exact: 0, estimated: 0 }
+        buckets.set(y.year, b)
+      }
+      if (y.reduction !== null) b.reduction = num(b.reduction) + y.reduction
+      b.avoidance += y.avoidance
+      b.total += y.total
+      b.months += y.months
+      if (exact) b.exact += y.total; else b.estimated += y.total
+    }
+  }
+
+  for (const c of calcs) {
+    const real = (c.id && periodsByCalcId.get(c.id)) || null
+    if (real && real.length) {
+      add(real, true)
+      exactTotal += scheduleTotals(real).total
+      scheduledProjects++
+      continue
+    }
+    const synth = calcToPeriods(c)
+    if (synth.length) {
+      add(synth, false)
+      estimatedTotal += scheduleTotals(synth).total
+      estimatedProjects++
+      continue
+    }
+    unscheduled += reportedSavings(c)
+    unscheduledProjects++
+  }
+
+  const years = Array.from(buckets.values()).sort((a, b) => a.year - b.year)
+  const placed = years.reduce((s, y) => s + y.total, 0)
+  const reconciles = Math.abs(placed - (exactTotal + estimatedTotal)) < 0.01
+
+  return {
+    years, exactTotal, estimatedTotal, unscheduled,
+    scheduledProjects, estimatedProjects, unscheduledProjects, reconciles,
+  }
+}
+
+export interface YoYRow {
+  year: number
+  total: number
+  reduction: number | null
+  avoidance: number
+  /** The prior year's total, or null when this is the first year on record. */
+  prior: number | null
+  /** total − prior. null when there is no prior year. */
+  delta: number | null
+  /** Percentage change. null when there is no prior year OR the prior year was
+   *  zero — growth from nothing is not a percentage, and rendering it as one
+   *  (or as Infinity) is how a report starts lying. */
+  pct: number | null
+}
+
+/** Year-on-year movement. Consecutive years only; gaps are not interpolated. */
+export function yearOverYear(years: { year: number; total: number; reduction: number | null; avoidance: number }[]): YoYRow[] {
+  const sorted = [...years].sort((a, b) => a.year - b.year)
+  return sorted.map((y, i) => {
+    const previous = i > 0 && sorted[i - 1].year === y.year - 1 ? sorted[i - 1] : null
+    const prior = previous ? previous.total : null
+    const delta = prior === null ? null : y.total - prior
+    const pct = prior === null || prior === 0 ? null : (delta! / Math.abs(prior)) * 100
+    return { year: y.year, total: y.total, reduction: y.reduction, avoidance: y.avoidance, prior, delta, pct }
+  })
+}
+
 // ---- Realization (negotiated → realized lifecycle) --------------------
 
 export interface RealizationPeriodRow {
