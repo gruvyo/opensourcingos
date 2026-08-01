@@ -27,6 +27,13 @@
   --warning: #b45309; --warning-soft: #fbf1e2;
   --danger:  #be123c; --danger-soft:  #fdeef1;
   --info:    #1d4ed8; --info-soft:    #eaf0fe;
+
+  /* Concept B shell: a consistent navy navigation frame in either theme. */
+  --nav-bg:          #0c1126;
+  --nav-surface:     #151c38;
+  --nav-border:      rgba(148, 163, 184, .16);
+  --nav-text:        #aab5d0;
+  --nav-text-strong: #f8fafc;
 }
 
 html {
@@ -72,4 +79,10 @@ body {
 .dark body {
   background: #0a0a0a;
   color: #fafafa;
+}
+
+.app-canvas {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(79, 70, 229, .07), transparent 24rem),
+    var(--bg);
 }

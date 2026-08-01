@@ -1,195 +1,172 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { User, Building, Settings as SettingsIcon, Shield } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import type { ReactNode } from 'react'
+import {
+  Building2,
+  CalendarDays,
+  Check,
+  CircleUserRound,
+  Database,
+  KeyRound,
+  Landmark,
+  ShieldCheck,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/page-header'
 
-export default function SettingsPage() {
-  const supabase = createClient()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [org, setOrg] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const loadData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
-      setUser(user)
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      // .single() legitimately errors (PGRST116) when there's no row yet —
-      // that's not a load failure, just an empty profile.
-      if (profileError && profileError.code !== 'PGRST116') {
-        setLoadError((prev) => prev || profileError.message)
-      }
-
-      if (profile) {
-        setProfile(profile)
-        if (profile.organization_id) {
-          const { data: org, error: orgError } = await supabase
-            .from('organizations')
-            .select('*')
-            .eq('id', profile.organization_id)
-            .single()
-          if (orgError && orgError.code !== 'PGRST116') {
-            setLoadError((prev) => prev || orgError.message)
-          }
-          if (org) setOrg(org)
-        }
-      }
-      setLoading(false)
-    }
-    loadData()
-  }, [supabase])
-
-  if (loading) {
-    return (
-      <div className="p-8">
-        <p className="text-sm text-[var(--text-3)]">Loading...</p>
+function SettingsPanel({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: typeof Building2
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-4 sm:px-6">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand-ink)]">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--text)]">{title}</h2>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-3)]">{description}</p>
+        </div>
       </div>
-    )
-  }
+      <div className="p-5 sm:p-6">{children}</div>
+    </Card>
+  )
+}
 
-  const sectionClass = 'p-6'
-  const labelClass = 'text-sm font-medium text-[var(--text-3)]'
-  const valueClass = 'mt-1 text-sm text-[var(--text)]'
+function SettingRow({ label, value, detail }: { label: string; value: ReactNode; detail?: string }) {
+  return (
+    <div className="flex flex-col gap-1 border-b border-[var(--border)] py-3 first:pt-0 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <div>
+        <p className="text-sm font-medium text-[var(--text)]">{label}</p>
+        {detail ? <p className="mt-0.5 text-xs text-[var(--text-3)]">{detail}</p> : null}
+      </div>
+      <div className="text-sm text-[var(--text-2)] sm:max-w-[55%] sm:text-right">{value}</div>
+    </div>
+  )
+}
+
+function Assurance({ children }: { children: ReactNode }) {
+  return (
+    <li className="flex gap-2 text-sm leading-6 text-[var(--text-2)]">
+      <Check className="mt-1 h-4 w-4 shrink-0 text-[var(--success)]" aria-hidden="true" />
+      <span>{children}</span>
+    </li>
+  )
+}
+
+export default async function SettingsPage() {
+  const supabase = await createClient()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  const user = authData.user
+
+  const profileResult = user
+    ? await supabase.from('profiles').select('id, organization_id, email, full_name, role').eq('id', user.id).maybeSingle()
+    : { data: null, error: null }
+  const profile = profileResult.data
+
+  const organizationResult = profile?.organization_id
+    ? await supabase.from('organizations').select('id, name, created_at').eq('id', profile.organization_id).maybeSingle()
+    : { data: null, error: null }
+  const organization = organizationResult.data
+
+  const loadError = authError?.message || profileResult.error?.message || organizationResult.error?.message || null
+  const workspaceId = organization?.id ? `${organization.id.slice(0, 8)}…` : '—'
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text)]">Settings</h1>
-        <p className="mt-1 text-sm text-[var(--text-2)]">
-          Account and organization settings
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6 lg:p-8">
+      <PageHeader
+        eyebrow="Workspace administration"
+        title="Settings"
+        description="Identity, workspace context, reporting defaults, and the controls behind trustworthy procurement reporting."
+        actions={<Badge tone="brand" className="px-3 py-1.5">Public beta</Badge>}
+      />
 
-      {loadError && (
-        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
-          <strong>These figures are incomplete.</strong> A query failed: {loadError}. Do not report
-          from this page until it loads cleanly.
+      {loadError ? (
+        <div className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
+          <strong>Settings are incomplete.</strong> A query failed: {loadError}.
         </div>
-      )}
+      ) : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Profile */}
-        <Card className={sectionClass}>
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
-              <User className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <h3 className="text-sm font-semibold text-[var(--text)]">Your Profile</h3>
-          </div>
-          <dl className="space-y-3">
-            <div>
-              <dt className={labelClass}>Email</dt>
-              <dd className={valueClass}>{user?.email || '—'}</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>User ID</dt>
-              <dd className={`${valueClass} font-mono text-xs`}>{user?.id?.slice(0, 8) || '—'}...</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Role</dt>
-              <dd className={valueClass}>{profile?.role || 'User'}</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Full Name</dt>
-              <dd className={valueClass}>{profile?.full_name || 'Not set'}</dd>
-            </div>
-          </dl>
-        </Card>
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SettingsPanel
+          icon={CircleUserRound}
+          title="Identity & access"
+          description="The account currently signed in and its workspace role."
+        >
+          <SettingRow label="Name" value={profile?.full_name || user?.user_metadata?.full_name || 'Not provided'} />
+          <SettingRow label="Email" value={user?.email || profile?.email || '—'} />
+          <SettingRow label="Role" value={<Badge tone="info">{profile?.role || 'viewer'}</Badge>} detail="Controls what this account may manage." />
+          <SettingRow label="Authentication" value="Google via Supabase Auth" detail="No password is stored by OpenSourcingOS." />
+        </SettingsPanel>
 
-        {/* Organization */}
-        <Card className={sectionClass}>
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-900/30">
-              <Building className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <h3 className="text-sm font-semibold text-[var(--text)]">Organization</h3>
-          </div>
-          <dl className="space-y-3">
-            <div>
-              <dt className={labelClass}>Organization Name</dt>
-              <dd className={valueClass}>{org?.org_name || '—'}</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Organization ID</dt>
-              <dd className={`${valueClass} font-mono text-xs`}>{org?.id?.slice(0, 8) || '—'}...</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Currency</dt>
-              <dd className={valueClass}>USD ($)</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Plan</dt>
-              <dd className={valueClass}>
-                <Badge tone="brand">MVP Beta</Badge>
-              </dd>
-            </div>
-          </dl>
-        </Card>
+        <SettingsPanel
+          icon={Building2}
+          title="Workspace"
+          description="The organization boundary applied to projects, suppliers, and reporting."
+        >
+          <SettingRow label="Organization" value={organization?.name || '—'} />
+          <SettingRow label="Workspace ID" value={<span className="font-mono text-xs">{workspaceId}</span>} />
+          <SettingRow label="Data isolation" value={<Badge tone="success">Row Level Security</Badge>} detail="Business records are scoped to this workspace." />
+          <SettingRow label="Environment" value="Hosted public beta" />
+        </SettingsPanel>
 
-        {/* Preferences */}
-        <Card className={sectionClass}>
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 dark:bg-green-900/30">
-              <SettingsIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-            </div>
-            <h3 className="text-sm font-semibold text-[var(--text)]">Preferences</h3>
-          </div>
-          <dl className="space-y-3">
-            <div>
-              <dt className={labelClass}>Theme</dt>
-              <dd className={valueClass}>Dark mode (toggle in sidebar)</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Date Format</dt>
-              <dd className={valueClass}>MMM D, YYYY</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Number Format</dt>
-              <dd className={valueClass}>US ($1,234)</dd>
-            </div>
-          </dl>
-        </Card>
+        <SettingsPanel
+          icon={Landmark}
+          title="Reporting defaults"
+          description="Current conventions used throughout portfolio and savings views."
+        >
+          <SettingRow label="Currency" value="USD ($)" detail="Applied to financial values and exports." />
+          <SettingRow label="Fiscal calendar" value="Calendar year" detail="January through December." />
+          <SettingRow label="Date presentation" value="MMM D, YYYY" />
+          <SettingRow label="Theme" value="Light or dark" detail="Use the control in the navigation sidebar." />
+        </SettingsPanel>
 
-        {/* System Info */}
-        <Card className={sectionClass}>
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-900/30">
-              <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <h3 className="text-sm font-semibold text-[var(--text)]">System</h3>
-          </div>
-          <dl className="space-y-3">
-            <div>
-              <dt className={labelClass}>Version</dt>
-              <dd className={valueClass}>MVP Beta</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Database</dt>
-              <dd className={valueClass}>Supabase (PostgreSQL)</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Hosting</dt>
-              <dd className={valueClass}>Vercel</dd>
-            </div>
-            <div>
-              <dt className={labelClass}>Authentication</dt>
-              <dd className={valueClass}>Supabase Auth (Email)</dd>
-            </div>
-          </dl>
-        </Card>
+        <SettingsPanel
+          icon={ShieldCheck}
+          title="Methodology controls"
+          description="Guardrails that keep reported savings traceable and defensible."
+        >
+          <ul className="space-y-2">
+            <Assurance>Opening proposal, baseline, and final offer remain linked as one commercial chain.</Assurance>
+            <Assurance>Cost Reduction requires a defensible baseline or a recorded override.</Assurance>
+            <Assurance>Cost increases remain negative and missing anchors remain not applicable.</Assurance>
+            <Assurance>Schedules preserve total deal economics across fiscal-year reporting.</Assurance>
+          </ul>
+        </SettingsPanel>
       </div>
+
+      <section className="mt-8" aria-labelledby="connections-title">
+        <div className="mb-4">
+          <h2 id="connections-title" className="text-lg font-semibold text-[var(--text)]">Platform connections</h2>
+          <p className="mt-1 text-sm text-[var(--text-2)]">Services currently supporting this workspace.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            { icon: KeyRound, label: 'Identity', value: 'Google sign-in', state: 'Connected' },
+            { icon: Database, label: 'Data', value: 'Supabase PostgreSQL', state: 'Protected' },
+            { icon: CalendarDays, label: 'Reporting', value: 'Fiscal-year schedules', state: 'Active' },
+          ].map(connection => (
+            <Card key={connection.label} className="flex items-center gap-4 p-5">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">
+                <connection.icon className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-[var(--text-3)]">{connection.label}</p>
+                <p className="truncate text-sm font-semibold text-[var(--text)]">{connection.value}</p>
+              </div>
+              <Badge tone="success">{connection.state}</Badge>
+            </Card>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
