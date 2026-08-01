@@ -1,9 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/', '/login', '/auth/callback']
+const PUBLIC_ROUTES = new Set(['/', '/login', '/auth/callback'])
 
-export async function updateSession(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -15,22 +15,19 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options)
-          )
+          })
         },
       },
-    }
+    },
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-
   const pathname = request.nextUrl.pathname
-  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+  const isPublicRoute = PUBLIC_ROUTES.has(pathname)
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
@@ -45,10 +42,6 @@ export async function updateSession(request: NextRequest) {
   }
 
   return supabaseResponse
-}
-
-export async function middleware(request: NextRequest) {
-  return await updateSession(request)
 }
 
 export const config = {
