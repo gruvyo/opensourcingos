@@ -1,7 +1,7 @@
 -- =====================================================================
 -- supabase/schema.sql -- GENERATED. Do not edit by hand.
 --
---   regenerate:  ./scripts/db.sh --dump
+--   regenerate:  supabase db dump --linked --schema public --file supabase/schema.sql
 --
 -- The live structure of the public schema, pulled straight from the
 -- hosted database. Structure only -- no rows. Read this before writing

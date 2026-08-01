@@ -35,5 +35,11 @@ guaranteed while the project remains a public beta.
 - Each demo user should see only their own workspace. Any cross-workspace read
   or write is a high-priority vulnerability.
 
-The historical remediation and current audit status are documented in
-[`SECURITY-P0-RUNBOOK.md`](SECURITY-P0-RUNBOOK.md).
+## Current safeguards
+
+- Row Level Security is enabled on business tables exposed through the Data API.
+- Organization-scoped policies isolate each demo workspace.
+- Privileged workspace-cloning functions are not callable by browser users.
+- The frontend uses a publishable Supabase key; secret and service-role keys
+  remain server-side and outside source control.
+- GitHub secret scanning and push protection are enabled.
