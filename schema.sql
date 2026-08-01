@@ -58,7 +58,7 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 
 CREATE FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) RETURNS integer
     LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'public'
+    SET search_path TO 'pg_catalog', 'public'
     AS $_$
 declare
   -- Dependency order matters for the INSERT pass because of foreign keys.
@@ -139,7 +139,7 @@ COMMENT ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner 
 
 CREATE FUNCTION public.current_org_id() RETURNS uuid
     LANGUAGE sql STABLE SECURITY DEFINER
-    SET search_path TO 'public'
+    SET search_path TO 'pg_catalog', 'public'
     AS $$
   select organization_id from public.profiles where id = auth.uid()
 $$;
@@ -151,7 +151,7 @@ $$;
 
 CREATE FUNCTION public.handle_new_user() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'public'
+    SET search_path TO 'pg_catalog', 'public'
     AS $$
 declare
   v_org      uuid;
@@ -188,6 +188,7 @@ $$;
 
 CREATE FUNCTION public.prevent_profile_privilege_change() RETURNS trigger
     LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
     AS $$
 begin
   if new.organization_id is distinct from old.organization_id then
@@ -203,6 +204,7 @@ end $$;
 
 CREATE FUNCTION public.update_updated_at() RETURNS trigger
     LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
     AS $$
 BEGIN
   NEW.updated_at = now();
@@ -2559,8 +2561,6 @@ GRANT USAGE ON SCHEMA public TO service_role;
 --
 
 REVOKE ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) TO anon;
-GRANT ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid) TO service_role;
 
 
@@ -2569,7 +2569,6 @@ GRANT ALL ON FUNCTION public.clone_org_data(p_source uuid, p_target uuid, p_owne
 --
 
 REVOKE ALL ON FUNCTION public.current_org_id() FROM PUBLIC;
-GRANT ALL ON FUNCTION public.current_org_id() TO anon;
 GRANT ALL ON FUNCTION public.current_org_id() TO authenticated;
 GRANT ALL ON FUNCTION public.current_org_id() TO service_role;
 
@@ -2578,8 +2577,7 @@ GRANT ALL ON FUNCTION public.current_org_id() TO service_role;
 -- Name: FUNCTION handle_new_user(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.handle_new_user() TO anon;
-GRANT ALL ON FUNCTION public.handle_new_user() TO authenticated;
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.handle_new_user() TO service_role;
 
 
