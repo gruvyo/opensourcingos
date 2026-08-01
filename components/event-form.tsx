@@ -40,11 +40,13 @@ export function EventForm({
   businessUnits,
   costCenters,
   suppliers: initialSuppliers,
+  defaultCurrency,
 }: {
   categories: Option[]
   businessUnits: Option[]
   costCenters: Option[]
   suppliers: Option[]
+  defaultCurrency: string
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -165,9 +167,7 @@ export function EventForm({
       return
     }
 
-    const isSupport = projectType === 'Support'
-
-    const eventData: Record<string, any> = {
+    const eventData = {
       event_name: form.event_name,
       event_description: form.event_description || null,
       event_type: form.event_type || null,
@@ -178,7 +178,7 @@ export function EventForm({
       procurement_owner_id: user.id,
       created_by: user.id,
       updated_by: user.id,
-      currency_code: 'USD',
+      currency_code: defaultCurrency,
       fx_rate_to_usd: 1.0,
       event_status: form.event_status,
       event_start_date: form.event_start_date || null,

@@ -1,0 +1,68 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { requireWorkspace } from '@/lib/authz'
+
+export type SettingsActionState = { status: 'idle' | 'success' | 'error'; message: string }
+
+const settingsSchema = z.object({
+  organizationName: z.string().trim().min(2, 'Organization name is required.').max(120),
+  fullName: z.string().trim().min(2, 'Your name is required.').max(120),
+  currencyCode: z.enum(['USD', 'CAD', 'EUR', 'GBP', 'AUD']),
+  locale: z.enum(['en-US', 'en-CA', 'en-GB']),
+  timezone: z.enum(['America/Chicago', 'America/New_York', 'America/Denver', 'America/Los_Angeles', 'UTC']),
+  fiscalYearStartMonth: z.coerce.number().int().min(1).max(12),
+  dateFormat: z.enum(['MMM D, YYYY', 'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']),
+  defaultRecognitionMethod: z.enum(['monthly', 'annual', 'one_time']),
+  requireBaseline: z.boolean(),
+  hardReductionApprovalThreshold: z.union([z.literal(''), z.coerce.number().min(0)]),
+})
+
+export async function updateSettings(
+  _previous: SettingsActionState,
+  formData: FormData,
+): Promise<SettingsActionState> {
+  try {
+    const { supabase } = await requireWorkspace(['admin'])
+    const parsed = settingsSchema.safeParse({
+      organizationName: formData.get('organizationName'),
+      fullName: formData.get('fullName'),
+      currencyCode: formData.get('currencyCode'),
+      locale: formData.get('locale'),
+      timezone: formData.get('timezone'),
+      fiscalYearStartMonth: formData.get('fiscalYearStartMonth'),
+      dateFormat: formData.get('dateFormat'),
+      defaultRecognitionMethod: formData.get('defaultRecognitionMethod'),
+      requireBaseline: formData.get('requireBaseline') === 'on',
+      hardReductionApprovalThreshold: formData.get('hardReductionApprovalThreshold') || '',
+    })
+
+    if (!parsed.success) {
+      return { status: 'error', message: parsed.error.issues[0]?.message || 'Check the highlighted settings.' }
+    }
+
+    const values = parsed.data
+    const { error } = await supabase.rpc('update_workspace_settings', {
+      p_organization_name: values.organizationName,
+      p_full_name: values.fullName,
+      p_currency_code: values.currencyCode,
+      p_locale: values.locale,
+      p_timezone: values.timezone,
+      p_fiscal_year_start_month: values.fiscalYearStartMonth,
+      p_date_format: values.dateFormat,
+      p_default_recognition_method: values.defaultRecognitionMethod,
+      p_require_baseline: values.requireBaseline,
+      p_hard_reduction_approval_threshold: values.hardReductionApprovalThreshold === ''
+        ? null
+        : values.hardReductionApprovalThreshold,
+    })
+
+    if (error) return { status: 'error', message: error.message }
+
+    revalidatePath('/settings')
+    return { status: 'success', message: 'Workspace settings saved.' }
+  } catch (error) {
+    return { status: 'error', message: error instanceof Error ? error.message : 'Settings could not be saved.' }
+  }
+}

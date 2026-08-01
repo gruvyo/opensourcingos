@@ -53,6 +53,53 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
+-- Name: capture_workspace_audit(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.capture_workspace_audit() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v_org uuid;
+  v_entity_id uuid;
+  v_entity_type text;
+begin
+  if tg_table_name = 'organizations' then
+    v_org := case when tg_op = 'DELETE' then old.id else new.id end;
+    v_entity_id := v_org;
+    v_entity_type := 'organization';
+  elsif tg_table_name = 'organization_settings' then
+    v_org := case when tg_op = 'DELETE' then old.organization_id else new.organization_id end;
+    v_entity_id := v_org;
+    v_entity_type := 'organization_settings';
+  else
+    v_org := case when tg_op = 'DELETE' then old.organization_id else new.organization_id end;
+    v_entity_id := case when tg_op = 'DELETE' then old.id else new.id end;
+    v_entity_type := 'supplier';
+  end if;
+
+  insert into public.audit_log (
+    organization_id, actor_id, entity_type, entity_id, action, before_data, after_data
+  ) values (
+    v_org,
+    auth.uid(),
+    v_entity_type,
+    v_entity_id,
+    lower(tg_op),
+    case when tg_op in ('UPDATE', 'DELETE') then to_jsonb(old) end,
+    case when tg_op in ('INSERT', 'UPDATE') then to_jsonb(new) end
+  );
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end
+$$;
+
+
+--
 -- Name: clone_org_data(uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -162,12 +209,9 @@ begin
   values (v_name || ' (workspace)')
   returning id into v_org;
 
-  insert into public.profiles (id, email, full_name, organization_id)
-  values (new.id, new.email, v_name, v_org);
+  insert into public.profiles (id, email, full_name, organization_id, role)
+  values (new.id, new.email, v_name, v_org, 'admin');
 
-  -- Demo data is a convenience. If seeding breaks, the person still gets an
-  -- account -- raising here would abort the auth transaction and they could
-  -- not sign up at all.
   begin
     select id into v_template from public.organizations where is_demo_template limit 1;
     if v_template is not null then
@@ -191,11 +235,17 @@ CREATE FUNCTION public.prevent_profile_privilege_change() RETURNS trigger
     SET search_path TO 'pg_catalog', 'public'
     AS $$
 begin
-  if new.organization_id is distinct from old.organization_id then
-    raise exception 'organization_id cannot be changed by the user';
+  if current_user in ('anon', 'authenticated') then
+    if new.organization_id is distinct from old.organization_id then
+      raise exception 'organization_id cannot be changed by the user';
+    end if;
+    if new.role is distinct from old.role then
+      raise exception 'role cannot be changed by the user';
+    end if;
   end if;
   return new;
-end $$;
+end
+$$;
 
 
 --
@@ -213,7 +263,98 @@ END;
 $$;
 
 
+--
+-- Name: update_workspace_settings(text, text, text, text, text, integer, text, text, boolean, numeric); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric) RETURNS void
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v_user uuid := auth.uid();
+  v_org uuid := public.current_org_id();
+  v_role text;
+begin
+  if v_user is null or v_org is null then
+    raise exception 'authentication required';
+  end if;
+
+  select role into v_role
+  from public.profiles
+  where id = v_user and organization_id = v_org;
+
+  if v_role is distinct from 'admin' then
+    raise exception 'administrator role required';
+  end if;
+
+  update public.organizations
+  set name = p_organization_name
+  where id = v_org;
+
+  update public.profiles
+  set full_name = p_full_name
+  where id = v_user and organization_id = v_org;
+
+  insert into public.organization_settings (
+    organization_id,
+    currency_code,
+    locale,
+    timezone,
+    fiscal_year_start_month,
+    date_format,
+    default_recognition_method,
+    require_baseline_for_hard_reduction,
+    hard_reduction_approval_threshold,
+    updated_by
+  ) values (
+    v_org,
+    p_currency_code,
+    p_locale,
+    p_timezone,
+    p_fiscal_year_start_month,
+    p_date_format,
+    p_default_recognition_method,
+    p_require_baseline,
+    p_hard_reduction_approval_threshold,
+    v_user
+  )
+  on conflict (organization_id) do update set
+    currency_code = excluded.currency_code,
+    locale = excluded.locale,
+    timezone = excluded.timezone,
+    fiscal_year_start_month = excluded.fiscal_year_start_month,
+    date_format = excluded.date_format,
+    default_recognition_method = excluded.default_recognition_method,
+    require_baseline_for_hard_reduction = excluded.require_baseline_for_hard_reduction,
+    hard_reduction_approval_threshold = excluded.hard_reduction_approval_threshold,
+    updated_by = excluded.updated_by;
+end
+$$;
+
+
 SET default_table_access_method = heap;
+
+--
+-- Name: audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    actor_id uuid,
+    entity_type text NOT NULL,
+    entity_id uuid NOT NULL,
+    action text NOT NULL,
+    before_data jsonb,
+    after_data jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT audit_log_action_check CHECK ((action = ANY (ARRAY['insert'::text, 'update'::text, 'delete'::text]))),
+    CONSTRAINT audit_log_entity_type_check CHECK ((entity_type = ANY (ARRAY['organization'::text, 'organization_settings'::text, 'supplier'::text])))
+);
+
+ALTER TABLE ONLY public.audit_log FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: award_lines; Type: TABLE; Schema: public; Owner: -
@@ -445,6 +586,33 @@ CREATE TABLE public.event_scope_lines (
 );
 
 ALTER TABLE ONLY public.event_scope_lines FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: organization_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_settings (
+    organization_id uuid NOT NULL,
+    currency_code text DEFAULT 'USD'::text NOT NULL,
+    locale text DEFAULT 'en-US'::text NOT NULL,
+    timezone text DEFAULT 'America/Chicago'::text NOT NULL,
+    fiscal_year_start_month integer DEFAULT 1 NOT NULL,
+    date_format text DEFAULT 'MMM D, YYYY'::text NOT NULL,
+    default_recognition_method text DEFAULT 'monthly'::text NOT NULL,
+    require_baseline_for_hard_reduction boolean DEFAULT true NOT NULL,
+    hard_reduction_approval_threshold numeric(15,2),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by uuid,
+    CONSTRAINT organization_settings_currency_code_check CHECK ((currency_code ~ '^[A-Z]{3}$'::text)),
+    CONSTRAINT organization_settings_date_format_check CHECK ((date_format = ANY (ARRAY['MMM D, YYYY'::text, 'MM/DD/YYYY'::text, 'DD/MM/YYYY'::text, 'YYYY-MM-DD'::text]))),
+    CONSTRAINT organization_settings_default_recognition_method_check CHECK ((default_recognition_method = ANY (ARRAY['monthly'::text, 'annual'::text, 'one_time'::text]))),
+    CONSTRAINT organization_settings_fiscal_year_start_month_check CHECK (((fiscal_year_start_month >= 1) AND (fiscal_year_start_month <= 12))),
+    CONSTRAINT organization_settings_hard_reduction_approval_threshold_check CHECK (((hard_reduction_approval_threshold IS NULL) OR (hard_reduction_approval_threshold >= (0)::numeric)))
+);
+
+ALTER TABLE ONLY public.organization_settings FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -844,11 +1012,25 @@ CREATE TABLE public.suppliers (
     risk_rating text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
+    website text,
+    country_code text,
+    relationship_owner_id uuid,
+    next_review_date date,
+    notes text,
+    CONSTRAINT suppliers_country_code_check CHECK (((country_code IS NULL) OR (country_code ~ '^[A-Z]{2}$'::text))),
     CONSTRAINT suppliers_risk_rating_check CHECK (((risk_rating = ANY (ARRAY['Low'::text, 'Medium'::text, 'High'::text])) OR (risk_rating IS NULL))),
     CONSTRAINT suppliers_supplier_status_check CHECK ((supplier_status = ANY (ARRAY['Active'::text, 'Inactive'::text, 'Prospective'::text, 'Blocked'::text, 'Under Review'::text])))
 );
 
 ALTER TABLE ONLY public.suppliers FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -913,6 +1095,14 @@ ALTER TABLE ONLY public.cost_centers
 
 ALTER TABLE ONLY public.event_scope_lines
     ADD CONSTRAINT event_scope_lines_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_settings organization_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_settings
+    ADD CONSTRAINT organization_settings_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -993,6 +1183,27 @@ ALTER TABLE ONLY public.supplier_offers
 
 ALTER TABLE ONLY public.suppliers
     ADD CONSTRAINT suppliers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_audit_log_actor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_log_actor ON public.audit_log USING btree (actor_id);
+
+
+--
+-- Name: idx_audit_log_entity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_log_entity ON public.audit_log USING btree (entity_type, entity_id, created_at DESC);
+
+
+--
+-- Name: idx_audit_log_org_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_log_org_created ON public.audit_log USING btree (organization_id, created_at DESC);
 
 
 --
@@ -1105,6 +1316,13 @@ CREATE INDEX idx_event_scope_lines_event ON public.event_scope_lines USING btree
 --
 
 CREATE INDEX idx_event_scope_lines_org ON public.event_scope_lines USING btree (organization_id);
+
+
+--
+-- Name: idx_organization_settings_updated_by; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_settings_updated_by ON public.organization_settings USING btree (updated_by);
 
 
 --
@@ -1269,6 +1487,13 @@ CREATE INDEX idx_suppliers_org ON public.suppliers USING btree (organization_id)
 
 
 --
+-- Name: idx_suppliers_relationship_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_suppliers_relationship_owner ON public.suppliers USING btree (relationship_owner_id);
+
+
+--
 -- Name: uq_baselines_official_cost_avoidance; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1332,6 +1557,13 @@ CREATE UNIQUE INDEX uq_supplier_offers_selected_award ON public.supplier_offers 
 
 
 --
+-- Name: uq_suppliers_org_normalized_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_suppliers_org_normalized_name ON public.suppliers USING btree (organization_id, supplier_normalized_name) WHERE (supplier_normalized_name IS NOT NULL);
+
+
+--
 -- Name: award_lines award_lines_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1357,6 +1589,27 @@ CREATE TRIGGER baseline_lines_updated_at BEFORE UPDATE ON public.baseline_lines 
 --
 
 CREATE TRIGGER baselines_updated_at BEFORE UPDATE ON public.baselines FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+
+--
+-- Name: organization_settings organization_settings_audit; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER organization_settings_audit AFTER INSERT OR DELETE OR UPDATE ON public.organization_settings FOR EACH ROW EXECUTE FUNCTION public.capture_workspace_audit();
+
+
+--
+-- Name: organization_settings organization_settings_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER organization_settings_updated_at BEFORE UPDATE ON public.organization_settings FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+
+--
+-- Name: organizations organizations_audit; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER organizations_audit AFTER UPDATE ON public.organizations FOR EACH ROW EXECUTE FUNCTION public.capture_workspace_audit();
 
 
 --
@@ -1395,10 +1648,40 @@ CREATE TRIGGER supplier_offers_updated_at BEFORE UPDATE ON public.supplier_offer
 
 
 --
+-- Name: suppliers suppliers_audit; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER suppliers_audit AFTER INSERT OR DELETE OR UPDATE ON public.suppliers FOR EACH ROW EXECUTE FUNCTION public.capture_workspace_audit();
+
+
+--
+-- Name: suppliers suppliers_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER suppliers_updated_at BEFORE UPDATE ON public.suppliers FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+
+--
 -- Name: profiles trg_prevent_profile_privilege_change; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_prevent_profile_privilege_change BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.prevent_profile_privilege_change();
+
+
+--
+-- Name: audit_log audit_log_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
+-- Name: audit_log audit_log_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -1639,6 +1922,22 @@ ALTER TABLE ONLY public.event_scope_lines
 
 ALTER TABLE ONLY public.event_scope_lines
     ADD CONSTRAINT event_scope_lines_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: organization_settings organization_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_settings
+    ADD CONSTRAINT organization_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_settings organization_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_settings
+    ADD CONSTRAINT organization_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.profiles(id);
 
 
 --
@@ -1970,6 +2269,27 @@ ALTER TABLE ONLY public.suppliers
 
 
 --
+-- Name: suppliers suppliers_relationship_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.suppliers
+    ADD CONSTRAINT suppliers_relationship_owner_id_fkey FOREIGN KEY (relationship_owner_id) REFERENCES public.profiles(id);
+
+
+--
+-- Name: audit_log; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: audit_log audit_log_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY audit_log_select ON public.audit_log FOR SELECT TO authenticated USING ((organization_id = ( SELECT public.current_org_id() AS current_org_id)));
+
+
+--
 -- Name: award_lines; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2123,13 +2443,6 @@ CREATE POLICY org_delete ON public.supplier_offers FOR DELETE TO authenticated U
 
 
 --
--- Name: suppliers org_delete; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY org_delete ON public.suppliers FOR DELETE TO authenticated USING ((organization_id = public.current_org_id()));
-
-
---
 -- Name: award_lines org_insert; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2232,13 +2545,6 @@ CREATE POLICY org_insert ON public.supplier_offer_lines FOR INSERT TO authentica
 --
 
 CREATE POLICY org_insert ON public.supplier_offers FOR INSERT TO authenticated WITH CHECK ((organization_id = public.current_org_id()));
-
-
---
--- Name: suppliers org_insert; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY org_insert ON public.suppliers FOR INSERT TO authenticated WITH CHECK ((organization_id = public.current_org_id()));
 
 
 --
@@ -2459,10 +2765,47 @@ CREATE POLICY org_update ON public.supplier_offers FOR UPDATE TO authenticated U
 
 
 --
--- Name: suppliers org_update; Type: POLICY; Schema: public; Owner: -
+-- Name: organization_settings; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
-CREATE POLICY org_update ON public.suppliers FOR UPDATE TO authenticated USING ((organization_id = public.current_org_id())) WITH CHECK ((organization_id = public.current_org_id()));
+ALTER TABLE public.organization_settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: organization_settings organization_settings_insert_by_admin; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organization_settings_insert_by_admin ON public.organization_settings FOR INSERT TO authenticated WITH CHECK (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = organization_settings.organization_id) AND (p.role = 'admin'::text))))));
+
+
+--
+-- Name: organization_settings organization_settings_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organization_settings_select ON public.organization_settings FOR SELECT TO authenticated USING ((organization_id = ( SELECT public.current_org_id() AS current_org_id)));
+
+
+--
+-- Name: organization_settings organization_settings_update_by_admin; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organization_settings_update_by_admin ON public.organization_settings FOR UPDATE TO authenticated USING (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = organization_settings.organization_id) AND (p.role = 'admin'::text)))))) WITH CHECK (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = organization_settings.organization_id) AND (p.role = 'admin'::text))))));
+
+
+--
+-- Name: organizations organization_update_by_admin; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organization_update_by_admin ON public.organizations FOR UPDATE TO authenticated USING (((id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = organizations.id) AND (p.role = 'admin'::text)))))) WITH CHECK (((id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = organizations.id) AND (p.role = 'admin'::text))))));
 
 
 --
@@ -2495,7 +2838,7 @@ CREATE POLICY profiles_select_org ON public.profiles FOR SELECT TO authenticated
 -- Name: profiles profiles_update_self; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY profiles_update_self ON public.profiles FOR UPDATE TO authenticated USING ((id = auth.uid())) WITH CHECK ((id = auth.uid()));
+CREATE POLICY profiles_update_self ON public.profiles FOR UPDATE TO authenticated USING ((id = ( SELECT auth.uid() AS uid))) WITH CHECK ((id = ( SELECT auth.uid() AS uid)));
 
 
 --
@@ -2529,6 +2872,24 @@ ALTER TABLE public.savings_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sourcing_events ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: suppliers supplier_delete_by_admin; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY supplier_delete_by_admin ON public.suppliers FOR DELETE TO authenticated USING (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = suppliers.organization_id) AND (p.role = 'admin'::text))))));
+
+
+--
+-- Name: suppliers supplier_insert_by_editor; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY supplier_insert_by_editor ON public.suppliers FOR INSERT TO authenticated WITH CHECK (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = suppliers.organization_id) AND (p.role = ANY (ARRAY['admin'::text, 'procurement_user'::text])))))));
+
+
+--
 -- Name: supplier_offer_lines; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2539,6 +2900,17 @@ ALTER TABLE public.supplier_offer_lines ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.supplier_offers ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: suppliers supplier_update_by_editor; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY supplier_update_by_editor ON public.suppliers FOR UPDATE TO authenticated USING (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = suppliers.organization_id) AND (p.role = ANY (ARRAY['admin'::text, 'procurement_user'::text]))))))) WITH CHECK (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (EXISTS ( SELECT 1
+   FROM public.profiles p
+  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND (p.organization_id = suppliers.organization_id) AND (p.role = ANY (ARRAY['admin'::text, 'procurement_user'::text])))))));
+
 
 --
 -- Name: suppliers; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2554,6 +2926,14 @@ GRANT USAGE ON SCHEMA public TO postgres;
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT USAGE ON SCHEMA public TO service_role;
+
+
+--
+-- Name: FUNCTION capture_workspace_audit(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.capture_workspace_audit() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.capture_workspace_audit() TO service_role;
 
 
 --
@@ -2597,6 +2977,23 @@ GRANT ALL ON FUNCTION public.prevent_profile_privilege_change() TO service_role;
 GRANT ALL ON FUNCTION public.update_updated_at() TO anon;
 GRANT ALL ON FUNCTION public.update_updated_at() TO authenticated;
 GRANT ALL ON FUNCTION public.update_updated_at() TO service_role;
+
+
+--
+-- Name: FUNCTION update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric) TO authenticated;
+GRANT ALL ON FUNCTION public.update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric) TO service_role;
+
+
+--
+-- Name: TABLE audit_log; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.audit_log TO authenticated;
+GRANT ALL ON TABLE public.audit_log TO service_role;
 
 
 --
@@ -2669,6 +3066,14 @@ GRANT ALL ON TABLE public.cost_centers TO service_role;
 GRANT ALL ON TABLE public.event_scope_lines TO anon;
 GRANT ALL ON TABLE public.event_scope_lines TO authenticated;
 GRANT ALL ON TABLE public.event_scope_lines TO service_role;
+
+
+--
+-- Name: TABLE organization_settings; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.organization_settings TO authenticated;
+GRANT ALL ON TABLE public.organization_settings TO service_role;
 
 
 --
@@ -2824,4 +3229,3 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 --
 -- PostgreSQL database dump complete
 --
-

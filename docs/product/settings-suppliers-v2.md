@@ -1,5 +1,16 @@
 # Settings and Suppliers v2
 
+## Implementation status
+
+Release 2 is implemented in `feat/settings-suppliers-v2`: workspace settings
+are editable and atomic, supplier records can be created independently, and
+supplier profiles reconcile projects, awards, negotiated savings, realized
+savings, and audit history. Database policies make viewers read-only while
+administrators and procurement users receive the intended editing rights.
+
+Membership invitations, performance reviews, certifications, duplicate merge,
+and portfolio concentration remain Release 3 work.
+
 ## Product intent
 
 Settings should become the control plane for a procurement workspace. Suppliers
