@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   Building2,
   CircleAlert,
@@ -201,7 +202,7 @@ export function SuppliersView({ suppliers }: { suppliers: SupplierSummary[] }) {
                     <Building2 className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-sm font-semibold text-[var(--text)]">{supplier.name}</h2>
+                    <h2 className="truncate text-sm font-semibold text-[var(--text)]"><Link href={`/suppliers/${supplier.id}`} className="hover:text-[var(--brand-ink)] hover:underline">{supplier.name}</Link></h2>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <Badge tone={statusTone(supplier.status)}>{supplier.status}</Badge>
                       {supplier.preferred ? <Badge tone="brand"><Star className="h-3 w-3" /> Preferred</Badge> : null}
@@ -236,7 +237,7 @@ export function SuppliersView({ suppliers }: { suppliers: SupplierSummary[] }) {
                 {filtered.map(supplier => (
                   <tr key={supplier.id} className="transition-colors hover:bg-[var(--surface-2)]">
                     <th scope="row" className="px-5 py-3 text-left font-medium text-[var(--text)] sm:px-6">
-                      <span className="flex items-center gap-2"><Building2 className="h-4 w-4 text-[var(--brand-ink)]" aria-hidden="true" />{supplier.name}</span>
+                      <Link href={`/suppliers/${supplier.id}`} className="flex items-center gap-2 hover:text-[var(--brand-ink)] hover:underline"><Building2 className="h-4 w-4 text-[var(--brand-ink)]" aria-hidden="true" />{supplier.name}</Link>
                     </th>
                     <td className="px-4 py-3"><Badge tone={statusTone(supplier.status)}>{supplier.status}</Badge></td>
                     <td className="px-4 py-3">

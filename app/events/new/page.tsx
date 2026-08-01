@@ -11,17 +11,19 @@ export default async function NewEventPage() {
     { data: businessUnits, error: businessUnitsError },
     { data: costCenters, error: costCentersError },
     { data: suppliers, error: suppliersError },
+    { data: settings, error: settingsError },
   ] = await Promise.all([
     supabase.from('categories').select('id, category_name').order('category_name'),
     supabase.from('business_units').select('id, business_unit_name').order('business_unit_name'),
     supabase.from('cost_centers').select('id, cost_center_name, business_unit_id').order('cost_center_name'),
     supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
+    supabase.from('organization_settings').select('currency_code').maybeSingle(),
   ])
 
   // A failed query here would render as an empty dropdown, which is indistinguishable
   // from a genuinely empty list. Say which one it is.
   const loadError = categoriesError?.message || businessUnitsError?.message
-    || costCentersError?.message || suppliersError?.message || null
+    || costCentersError?.message || suppliersError?.message || settingsError?.message || null
 
   return (
     <div className="p-8">
@@ -46,6 +48,7 @@ export default async function NewEventPage() {
         businessUnits={businessUnits || []}
         costCenters={costCenters || []}
         suppliers={suppliers || []}
+        defaultCurrency={settings?.currency_code || 'USD'}
       />
     </div>
   )
