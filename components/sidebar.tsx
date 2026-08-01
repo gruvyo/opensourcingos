@@ -11,15 +11,17 @@ import {
   Settings,
   Briefcase,
   LogOut,
+  TrendingUp,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from './theme-toggle'
 
 const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Projects', href: '/events', icon: Briefcase },
+  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Sourcing Events', href: '/events', icon: Briefcase },
   { label: 'Savings', href: '/savings', icon: Calculator },
+  { label: 'Realization', href: '/realization', icon: TrendingUp },
   { label: 'Suppliers', href: '/suppliers', icon: Users },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Settings', href: '/settings', icon: Settings },
