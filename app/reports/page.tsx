@@ -17,13 +17,7 @@ export default async function ReportsPage() {
       awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(supplier_name)
     `).order('created_at', { ascending: false }),
     supabase.from('savings_calculations').select(`
-      id, calculation_name, savings_type, gross_savings_amount, savings_percentage,
-      calculation_status, cost_reduction_amount, cost_avoidance_amount, net_savings_amount,
-      savings_start_date, savings_end_date, event_id,
-      event:sourcing_events(event_name, contract_start_date),
-      baseline:baselines(baseline_name, baseline_type, hard_reduction_override,
-                         hard_reduction_override_reason),
-      award:awards(award_name)
+      id, event_id, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount
     `).order('created_at', { ascending: false }),
   ])
 
@@ -32,10 +26,13 @@ export default async function ReportsPage() {
   const loadError = eventsError?.message || savingsCalcsError?.message || null
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Reports</h1>
-      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-        Procurement activity report — pipeline, savings, and project throughput
+    <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand-ink)]">
+        Portfolio intelligence
+      </p>
+      <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text)] sm:text-3xl">Reports</h1>
+      <p className="mt-1 text-sm text-[var(--text-2)]">
+        Choose a report, narrow the portfolio, and export the exact rows on screen.
       </p>
 
       {loadError && (

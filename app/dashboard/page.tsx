@@ -9,6 +9,10 @@ import {
 import { SavingsByCategoryChart, SavingsByTypeChart } from '@/components/dashboard-charts'
 import { FiscalYearPanel } from '@/components/fiscal-year-panel'
 import {
+  DashboardActivityBreakdowns,
+  type ActivityBreakdown,
+} from '@/components/dashboard-activity-breakdowns'
+import {
   getFirst,
   num,
   portfolioByYear,
@@ -48,6 +52,8 @@ const STATUS_PROGRESS: Record<string, number> = {
 
 type EventRow = EventLiteRow & {
   project_type?: string | null
+  event_type?: string | null
+  buyer_name?: string | null
   event_start_date?: string | null
   project_due_date?: string | null
   event_close_date?: string | null
@@ -159,6 +165,21 @@ function realizationYear(period: DashboardRealizationPeriod): number | null {
   return Number(value.slice(0, 4))
 }
 
+function countBy(
+  events: EventRow[],
+  getLabel: (event: EventRow) => string,
+): Array<{ label: string; value: number }> {
+  const counts = new Map<string, number>()
+  for (const event of events) {
+    const label = getLabel(event)
+    counts.set(label, (counts.get(label) || 0) + 1)
+  }
+  return Array.from(counts.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .slice(0, 6)
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -176,7 +197,7 @@ export default async function DashboardPage({
     { data: realizationPeriods, error: realizationError },
   ] = await Promise.all([
     supabase.from('sourcing_events').select(`
-      id, event_name, event_status, project_type, contract_start_date,
+      id, event_name, event_type, event_status, project_type, buyer_name, contract_start_date,
       event_start_date, project_due_date, event_close_date,
       category:categories!sourcing_events_category_id_fkey(category_name),
       business_unit:business_units(business_unit_name),
@@ -259,6 +280,30 @@ export default async function DashboardPage({
   const suppliers = supplierSummaries(eventList, calcList, rollup.totalSavings)
   const activeEvents = eventSummaries(eventList, calcList)
   const scopeLabel = selectedYear === null ? 'All years' : `FY${selectedYear}`
+  const sourcingEvents = eventList.filter(event => (event.project_type || 'Sourcing') === 'Sourcing')
+  const activeSourcingEvents = sourcingEvents.filter(event => !INACTIVE_STATUSES.has(event.event_status || ''))
+  const activityCards: ActivityBreakdown[] = [
+    {
+      title: 'Projects by Business Unit',
+      description: 'All sourcing projects',
+      items: countBy(sourcingEvents, event => relationName(event.business_unit, 'business_unit_name', 'Unassigned')),
+    },
+    {
+      title: 'Pipeline by Status',
+      description: 'Active sourcing projects',
+      items: countBy(activeSourcingEvents, event => event.event_status || 'Pipeline'),
+    },
+    {
+      title: 'Projects by Type',
+      description: 'Sourcing method or event type',
+      items: countBy(sourcingEvents, event => event.event_type || 'Unspecified'),
+    },
+    {
+      title: 'Projects by Owner',
+      description: 'Assigned buyer or project owner',
+      items: countBy(sourcingEvents, event => event.buyer_name || 'Unassigned'),
+    },
+  ]
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
@@ -327,6 +372,8 @@ export default async function DashboardPage({
         />
         <ActiveEventsTable events={activeEvents.slice(0, 6)} />
       </Card>
+
+      <DashboardActivityBreakdowns cards={activityCards} />
 
       <section className="mt-10" aria-labelledby="reporting-detail-title">
         <div className="mb-4">
