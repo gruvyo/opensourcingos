@@ -173,6 +173,8 @@ export function EventForm({
       event_type: form.event_type || null,
       project_type: projectType,
       buyer_name: form.buyer_name || null,
+      // Keep the legacy field populated for rollback compatibility. The same
+      // content is written to the append-only timeline immediately below.
       notes: form.notes || null,
       organization_id: profile.organization_id,
       procurement_owner_id: user.id,
@@ -200,6 +202,26 @@ export function EventForm({
       setError(insertError.message)
       setLoading(false)
       return
+    }
+
+    if (form.notes.trim()) {
+      const { error: updateError } = await supabase
+        .from('project_updates')
+        .insert({
+          organization_id: profile.organization_id,
+          event_id: data.id,
+          body: form.notes.trim(),
+          created_by: user.id,
+        })
+
+      if (updateError) {
+        // Compensate for the failed second write so the user never receives a
+        // half-created project with its initial update missing.
+        await supabase.from('sourcing_events').delete().eq('id', data.id)
+        setError(`The project was not created because its initial update could not be saved: ${updateError.message}`)
+        setLoading(false)
+        return
+      }
     }
 
     router.push(`/events/${data.id}`)
@@ -451,15 +473,19 @@ export function EventForm({
         )}
       </Card>
 
-      {/* Notes */}
+      {/* Initial Project Update */}
       <Card className="p-6">
-        <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">Notes</h2>
+        <h2 className="text-lg font-semibold text-[var(--text)]">Initial Project Update</h2>
+        <p className="mt-1 text-xs text-[var(--text-3)]">
+          Optional. This becomes the first dated entry in the project&apos;s update history.
+        </p>
         <textarea
           value={form.notes}
           onChange={(e) => handleChange('notes', e.target.value)}
           className={textareaClass}
           rows={4}
-          placeholder="Add any notes, context, or updates about this project..."
+          maxLength={10000}
+          placeholder="Add the starting context, latest decision, or next step..."
         />
       </Card>
 

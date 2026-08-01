@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import {
   FileText, List, BarChart2, Users, FileCheck,
-  Calculator, CalendarRange, Clock, StickyNote, Pencil,
-  Briefcase, LifeBuoy,
+  Calculator, CalendarRange, Clock, Pencil,
+  Briefcase, LifeBuoy, MessageSquareText, Send,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatDate, statusColor } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScopeLinesTab } from './scope-lines-tab'
@@ -27,6 +28,7 @@ function getFirst(obj: any): any {
 
 type Event = {
   id: string
+  organization_id: string
   event_name: string
   event_description: string | null
   event_type: string
@@ -51,6 +53,20 @@ type Event = {
   awarded_supplier: any
 }
 
+type ProjectUpdate = {
+  id: string
+  body: string
+  created_at: string
+  created_by: string | null
+  author: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null
+}
+
+type CurrentProfile = {
+  id: string
+  full_name: string | null
+  email: string | null
+}
+
 const SOURCING_TABS = [
   { id: 'overview', label: 'Overview', icon: FileText },
   // Scope Lines hidden (2026-07-26): no savings figure reads scope-line data — it
@@ -66,12 +82,12 @@ const SOURCING_TABS = [
   // Realization tab hidden per product decision (2026-07-26): realized savings are
   // assumed = projected, so realization tracking adds no signal. Code kept (import +
   // render below) so it can be re-enabled by restoring this entry.
-  { id: 'notes', label: 'Notes', icon: StickyNote },
+  { id: 'updates', label: 'Updates', icon: MessageSquareText },
 ]
 
 const SUPPORT_TABS = [
   { id: 'overview', label: 'Overview', icon: FileText },
-  { id: 'notes', label: 'Notes', icon: StickyNote },
+  { id: 'updates', label: 'Updates', icon: MessageSquareText },
 ]
 
 export function EventDetail({
@@ -81,6 +97,8 @@ export function EventDetail({
   categories,
   businessUnits,
   costCenters,
+  updates,
+  currentProfile,
 }: {
   event: Event
   scopeLines: any[]
@@ -88,6 +106,8 @@ export function EventDetail({
   categories: any[]
   businessUnits: any[]
   costCenters: any[]
+  updates: ProjectUpdate[]
+  currentProfile: CurrentProfile
 }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEditModal, setShowEditModal] = useState(false)
@@ -151,7 +171,14 @@ export function EventDetail({
 
       <div className="mt-6">
         {activeTab === 'overview' && <OverviewTab event={event} />}
-        {activeTab === 'notes' && <NotesTab notes={event.notes} />}
+        {activeTab === 'updates' && (
+          <ProjectUpdatesTab
+            eventId={event.id}
+            organizationId={event.organization_id}
+            initialUpdates={updates}
+            currentProfile={currentProfile}
+          />
+        )}
         {!isSupport && activeTab === 'scope' && <ScopeLinesTab eventId={event.id} scopeLines={scopeLines} />}
         {!isSupport && activeTab === 'baselines' && <BaselinesTab eventId={event.id} scopeLines={scopeLines} />}
         {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} />}
@@ -233,16 +260,125 @@ function OverviewTab({ event }: { event: Event }) {
   )
 }
 
-function NotesTab({ notes }: { notes: string | null }) {
+function ProjectUpdatesTab({
+  eventId,
+  organizationId,
+  initialUpdates,
+  currentProfile,
+}: {
+  eventId: string
+  organizationId: string
+  initialUpdates: ProjectUpdate[]
+  currentProfile: CurrentProfile
+}) {
+  const supabase = createClient()
+  const [updates, setUpdates] = useState(initialUpdates)
+  const [body, setBody] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const addUpdate = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const trimmedBody = body.trim()
+    if (!trimmedBody || saving) return
+
+    setSaving(true)
+    setError(null)
+
+    const { data, error: insertError } = await supabase
+      .from('project_updates')
+      .insert({
+        organization_id: organizationId,
+        event_id: eventId,
+        body: trimmedBody,
+        created_by: currentProfile.id,
+      })
+      .select('id, body, created_at, created_by')
+      .single()
+
+    if (insertError) {
+      setError(insertError.message)
+      setSaving(false)
+      return
+    }
+
+    setUpdates(current => [{
+      ...data,
+      author: {
+        full_name: currentProfile.full_name,
+        email: currentProfile.email,
+      },
+    }, ...current])
+    setBody('')
+    setSaving(false)
+  }
+
   return (
-    <Card className="p-6">
-      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Notes</h3>
-      {notes ? (
-        <div className="whitespace-pre-wrap text-sm text-[var(--text-2)]">{notes}</div>
-      ) : (
-        <p className="text-sm text-[var(--text-3)]">No notes have been added for this project.</p>
-      )}
-    </Card>
+    <div className="space-y-4">
+      <Card className="p-6">
+        <form onSubmit={addUpdate}>
+          <label htmlFor="project-update" className="text-sm font-semibold text-[var(--text)]">
+            Add a project update
+          </label>
+          <p className="mt-1 text-xs text-[var(--text-3)]">
+            Build a dated record of decisions, milestones, and next steps.
+          </p>
+          <textarea
+            id="project-update"
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            maxLength={10000}
+            rows={4}
+            placeholder="What changed? Include the outcome and next step..."
+            className="mt-4 block w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+          />
+          {error && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>
+          )}
+          <div className="mt-3 flex items-center justify-between gap-4">
+            <span className="text-xs text-[var(--text-3)]">{body.length.toLocaleString()} / 10,000</span>
+            <Button type="submit" size="sm" disabled={saving || !body.trim()}>
+              <Send className="h-3.5 w-3.5" />
+              {saving ? 'Adding...' : 'Add Update'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <div className="space-y-3">
+        {updates.length === 0 ? (
+          <Card className="p-8 text-center">
+            <MessageSquareText className="mx-auto mb-3 h-8 w-8 text-[var(--text-3)]" />
+            <p className="text-sm font-medium text-[var(--text)]">No updates yet</p>
+            <p className="mt-1 text-sm text-[var(--text-3)]">Add the first update to start this project&apos;s history.</p>
+          </Card>
+        ) : updates.map(update => {
+          const author = getFirst(update.author)
+          const authorName = author?.full_name || author?.email || 'Workspace member'
+          return (
+            <Card key={update.id} className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-soft)] text-sm font-semibold text-[var(--brand-ink)]">
+                  {authorName.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <span className="text-sm font-semibold text-[var(--text)]">{authorName}</span>
+                    <time className="text-xs text-[var(--text-3)]" dateTime={update.created_at}>
+                      {new Intl.DateTimeFormat('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                        hour: 'numeric', minute: '2-digit',
+                      }).format(new Date(update.created_at))}
+                    </time>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--text-2)]">{update.body}</p>
+                </div>
+              </div>
+            </Card>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
