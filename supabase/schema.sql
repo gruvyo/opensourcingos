@@ -1340,10 +1340,24 @@ CREATE INDEX idx_business_units_org ON public.business_units USING btree (organi
 
 
 --
+-- Name: uq_business_units_org_normalized_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_business_units_org_normalized_name ON public.business_units USING btree (organization_id, lower(btrim(business_unit_name))) WHERE (organization_id IS NOT NULL);
+
+
+--
 -- Name: idx_categories_org; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_categories_org ON public.categories USING btree (organization_id);
+
+
+--
+-- Name: uq_categories_org_normalized_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_categories_org_normalized_name ON public.categories USING btree (organization_id, lower(btrim(category_name))) WHERE (organization_id IS NOT NULL);
 
 
 --
