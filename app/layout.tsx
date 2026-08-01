@@ -1,10 +1,7 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { AppShell } from '@/components/app-shell'
 import { ThemeProvider } from '@/components/theme-provider'
-
-const inter = Inter({ subsets: ['latin'] })
 
 const siteUrl = 'https://opensourcingos.com'
 const siteTitle = 'OpenSourcingOS — Procurement Savings, Tracked Properly'
@@ -52,7 +49,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body>
         <ThemeProvider>
           <AppShell>{children}</AppShell>
         </ThemeProvider>
