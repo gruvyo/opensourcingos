@@ -2,10 +2,11 @@
 # =====================================================================
 # scripts/db.sh — apply a migration to the hosted Supabase database.
 # =====================================================================
-#   ./scripts/db.sh migration-p7-savings-schedule.sql   apply a migration
+#   ./scripts/db.sh supabase/legacy-migrations/migration-p7-savings-schedule.sql
+#                                                       apply a migration
 #   ./scripts/db.sh --check                             connection + schema
 #   ./scripts/db.sh --query "select 1"                  ad-hoc read
-#   ./scripts/db.sh --dump                              schema -> schema.sql
+#   ./scripts/db.sh --dump                              schema -> supabase/schema.sql
 #
 # The connection string lives in .env.db.local, which .gitignore already
 # excludes via the `.env*.local` rule. It is never printed, never passed on
@@ -95,11 +96,11 @@ case "${1:-}" in
     # own header -- and there was no way to know what a DROP would really take
     # with it. Structure only: no rows, no data, nothing confidential.
     [[ -x "$PGDUMP" ]] || { echo "pg_dump not found at $PGDUMP. brew install libpq, or set PGDUMP_BIN." >&2; exit 1; }
-    OUT="${2:-$REPO/schema.sql}"
+    OUT="${2:-$REPO/supabase/schema.sql}"
     echo "Dumping public schema..."
     {
       echo "-- ====================================================================="
-      echo "-- schema.sql -- GENERATED. Do not edit by hand."
+      echo "-- supabase/schema.sql -- GENERATED. Do not edit by hand."
       echo "--"
       echo "--   regenerate:  ./scripts/db.sh --dump"
       echo "--"

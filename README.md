@@ -12,7 +12,7 @@ baselines, supplier offers, savings schedules, fiscal-year reporting, and
 portfolio analysis. It is designed around one question: can every reported
 savings figure be traced back to the commercial anchors that produced it?
 
-[Try the hosted demo](https://opensourcingos-lac.vercel.app/login) ·
+[Try the hosted demo](https://opensourcingos.com/login) ·
 [Report a security issue](SECURITY.md) ·
 [Contribute](CONTRIBUTING.md)
 
@@ -57,7 +57,7 @@ source of truth. The executable methodology suite currently covers 340 checks.
 
 ## Try the demo
 
-Visit [opensourcingos-lac.vercel.app](https://opensourcingos-lac.vercel.app/login)
+Visit [opensourcingos.com](https://opensourcingos.com/login)
 and continue with Google. A first sign-in creates a private workspace and copies
 in example projects. Changes made in one workspace are not visible to another
 user.
@@ -108,10 +108,11 @@ modern `sb_publishable_...` key. Never place a secret or service-role key in a
 
 ## Database status
 
-[`schema.sql`](schema.sql) is a structure-only snapshot of the live `public`
-schema. It includes tables, functions, Row Level Security, policies, and grants.
-The numbered SQL files record the evolution of the hosted database, and the
-P13 migration is under [`supabase/migrations`](supabase/migrations).
+[`supabase/schema.sql`](supabase/schema.sql) is a structure-only snapshot of the
+live `public` schema. It includes tables, functions, Row Level Security,
+policies, and grants. Historical P0–P12 and earlier seed/fix SQL is retained in
+[`supabase/legacy-migrations`](supabase/legacy-migrations), while current
+migrations live under [`supabase/migrations`](supabase/migrations).
 
 A safe, one-command bootstrap for a completely new Supabase project is not yet
 packaged. The generated schema intentionally excludes Supabase-managed schemas,

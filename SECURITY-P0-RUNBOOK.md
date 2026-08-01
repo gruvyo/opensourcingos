@@ -13,13 +13,13 @@ historical object as publicly accessible.
 
 | Control | Status | Evidence |
 | --- | --- | --- |
-| Tenant isolation | Done | `migration-p0-rls-tenant-isolation.sql` was applied and verified live on 2026-07-25: 0 fail-open policies, 63 organization-scoped policies across 17 tables, and a two-organization isolation test passed. |
+| Tenant isolation | Done | `supabase/legacy-migrations/migration-p0-rls-tenant-isolation.sql` was applied and verified live on 2026-07-25: 0 fail-open policies, 63 organization-scoped policies across 17 tables, and a two-organization isolation test passed. |
 | Profile ownership | Done | The same migration prevents users from editing another user's profile or changing their organization. |
 | Exposed legacy anon key | Neutralized | The Supabase management API confirmed on 2026-07-31 that the legacy `anon` JWT is disabled and the modern `sb_publishable_...` key is active. Production/preview were moved to the modern key before commit `c92a467`. |
 | Git-history cleanup | Done | A full reachable-history audit on 2026-07-31 found only placeholders and `***REMOVED***` markers in historical `NEXT_PUBLIC_SUPABASE_ANON_KEY` assignments. It found no JWT-shaped, `sb_publishable_...`, `sb_secret_...`, or service-role value. |
 | Privileged database functions | Done | P13 removed browser access to `clone_org_data()` and `handle_new_user()`, pinned application-function search paths, and was verified live on 2026-07-31. |
-| Reproducible schema | Done | The hosted schema is captured in `schema.sql`, including RLS and policy definitions. Database changes P0–P13 are retained as migrations. |
-| Local environment files | Done | `.env.local` and `.env*.local` are ignored and no environment file is tracked. `setup.sh` contains placeholders only. |
+| Reproducible schema | Done | The hosted schema is captured in `supabase/schema.sql`, including RLS and policy definitions. Database changes P0–P13 are retained as migrations. |
+| Local environment files | Done | `.env.local` and `.env*.local` are ignored and no environment file is tracked. The archived `scripts/archive/setup/setup.sh` contains placeholders only. |
 | Vercel environment | Done | Production and Preview use the same sensitive Supabase variables. The local/deployed configuration uses the modern publishable key, no public secret-shaped variable was found, and the production Google OAuth redirect was verified on 2026-07-31. |
 | GitHub secret scanning | Done | Secret scanning and push protection were enabled on 2026-07-31. GitHub reported 0 alerts immediately after enablement. |
 

@@ -55,12 +55,12 @@ Any change affecting savings must:
 
 ## Database changes
 
-- Never edit `schema.sql` by hand; regenerate it from the hosted schema.
+- Never edit `supabase/schema.sql` by hand; regenerate it from the hosted schema.
 - Create new Supabase migrations with `supabase migration new <name>`.
 - Review RLS, grants, function execution privileges, and function search paths.
 - Test migrations transactionally before applying them to a hosted project.
 - Run Supabase security advisors after changes.
-- Refresh `schema.sql` after applying a migration.
+- Refresh `supabase/schema.sql` after applying a migration.
 
 ## Pull requests
 
