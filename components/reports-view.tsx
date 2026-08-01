@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Download, DollarSign, Briefcase, TrendingUp, Filter } from 'lucide-react'
-import { formatCurrency, formatReduction, formatDate, statusColor } from '@/lib/utils'
-import { portfolioRollup, classifyRealization, baselineQuality } from '@/lib/savings'
-import { Card } from '@/components/ui/card'
+import { useMemo, useState } from 'react'
+import { Download, FileBarChart2, Filter, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
+import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
+import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savings'
+
+type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string }
 
 type EventRow = {
   id: string
@@ -21,392 +22,452 @@ type EventRow = {
   event_close_date: string | null
   contract_start_date: string | null
   contract_end_date: string | null
-  category: any
-  business_unit: any
-  incumbent_supplier: any
-  awarded_supplier: any
+  category: unknown
+  business_unit: unknown
+  incumbent_supplier: unknown
+  awarded_supplier: unknown
 }
 
-type SavingsRow = {
+type SavingsRow = SavingsCalcRow & {
   id: string
   event_id: string | null
-  calculation_name: string
-  savings_type: string
-  gross_savings_amount: number
-  savings_percentage: number
-  calculation_status: string
-  cost_reduction_amount: number
-  cost_avoidance_amount: number
-  net_savings_amount: number
-  savings_start_date: string | null
-  savings_end_date: string | null
-  event: any
-  baseline: any
-  award: any
 }
 
-function getFirst(obj: any): any {
-  if (!obj) return null
-  if (Array.isArray(obj)) return obj[0] || null
-  return obj
+type ReportId =
+  | 'pipeline'
+  | 'savings-project'
+  | 'savings-business-unit'
+  | 'savings-buyer'
+  | 'projects-business-unit'
+  | 'projects-buyer'
+  | 'pipeline-business-unit'
+  | 'pipeline-buyer'
+
+type ReportValue = string | number | null
+type ReportRow = Record<string, ReportValue>
+type ColumnFormat = 'text' | 'number' | 'currency' | 'date' | 'status'
+
+type ReportColumn = {
+  key: string
+  label: string
+  format?: ColumnFormat
 }
 
-function downloadCSV(filename: string, rows: string[][]) {
-  const csv = rows.map(r => r.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
+type ReportDefinition = {
+  title: string
+  description: string
+  filename: string
+  columns: ReportColumn[]
+  rows: ReportRow[]
+}
+
+type SavingsTotals = {
+  reduction: number
+  avoidance: number
+  total: number
+}
+
+const INACTIVE_STATUSES = new Set(['Closed', 'Cancelled', 'Rejected', 'Complete'])
+
+const REPORT_OPTIONS: Array<{ id: ReportId; label: string; group: string }> = [
+  { id: 'pipeline', label: 'Sourcing Project Pipeline', group: 'Pipeline' },
+  { id: 'pipeline-business-unit', label: 'Pipeline by Business Unit', group: 'Pipeline' },
+  { id: 'pipeline-buyer', label: 'Pipeline by Buyer', group: 'Pipeline' },
+  { id: 'savings-project', label: 'Savings by Project', group: 'Savings' },
+  { id: 'savings-business-unit', label: 'Savings by Business Unit', group: 'Savings' },
+  { id: 'savings-buyer', label: 'Savings by Buyer', group: 'Savings' },
+  { id: 'projects-business-unit', label: 'Projects by Business Unit', group: 'Projects' },
+  { id: 'projects-buyer', label: 'Projects by Buyer', group: 'Projects' },
+]
+
+function relationName(relation: unknown, key: keyof NamedRelation, fallback: string): string {
+  const value = getFirst<NamedRelation>(relation)?.[key]
+  return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+function csvCell(value: ReportValue): string {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[]) {
+  const csvRows = [
+    columns.map(column => csvCell(column.label)).join(','),
+    ...rows.map(row => columns.map(column => csvCell(row[column.key])).join(',')),
+  ]
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  link.remove()
   URL.revokeObjectURL(url)
 }
 
+function sortRows(rows: ReportRow[], key: string): ReportRow[] {
+  return rows.sort((a, b) => num(b[key]) - num(a[key]) || String(a[key]).localeCompare(String(b[key])))
+}
+
+function formatValue(value: ReportValue, format: ColumnFormat = 'text'): string {
+  if (format === 'currency') return formatCurrency(num(value))
+  if (format === 'date') return formatDate(typeof value === 'string' ? value : null)
+  if (format === 'number') return num(value).toLocaleString('en-US')
+  if (value === null || value === '') return '—'
+  return String(value)
+}
+
+function aggregateBy(
+  events: EventRow[],
+  totalsByEvent: Map<string, SavingsTotals>,
+  getLabel: (event: EventRow) => string,
+) {
+  const groups = new Map<string, {
+    projects: number
+    active: number
+    reduction: number
+    avoidance: number
+    savings: number
+  }>()
+
+  for (const event of events) {
+    const label = getLabel(event)
+    const current = groups.get(label) ?? { projects: 0, active: 0, reduction: 0, avoidance: 0, savings: 0 }
+    const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0 }
+    current.projects += 1
+    current.active += INACTIVE_STATUSES.has(event.event_status) ? 0 : 1
+    current.reduction += savings.reduction
+    current.avoidance += savings.avoidance
+    current.savings += savings.total
+    groups.set(label, current)
+  }
+
+  return groups
+}
+
 export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savingsCalcs: SavingsRow[] }) {
+  const [reportId, setReportId] = useState<ReportId>('pipeline')
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [buFilter, setBuFilter] = useState('')
+  const [businessUnitFilter, setBusinessUnitFilter] = useState('')
+  const [buyerFilter, setBuyerFilter] = useState('')
 
-  // Sourcing-only events for savings analysis
-  const sourcingEvents = events.filter((e) => (e.project_type || 'Sourcing') === 'Sourcing')
+  const sourcingEvents = useMemo(
+    () => events.filter(event => (event.project_type || 'Sourcing') === 'Sourcing'),
+    [events],
+  )
 
-  // Filters
-  const businessUnits = useMemo(() => {
-    const set = new Set<string>()
-    sourcingEvents.forEach((e) => {
-      const bu = getFirst(e.business_unit)?.business_unit_name
-      if (bu) set.add(bu)
-    })
-    return Array.from(set).sort()
-  }, [sourcingEvents])
+  const eventTypes = useMemo(
+    () => Array.from(new Set(sourcingEvents.map(event => event.event_type).filter(Boolean))).sort(),
+    [sourcingEvents],
+  )
+  const statuses = useMemo(
+    () => Array.from(new Set(sourcingEvents.map(event => event.event_status).filter(Boolean))).sort(),
+    [sourcingEvents],
+  )
+  const businessUnits = useMemo(
+    () => Array.from(new Set(sourcingEvents.map(event => relationName(event.business_unit, 'business_unit_name', 'Unassigned')))).sort(),
+    [sourcingEvents],
+  )
+  const buyers = useMemo(
+    () => Array.from(new Set(sourcingEvents.map(event => event.buyer_name || 'Unassigned'))).sort(),
+    [sourcingEvents],
+  )
 
-  const filteredEvents = useMemo(() => {
-    return sourcingEvents.filter((e) => {
-      if (typeFilter && e.event_type !== typeFilter) return false
-      if (statusFilter && e.event_status !== statusFilter) return false
-      if (buFilter && getFirst(e.business_unit)?.business_unit_name !== buFilter) return false
-      return true
-    })
-  }, [sourcingEvents, typeFilter, statusFilter, buFilter])
+  const filteredEvents = useMemo(() => sourcingEvents.filter(event => {
+    if (typeFilter && event.event_type !== typeFilter) return false
+    if (statusFilter && event.event_status !== statusFilter) return false
+    if (businessUnitFilter && relationName(event.business_unit, 'business_unit_name', 'Unassigned') !== businessUnitFilter) return false
+    if (buyerFilter && (event.buyer_name || 'Unassigned') !== buyerFilter) return false
+    return true
+  }), [sourcingEvents, typeFilter, statusFilter, businessUnitFilter, buyerFilter])
 
-  // Savings figures — single source of truth (lib/savings), scoped to sourcing projects.
-  // byBusinessUnit here attributes savings to events by event_id (the old code matched
-  // by event_name, which mis-attributed whenever two events shared a name).
-  // savingsCalcs is filtered to sourcingEvents' ids first so the headline total, the
-  // business-unit breakdown, the savings table and the CSV export all count the SAME
-  // set — a calculation belonging to a non-sourcing project would otherwise inflate
-  // the total without appearing in any row, and the table used to ignore the page's
-  // own type/status/business-unit filters entirely while the cards obeyed them.
-  const now = new Date()
-  const sourcingEventIds = new Set(sourcingEvents.map((e) => e.id))
-  const sourcingSavingsCalcs = savingsCalcs.filter((c) => c.event_id != null && sourcingEventIds.has(c.event_id))
-  const rollup = portfolioRollup(sourcingSavingsCalcs as any, sourcingEvents as any, { now })
-  const totalSavings = rollup.totalSavings
-  const totalCostReduction = rollup.totalCostReduction
-  const totalCostAvoidance = rollup.totalCostAvoidance
-
-  // For CSV realized/accrued classification, use the SAME canonical rule.
-  const contractStartByEventId = new Map<string, string | null>()
-  for (const e of events) contractStartByEventId.set(e.id, e.contract_start_date ?? null)
-
-  // By status (project counts)
-  const byStatus = new Map<string, number>()
-  for (const e of sourcingEvents) {
-    byStatus.set(e.event_status, (byStatus.get(e.event_status) || 0) + 1)
-  }
-
-  // By type
-  const byType = new Map<string, number>()
-  for (const e of sourcingEvents) {
-    byType.set(e.event_type, (byType.get(e.event_type) || 0) + 1)
-  }
-
-  // By buyer
-  const byBuyer = new Map<string, number>()
-  for (const e of sourcingEvents) {
-    const buyer = e.buyer_name || 'Unassigned'
-    byBuyer.set(buyer, (byBuyer.get(buyer) || 0) + 1)
-  }
-
-  const exportEvents = () => {
-    const headers = ['Project Name', 'Type', 'Status', 'Owner', 'Category', 'Business Unit', 'Supplier', 'Project Start', 'Project Due Date', 'Completion Date', 'Contract Start', 'Contract End']
-    const rows = [headers, ...filteredEvents.map(e => [
-      e.event_name, e.event_type, e.event_status, e.buyer_name || '',
-      getFirst(e.category)?.category_name || '',
-      getFirst(e.business_unit)?.business_unit_name || '',
-      getFirst(e.awarded_supplier)?.supplier_name || getFirst(e.incumbent_supplier)?.supplier_name || '',
-      e.event_start_date || '', e.project_due_date || '', e.event_close_date || '',
-      e.contract_start_date || '', e.contract_end_date || '',
-    ])]
-    downloadCSV('procurement_projects.csv', rows)
-  }
-
-  /**
-   * How a row's Cost Reduction was justified. An override that does not follow
-   * the number into the report is the kind nobody finds a year later, so it
-   * travels with it -- on screen and in the CSV.
-   */
-  const reductionBasis = (c: any) => {
-    const b = getFirst(c.baseline)
-    if (!b) return { label: 'No baseline', reason: '', overridden: false }
-    const q = baselineQuality(b.baseline_type, {
-      enabled: b.hard_reduction_override,
-      reason: b.hard_reduction_override_reason,
-    })
-    return {
-      label: q.byOverride ? 'Hard by override' : q.isHard ? 'Hard' : 'Soft',
-      reason: q.byOverride ? (b.hard_reduction_override_reason || '') : '',
-      overridden: q.byOverride,
-      type: b.baseline_type || '',
+  const report = useMemo<ReportDefinition>(() => {
+    const filteredIds = new Set(filteredEvents.map(event => event.id))
+    const totalsByEvent = new Map<string, SavingsTotals>()
+    for (const calculation of savingsCalcs) {
+      if (!calculation.event_id || !filteredIds.has(calculation.event_id)) continue
+      const current = totalsByEvent.get(calculation.event_id) ?? { reduction: 0, avoidance: 0, total: 0 }
+      current.reduction += num(calculation.cost_reduction_amount)
+      current.avoidance += num(calculation.cost_avoidance_amount)
+      current.total += reportedSavings(calculation)
+      totalsByEvent.set(calculation.event_id, current)
     }
-  }
 
-  const exportSavings = () => {
-    const headers = ['Event', 'Calculation', 'Type', 'Baseline Type', 'Reduction Basis', 'Override Reason', 'Cost Reduction', 'Cost Avoidance', 'Total Savings', 'Savings %', 'Status', 'Savings Start', 'Savings End', 'Classification']
-    const rows = [headers, ...sourcingSavingsCalcs.map(c => {
-      const isRealized = classifyRealization(c as any, contractStartByEventId, now) === 'Realized'
-      return [
-        getFirst(c.event)?.event_name || '', c.calculation_name, c.savings_type,
-        reductionBasis(c).type || '', reductionBasis(c).label, reductionBasis(c).reason,
-        c.cost_reduction_amount == null ? '' : c.cost_reduction_amount.toString(), (c.cost_avoidance_amount || 0).toString(),
-        (c.gross_savings_amount || 0).toString(), c.savings_percentage?.toFixed(2) || '',
-        c.calculation_status,
-        c.savings_start_date || '', c.savings_end_date || '',
-        isRealized ? 'Realized' : 'Accrued',
-      ]
-    })]
-    downloadCSV('savings_report.csv', rows)
-  }
+    const projectRows = filteredEvents.map(event => {
+      const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0 }
+      return {
+        project: event.event_name,
+        type: event.event_type,
+        owner: event.buyer_name || 'Unassigned',
+        businessUnit: relationName(event.business_unit, 'business_unit_name', 'Unassigned'),
+        supplier: relationName(
+          getFirst(event.awarded_supplier) || event.incumbent_supplier,
+          'supplier_name',
+          'Unassigned',
+        ),
+        dueDate: event.project_due_date,
+        status: event.event_status,
+        reduction: savings.reduction,
+        avoidance: savings.avoidance,
+        savings: savings.total,
+      }
+    })
 
-  const labelClass = 'text-sm font-medium text-[var(--text-3)]'
-  const valueClass = 'mt-1 text-2xl font-bold'
+    const byBusinessUnit = aggregateBy(
+      filteredEvents,
+      totalsByEvent,
+      event => relationName(event.business_unit, 'business_unit_name', 'Unassigned'),
+    )
+    const byBuyer = aggregateBy(filteredEvents, totalsByEvent, event => event.buyer_name || 'Unassigned')
+    const activeEvents = filteredEvents.filter(event => !INACTIVE_STATUSES.has(event.event_status))
+    const activeByBusinessUnit = aggregateBy(
+      activeEvents,
+      totalsByEvent,
+      event => relationName(event.business_unit, 'business_unit_name', 'Unassigned'),
+    )
+    const activeByBuyer = aggregateBy(activeEvents, totalsByEvent, event => event.buyer_name || 'Unassigned')
+
+    const savingsColumns: ReportColumn[] = [
+      { key: 'name', label: 'Group' },
+      { key: 'projects', label: 'Projects', format: 'number' },
+      { key: 'reduction', label: 'Cost Reduction', format: 'currency' },
+      { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
+      { key: 'savings', label: 'Total Savings', format: 'currency' },
+    ]
+
+    if (reportId === 'pipeline') {
+      return {
+        title: 'Sourcing Project Pipeline',
+        description: 'Active sourcing work with ownership, supplier, due date, and current workflow status.',
+        filename: 'sourcing-project-pipeline.csv',
+        columns: [
+          { key: 'project', label: 'Project' },
+          { key: 'type', label: 'Type' },
+          { key: 'owner', label: 'Owner' },
+          { key: 'businessUnit', label: 'Business Unit' },
+          { key: 'supplier', label: 'Supplier' },
+          { key: 'dueDate', label: 'Due Date', format: 'date' },
+          { key: 'status', label: 'Status', format: 'status' },
+        ],
+        rows: projectRows.filter(row => !INACTIVE_STATUSES.has(String(row.status))),
+      }
+    }
+
+    if (reportId === 'savings-project') {
+      return {
+        title: 'Savings by Project',
+        description: 'Reported cost reduction, cost avoidance, and total savings for each sourcing project.',
+        filename: 'savings-by-project.csv',
+        columns: [
+          { key: 'project', label: 'Project' },
+          { key: 'owner', label: 'Owner' },
+          { key: 'businessUnit', label: 'Business Unit' },
+          { key: 'status', label: 'Status', format: 'status' },
+          { key: 'reduction', label: 'Cost Reduction', format: 'currency' },
+          { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
+          { key: 'savings', label: 'Total Savings', format: 'currency' },
+        ],
+        rows: sortRows(projectRows, 'savings'),
+      }
+    }
+
+    const groupedRows = (groups: ReturnType<typeof aggregateBy>, pipelineOnly = false): ReportRow[] =>
+      Array.from(groups.entries()).map(([name, values]) => ({
+        name,
+        projects: pipelineOnly ? values.active : values.projects,
+        active: values.active,
+        reduction: values.reduction,
+        avoidance: values.avoidance,
+        savings: values.savings,
+      }))
+
+    if (reportId === 'savings-business-unit' || reportId === 'savings-buyer') {
+      const byUnit = reportId === 'savings-business-unit'
+      return {
+        title: byUnit ? 'Savings by Business Unit' : 'Savings by Buyer',
+        description: byUnit
+          ? 'Savings attributed to the business unit that owns each sourcing project.'
+          : 'Savings attributed to the buyer or project owner responsible for each sourcing project.',
+        filename: byUnit ? 'savings-by-business-unit.csv' : 'savings-by-buyer.csv',
+        columns: [
+          { ...savingsColumns[0], label: byUnit ? 'Business Unit' : 'Buyer' },
+          ...savingsColumns.slice(1),
+        ],
+        rows: sortRows(groupedRows(byUnit ? byBusinessUnit : byBuyer), 'savings'),
+      }
+    }
+
+    if (reportId === 'projects-business-unit' || reportId === 'projects-buyer') {
+      const byUnit = reportId === 'projects-business-unit'
+      return {
+        title: byUnit ? 'Projects by Business Unit' : 'Projects by Buyer',
+        description: 'Total and active sourcing project counts for the selected portfolio scope.',
+        filename: byUnit ? 'projects-by-business-unit.csv' : 'projects-by-buyer.csv',
+        columns: [
+          { key: 'name', label: byUnit ? 'Business Unit' : 'Buyer' },
+          { key: 'projects', label: 'Total Projects', format: 'number' },
+          { key: 'active', label: 'Active Projects', format: 'number' },
+        ],
+        rows: sortRows(groupedRows(byUnit ? byBusinessUnit : byBuyer), 'projects'),
+      }
+    }
+
+    const byUnit = reportId === 'pipeline-business-unit'
+    return {
+      title: byUnit ? 'Pipeline by Business Unit' : 'Pipeline by Buyer',
+      description: 'Active sourcing projects and their associated forecast or booked savings.',
+      filename: byUnit ? 'pipeline-by-business-unit.csv' : 'pipeline-by-buyer.csv',
+      columns: [
+        { key: 'name', label: byUnit ? 'Business Unit' : 'Buyer' },
+        { key: 'projects', label: 'Pipeline Projects', format: 'number' },
+        { key: 'savings', label: 'Pipeline Savings', format: 'currency' },
+      ],
+      rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
+    }
+  }, [filteredEvents, savingsCalcs, reportId])
+
+  const filtersActive = Boolean(typeFilter || statusFilter || businessUnitFilter || buyerFilter)
+
+  const resetFilters = () => {
+    setTypeFilter('')
+    setStatusFilter('')
+    setBusinessUnitFilter('')
+    setBuyerFilter('')
+  }
 
   return (
     <div className="mt-6 space-y-6">
-      {/* Savings breakdown */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="p-6">
-          <p className={labelClass}>Cost Reduction</p>
-          <p className={`${valueClass} text-red-600 dark:text-red-400`}>{formatReduction(totalCostReduction)}</p>
-          <p className="mt-1 text-xs text-[var(--text-3)]">Actual bottom-line reduction — price went down from what we were paying</p>
-        </Card>
-        <Card className="p-6">
-          <p className={labelClass}>Cost Avoidance</p>
-          <p className={`${valueClass} text-amber-600 dark:text-amber-400`}>{formatCurrency(totalCostAvoidance)}</p>
-          <p className="mt-1 text-xs text-[var(--text-3)]">Value not paid — negotiated below what supplier proposed</p>
-        </Card>
-        <Card className="p-6">
-          <p className={labelClass}>Total Savings</p>
-          <p className={`${valueClass} text-green-600 dark:text-green-400`}>{formatCurrency(totalSavings)}</p>
-          <p className="mt-1 text-xs text-[var(--text-3)]">Cost reduction + cost avoidance combined</p>
-        </Card>
-      </div>
-
-      {/* Activity breakdowns */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* By Business Unit */}
-        <Card className="p-6">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Projects by Business Unit</h3>
-          <div className="space-y-2">
-            {rollup.byBusinessUnit.map(({ name, value, count }) => (
-              <div key={name} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-4 py-2">
-                <span className="text-sm text-[var(--text-2)]">{name}</span>
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-[var(--text-3)]">{count} project{count !== 1 ? 's' : ''}</span>
-                  <span className="text-sm font-medium text-[var(--text)]">{formatCurrency(value)}</span>
-                </div>
-              </div>
-            ))}
-            {rollup.byBusinessUnit.length === 0 && <p className="text-sm text-[var(--text-3)]">No data yet</p>}
+      <Card className="p-5 sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,360px)_1fr_auto] lg:items-end">
+          <div>
+            <label htmlFor="report-picker" className="text-sm font-semibold text-[var(--text)]">Choose report</label>
+            <Select
+              id="report-picker"
+              value={reportId}
+              onChange={event => setReportId(event.target.value as ReportId)}
+              className="mt-2"
+            >
+              {['Pipeline', 'Savings', 'Projects'].map(group => (
+                <optgroup key={group} label={group}>
+                  {REPORT_OPTIONS.filter(option => option.group === group).map(option => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </Select>
           </div>
-        </Card>
-
-        {/* By Status */}
-        <Card className="p-6">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Pipeline by Status</h3>
-          <div className="space-y-2">
-            {Array.from(byStatus.entries()).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-4 py-2">
-                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(status)}`}>
-                  {status}
-                </span>
-                <span className="text-sm font-medium text-[var(--text)]">{count}</span>
-              </div>
-            ))}
-            {byStatus.size === 0 && <p className="text-sm text-[var(--text-3)]">No data yet</p>}
+          <div>
+            <div className="flex items-center gap-2 text-[var(--brand-ink)]">
+              <FileBarChart2 className="h-4 w-4" aria-hidden="true" />
+              <h2 className="text-base font-semibold">{report.title}</h2>
+            </div>
+            <p className="mt-1 text-sm text-[var(--text-2)]">{report.description}</p>
           </div>
-        </Card>
-
-        {/* By Type */}
-        <Card className="p-6">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Projects by Type</h3>
-          <div className="space-y-2">
-            {Array.from(byType.entries()).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-              <div key={type} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-4 py-2">
-                <span className="text-sm text-[var(--text-2)]">{type}</span>
-                <span className="text-sm font-medium text-[var(--text)]">{count}</span>
-              </div>
-            ))}
-            {byType.size === 0 && <p className="text-sm text-[var(--text-3)]">No data yet</p>}
-          </div>
-        </Card>
-
-        {/* By Owner / Buyer */}
-        <Card className="p-6">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Projects by Owner</h3>
-          <div className="space-y-2">
-            {Array.from(byBuyer.entries()).sort((a, b) => b[1] - a[1]).map(([buyer, count]) => (
-              <div key={buyer} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-4 py-2">
-                <span className="text-sm text-[var(--text-2)]">{buyer}</span>
-                <span className="text-sm font-medium text-[var(--text)]">{count}</span>
-              </div>
-            ))}
-            {byBuyer.size === 0 && <p className="text-sm text-[var(--text-3)]">No data yet</p>}
-          </div>
-        </Card>
-      </div>
-
-      {/* Export buttons */}
-      <div className="flex flex-wrap gap-4">
-        <Button onClick={exportEvents}>
-          <Download className="h-4 w-4" />
-          Export Projects CSV
-        </Button>
-        <button onClick={exportSavings}
-          className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-          <Download className="h-4 w-4" />
-          Export Savings CSV
-        </button>
-      </div>
-
-      {/* Project pipeline table */}
-      <Card className="overflow-x-auto">
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
-          <h3 className="text-sm font-semibold text-[var(--text)]">Sourcing Project Pipeline</h3>
-          <div className="flex items-center gap-1 text-xs text-[var(--text-3)]">
-            <Filter className="h-3 w-3" /> {filteredEvents.length} of {sourcingEvents.length} projects
-          </div>
+          <Button onClick={() => downloadCSV(report.filename, report.columns, report.rows)} disabled={report.rows.length === 0}>
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Export CSV
+          </Button>
         </div>
+      </Card>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 border-b border-[var(--border)] px-6 py-3">
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="px-3 py-1.5 text-xs">
-            <option value="">All Types</option>
-            {Array.from(byType.keys()).sort().map(t => <option key={t} value={t}>{t}</option>)}
-          </Select>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-1.5 text-xs">
-            <option value="">All Statuses</option>
-            {Array.from(byStatus.keys()).sort().map(s => <option key={s} value={s}>{s}</option>)}
-          </Select>
-          <Select value={buFilter} onChange={(e) => setBuFilter(e.target.value)} className="px-3 py-1.5 text-xs">
-            <option value="">All Business Units</option>
-            {businessUnits.map(bu => <option key={bu} value={bu}>{bu}</option>)}
-          </Select>
+      <Card className="p-5 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-[var(--brand-ink)]" aria-hidden="true" />
+            <h2 className="text-sm font-semibold text-[var(--text)]">Portfolio filters</h2>
+          </div>
+          {filtersActive && (
+            <button onClick={resetFilters} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--brand-ink)] hover:underline">
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Clear filters
+            </button>
+          )}
         </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <FilterSelect label="Project type" value={typeFilter} onChange={setTypeFilter} options={eventTypes} allLabel="All project types" />
+          <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses} allLabel="All statuses" />
+          <FilterSelect label="Business unit" value={businessUnitFilter} onChange={setBusinessUnitFilter} options={businessUnits} allLabel="All business units" />
+          <FilterSelect label="Buyer" value={buyerFilter} onChange={setBuyerFilter} options={buyers} allLabel="All buyers" />
+        </div>
+      </Card>
 
-        <table className="w-full min-w-[900px]">
-          <thead>
-            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Project</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Owner</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Business Unit</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Supplier</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Due Date</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {filteredEvents.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--text-3)]">No projects match the current filters</td></tr>
-            ) : (
-              filteredEvents.map((e) => (
-                <tr key={e.id} className="hover:bg-[var(--surface-2)]">
-                  <td className="px-4 py-3 text-sm font-medium text-[var(--text)]">{e.event_name}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-2)]">{e.event_type}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-2)]">{e.buyer_name || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-2)]">{getFirst(e.business_unit)?.business_unit_name || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-2)]">{getFirst(e.awarded_supplier)?.supplier_name || getFirst(e.incumbent_supplier)?.supplier_name || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-2)]">{formatDate(e.project_due_date)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(e.event_status)}`}>
-                      {e.event_status}
-                    </span>
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4 sm:px-6">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--text)]">{report.title}</h2>
+            <p className="mt-1 text-xs text-[var(--text-3)]">Current filters · {report.rows.length} row{report.rows.length === 1 ? '' : 's'}</p>
+          </div>
+          <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-xs font-medium text-[var(--brand-ink)]">
+            Live workspace data
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px]">
+            <caption className="sr-only">{report.title}</caption>
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                {report.columns.map(column => (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)] ${column.format === 'currency' || column.format === 'number' ? 'text-right' : 'text-left'}`}
+                  >
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {report.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={report.columns.length} className="px-5 py-12 text-center text-sm text-[var(--text-3)]">
+                    No rows match the selected report and filters.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </Card>
-
-      {/* Savings calculations table */}
-      <Card className="overflow-x-auto">
-        <div className="border-b border-[var(--border)] px-6 py-4">
-          <h3 className="text-sm font-semibold text-[var(--text)]">Savings Calculations</h3>
+              ) : report.rows.map((row, rowIndex) => (
+                <tr key={`${reportId}-${rowIndex}`} className="transition-colors hover:bg-[var(--surface-2)]">
+                  {report.columns.map(column => {
+                    const formatted = formatValue(row[column.key], column.format)
+                    const numeric = column.format === 'currency' || column.format === 'number'
+                    return (
+                      <td key={column.key} className={`px-4 py-3 text-sm ${numeric ? 'text-right font-medium tabular-nums text-[var(--text)]' : 'text-left text-[var(--text-2)]'}`}>
+                        {column.format === 'status' ? (
+                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(formatted)}`}>{formatted}</span>
+                        ) : formatted}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <table className="w-full min-w-[900px]">
-          <thead>
-            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Event</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Basis</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Cost Reduction</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Cost Avoidance</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Total</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Period</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Classification</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {savingsCalcs.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--text-3)]">No savings calculations yet</td></tr>
-            ) : (
-              sourcingSavingsCalcs.map((c) => {
-                const isRealized = classifyRealization(c as any, contractStartByEventId, now) === 'Realized'
-                return (
-                  <tr key={c.id} className="hover:bg-[var(--surface-2)]">
-                    <td className="px-4 py-3 text-sm text-[var(--text)]">{getFirst(c.event)?.event_name || '—'}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone="neutral" className="rounded px-2 py-0.5">{c.savings_type}</Badge>
-                    </td>
-                    {/* Whether the Cost Reduction beside this is bookable to the
-                        P&L, and if it only qualifies by override, the reason —
-                        so the justification travels with the number. */}
-                    <td className="px-4 py-3">
-                      {(() => {
-                        const b = reductionBasis(c)
-                        const tone =
-                          b.label === 'Hard by override' ? 'text-amber-700 dark:text-amber-300'
-                            : b.label === 'Hard' ? 'text-blue-700 dark:text-blue-300'
-                            : 'text-[var(--text-3)]'
-                        return (
-                          <span className={`text-xs font-medium ${tone}`}
-                            title={b.overridden ? `Override reason: ${b.reason}` : b.type}>
-                            {b.label}
-                            {b.overridden && <span className="ml-1" aria-hidden="true">*</span>}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{formatReduction(c.cost_reduction_amount)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-amber-600 dark:text-amber-400">{formatCurrency(c.cost_avoidance_amount)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(c.gross_savings_amount)}</td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">
-                      {c.savings_start_date ? `${formatDate(c.savings_start_date)} → ${formatDate(c.savings_end_date)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${isRealized ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                        {isRealized ? 'Realized' : 'Accrued'}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
       </Card>
+    </div>
+  )
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  allLabel,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: string[]
+  allLabel: string
+}) {
+  const id = `report-filter-${label.toLowerCase().replace(/\s+/g, '-')}`
+  return (
+    <div>
+      <label htmlFor={id} className="text-xs font-medium text-[var(--text-3)]">{label}</label>
+      <Select id={id} value={value} onChange={event => onChange(event.target.value)} className="mt-1.5">
+        <option value="">{allLabel}</option>
+        {options.map(option => <option key={option} value={option}>{option}</option>)}
+      </Select>
     </div>
   )
 }
