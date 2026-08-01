@@ -901,6 +901,7 @@ CREATE TABLE public.sourcing_events (
     currency_code text DEFAULT 'USD'::text,
     fx_rate_to_usd numeric(10,4) DEFAULT 1.0000,
     event_start_date date,
+    project_due_date date,
     event_close_date date,
     contract_start_date date,
     contract_end_date date,
@@ -917,6 +918,14 @@ CREATE TABLE public.sourcing_events (
     CONSTRAINT sourcing_events_event_status_check CHECK ((event_status = ANY (ARRAY['Pipeline'::text, 'Scoped'::text, 'Baseline Pending'::text, 'Baseline Approved'::text, 'In Market'::text, 'Negotiation'::text, 'Award Recommended'::text, 'Award Approved'::text, 'Contracted'::text, 'Implemented'::text, 'Realized'::text, 'Finance Validated'::text, 'Closed'::text, 'Cancelled'::text, 'Rejected'::text, 'Not Started'::text, 'In Progress'::text, 'Hold'::text, 'Complete'::text]))),
     CONSTRAINT sourcing_events_project_type_check CHECK ((project_type = ANY (ARRAY['Sourcing'::text, 'Support'::text])))
 );
+
+
+--
+-- Name: COLUMN sourcing_events.project_due_date; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sourcing_events.project_due_date IS 'Planned date by which the project should be completed. Distinct from event_close_date, the actual completion/close date.';
+
 
 ALTER TABLE ONLY public.sourcing_events FORCE ROW LEVEL SECURITY;
 

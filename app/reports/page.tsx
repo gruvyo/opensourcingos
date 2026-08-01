@@ -10,7 +10,7 @@ export default async function ReportsPage() {
   ] = await Promise.all([
     supabase.from('sourcing_events').select(`
       id, event_name, event_type, event_status, project_type, buyer_name,
-      event_start_date, event_close_date, contract_start_date, contract_end_date,
+      event_start_date, project_due_date, event_close_date, contract_start_date, contract_end_date,
       category:categories(category_name),
       business_unit:business_units(business_unit_name),
       incumbent_supplier:suppliers!sourcing_events_incumbent_supplier_id_fkey(supplier_name),

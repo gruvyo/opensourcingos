@@ -71,7 +71,7 @@ export function EventForm({
     incumbent_supplier_id: '',
     event_status: 'Pipeline',
     event_start_date: '',
-    event_close_date: '',
+    project_due_date: '',
     buyer_name: '',
     notes: '',
   })
@@ -182,7 +182,7 @@ export function EventForm({
       fx_rate_to_usd: 1.0,
       event_status: form.event_status,
       event_start_date: form.event_start_date || null,
-      event_close_date: form.event_close_date || null,
+      project_due_date: form.project_due_date || null,
       category_id: form.category_id || null,
       business_unit_id: form.business_unit_id || null,
       cost_center_id: form.cost_center_id || null,
@@ -429,17 +429,19 @@ export function EventForm({
               onChange={(e) => handleChange('event_start_date', e.target.value)}
               className="mt-1"
             />
-            <p className="mt-1 text-xs text-[var(--text-3)]">When the sourcing project kicked off</p>
+            <p className="mt-1 text-xs text-[var(--text-3)]">
+              {projectType === 'Sourcing' ? 'When the sourcing project kicked off' : 'When the support project started'}
+            </p>
           </div>
           <div>
-            <label className={labelClass}>{projectType === 'Sourcing' ? 'Project Close Date' : 'Due Date'}</label>
+            <label className={labelClass}>Project Due Date</label>
             <Input
               type="date"
-              value={form.event_close_date}
-              onChange={(e) => handleChange('event_close_date', e.target.value)}
+              value={form.project_due_date}
+              onChange={(e) => handleChange('project_due_date', e.target.value)}
               className="mt-1"
             />
-            <p className="mt-1 text-xs text-[var(--text-3)]">{projectType === 'Sourcing' ? 'When the project is expected to wrap up' : 'When the support issue should be resolved'}</p>
+            <p className="mt-1 text-xs text-[var(--text-3)]">When the project is expected to be completed</p>
           </div>
         </div>
         {projectType === 'Sourcing' && (

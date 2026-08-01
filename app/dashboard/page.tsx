@@ -49,6 +49,7 @@ const STATUS_PROGRESS: Record<string, number> = {
 type EventRow = EventLiteRow & {
   project_type?: string | null
   event_start_date?: string | null
+  project_due_date?: string | null
   event_close_date?: string | null
   awarded_supplier?: unknown
 }
@@ -176,7 +177,7 @@ export default async function DashboardPage({
   ] = await Promise.all([
     supabase.from('sourcing_events').select(`
       id, event_name, event_status, project_type, contract_start_date,
-      event_start_date, event_close_date,
+      event_start_date, project_due_date, event_close_date,
       category:categories!sourcing_events_category_id_fkey(category_name),
       business_unit:business_units(business_unit_name),
       awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(id, supplier_name)
