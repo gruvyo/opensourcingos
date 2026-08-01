@@ -110,9 +110,9 @@ modern `sb_publishable_...` key. Never place a secret or service-role key in a
 
 [`supabase/schema.sql`](supabase/schema.sql) is a structure-only snapshot of the
 live `public` schema. It includes tables, functions, Row Level Security,
-policies, and grants. Historical P0–P12 and earlier seed/fix SQL is retained in
-[`supabase/legacy-migrations`](supabase/legacy-migrations), while current
-migrations live under [`supabase/migrations`](supabase/migrations).
+policies, and grants. Reviewed forward migrations live under
+[`supabase/migrations`](supabase/migrations). See
+[`supabase/README.md`](supabase/README.md) before changing either.
 
 A safe, one-command bootstrap for a completely new Supabase project is not yet
 packaged. The generated schema intentionally excludes Supabase-managed schemas,
@@ -154,9 +154,8 @@ patterns; see the public-beta status below.
   key.
 - GitHub secret scanning and push protection are enabled.
 
-The detailed audit record is in
-[`SECURITY-P0-RUNBOOK.md`](SECURITY-P0-RUNBOOK.md). Please report suspected
-vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md).
+Please report suspected vulnerabilities privately as described in
+[`SECURITY.md`](SECURITY.md).
 
 ## Project status
 

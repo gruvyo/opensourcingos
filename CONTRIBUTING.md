@@ -25,6 +25,13 @@ Fill `.env.local` with a compatible Supabase project URL and a modern
 publishable key. Never use a service-role or secret key in a `NEXT_PUBLIC_`
 variable.
 
+## Framework guidance
+
+This project follows the conventions of its pinned Next.js version. Before
+changing routing, rendering, caching, or request APIs, check the matching guides
+bundled under `node_modules/next/dist/docs/`; older examples may use APIs that
+have changed.
+
 ## Required checks
 
 Before submitting a pull request, run:
