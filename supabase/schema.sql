@@ -1,5 +1,5 @@
 -- =====================================================================
--- schema.sql -- GENERATED. Do not edit by hand.
+-- supabase/schema.sql -- GENERATED. Do not edit by hand.
 --
 --   regenerate:  ./scripts/db.sh --dump
 --
@@ -2824,5 +2824,4 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 --
 -- PostgreSQL database dump complete
 --
-
 
