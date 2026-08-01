@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
 
@@ -19,22 +20,22 @@ import { Card } from '@/components/ui/card'
  * what will happen to them if they click it.
  */
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginPageContent />
+    </Suspense>
+  )
+}
 
-  // /auth/callback bounces a failed code exchange back here with ?error=auth.
-  // Only a known CODE is honoured and the wording is ours -- the URL never
-  // gets to choose what this page says. See the comment in app/auth/callback.
-  //
-  // Read from window rather than useSearchParams deliberately: this page is
-  // statically prerendered, and useSearchParams would force a Suspense
-  // boundary around it for the sake of a one-shot message.
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('error') === 'auth') {
-      setError('That sign-in could not be completed. Please try again.')
-    }
-  }, [])
+function LoginPageContent() {
+  const searchParams = useSearchParams()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(() =>
+    searchParams.get('error') === 'auth'
+      ? 'That sign-in could not be completed. Please try again.'
+      : null,
+  )
+  const supabase = createClient()
 
   const signInWithGoogle = async () => {
     setLoading(true)
@@ -115,7 +116,40 @@ export default function LoginPage() {
           Choose <span className="font-medium">Advanced</span> →{' '}
           <span className="font-medium">Go to OpenSourcingOS</span> to continue.
         </p>
+
+        <nav className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs text-[var(--text-3)]" aria-label="Project and support links">
+          <a
+            href="https://opensourcingos.com"
+            className="transition-colors hover:text-[var(--brand)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+          >
+            About the project
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href="https://github.com/gruvyo/opensourcingos"
+            target="_blank"
+            rel="noreferrer"
+            className="transition-colors hover:text-[var(--brand)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+          >
+            View on GitHub
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href="mailto:hello@opensourcingos.com"
+            className="transition-colors hover:text-[var(--brand)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+          >
+            Contact us
+          </a>
+        </nav>
       </div>
+    </div>
+  )
+}
+
+function LoginPageFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
+      <p className="text-sm text-[var(--text-2)]">Loading sign in…</p>
     </div>
   )
 }

@@ -6,12 +6,14 @@ import { ThemeProvider } from '@/components/theme-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
-const siteUrl = 'https://opensourcingos-lac.vercel.app'
+const siteUrl = 'https://opensourcingos.com'
+const siteTitle = 'OpenSourcingOS — Procurement Savings, Tracked Properly'
+const siteDescription = 'Open-source procurement value tracking for sourcing projects, baselines, supplier offers, savings schedules, fiscal-year reporting, and realization.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: 'OpenSourcingOS — Procurement Value Tracker',
-  description: 'Track sourcing events, baselines, supplier offers, savings, and realization in one procurement platform.',
+  title: siteTitle,
+  description: siteDescription,
   keywords: [
     'procurement', 'sourcing', 'savings tracker', 'cost avoidance',
     'baseline modeling', 'should-cost', 'offer comparison',
@@ -24,21 +26,21 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: siteUrl,
     siteName: 'OpenSourcingOS',
-    title: 'OpenSourcingOS — Procurement Value Tracker',
-    description: 'Track sourcing events, baselines, supplier offers, savings, and realization in one procurement platform.',
+    title: siteTitle,
+    description: siteDescription,
     images: [
       {
         url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'OpenSourcingOS — Procurement Value Tracker',
+        width: 1280,
+        height: 640,
+        alt: 'OpenSourcingOS — Procurement savings, tracked properly',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'OpenSourcingOS — Procurement Value Tracker',
-    description: 'Track sourcing events, baselines, supplier offers, savings, and realization in one procurement platform.',
+    title: siteTitle,
+    description: siteDescription,
     images: ['/og-image.png'],
   },
   icons: {

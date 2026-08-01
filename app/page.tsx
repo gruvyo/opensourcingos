@@ -6,7 +6,7 @@ import coverImage from '../public/readme-cover-concept-b.png'
 
 export const metadata: Metadata = {
   title: 'OpenSourcingOS — Procurement Savings, Tracked Properly',
-  description: 'An open-source procurement value tracker for baselines, supplier offers, savings schedules, fiscal-year reporting, and realization.',
+  description: 'Open-source procurement value tracking for sourcing projects, baselines, supplier offers, savings schedules, fiscal-year reporting, and realization.',
 }
 
 const features = [
