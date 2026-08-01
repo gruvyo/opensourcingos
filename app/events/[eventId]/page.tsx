@@ -11,6 +11,9 @@ export default async function EventDetailPage({
 }) {
   const { eventId } = await params
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) notFound()
 
   const [
     { data: event, error: eventError },
@@ -19,6 +22,8 @@ export default async function EventDetailPage({
     { data: categories, error: categoriesError },
     { data: businessUnits, error: businessUnitsError },
     { data: costCenters, error: costCentersError },
+    { data: updates, error: updatesError },
+    { data: currentProfile },
   ] = await Promise.all([
     supabase.from('sourcing_events')
       .select(`
@@ -47,15 +52,29 @@ export default async function EventDetailPage({
     supabase.from('cost_centers')
       .select('id, cost_center_name')
       .order('cost_center_name'),
+    supabase.from('project_updates')
+      .select(`
+        id,
+        body,
+        created_at,
+        created_by,
+        author:profiles!project_updates_created_by_fkey(full_name, email)
+      `)
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false }),
+    supabase.from('profiles')
+      .select('id, full_name, email')
+      .eq('id', user.id)
+      .single(),
   ])
 
-  if (!event) notFound()
+  if (!event || !currentProfile) notFound()
 
   // .single() legitimately errors (PGRST116) when the row doesn't exist —
   // that's not a load failure, it's handled by notFound() above.
   const loadError = (eventError && eventError.code !== 'PGRST116' ? eventError.message : null)
     || scopeLinesError?.message || suppliersError?.message || categoriesError?.message
-    || businessUnitsError?.message || costCentersError?.message || null
+    || businessUnitsError?.message || costCentersError?.message || updatesError?.message || null
 
   return (
     <div className="p-8">
@@ -78,6 +97,8 @@ export default async function EventDetailPage({
         categories={categories || []}
         businessUnits={businessUnits || []}
         costCenters={costCenters || []}
+        updates={updates || []}
+        currentProfile={currentProfile}
       />
     </div>
   )

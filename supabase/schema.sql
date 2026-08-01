@@ -111,7 +111,7 @@ declare
   -- Dependency order matters for the INSERT pass because of foreign keys.
   v_tables text[] := array[
     'categories', 'business_units', 'cost_centers', 'suppliers',
-    'sourcing_events', 'event_scope_lines',
+    'sourcing_events', 'project_updates', 'event_scope_lines',
     'baselines', 'baseline_lines',
     'supplier_offers', 'supplier_offer_lines',
     'savings_calculations', 'savings_periods'
@@ -656,6 +656,31 @@ ALTER TABLE ONLY public.profiles FORCE ROW LEVEL SECURITY;
 
 
 --
+-- Name: project_updates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.project_updates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    body text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT project_updates_body_length CHECK ((char_length(body) <= 10000)),
+    CONSTRAINT project_updates_body_not_blank CHECK ((length(btrim(body)) > 0))
+);
+
+ALTER TABLE ONLY public.project_updates FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: TABLE project_updates; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.project_updates IS 'Append-only, dated project progress updates. Editing, deletion, mentions, and notifications are intentionally deferred.';
+
+
+--
 -- Name: realization_periods; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -927,6 +952,13 @@ CREATE TABLE public.sourcing_events (
 COMMENT ON COLUMN public.sourcing_events.project_due_date IS 'Planned date by which the project should be completed. Distinct from event_close_date, the actual completion/close date.';
 
 
+--
+-- Name: COLUMN sourcing_events.notes; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sourcing_events.notes IS 'Legacy project note retained for compatibility. New content belongs in project_updates.';
+
+
 ALTER TABLE ONLY public.sourcing_events FORCE ROW LEVEL SECURITY;
 
 
@@ -1131,6 +1163,14 @@ ALTER TABLE ONLY public.profiles
 
 
 --
+-- Name: project_updates project_updates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_updates
+    ADD CONSTRAINT project_updates_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: realization_periods realization_periods_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1300,10 +1340,24 @@ CREATE INDEX idx_business_units_org ON public.business_units USING btree (organi
 
 
 --
+-- Name: uq_business_units_org_normalized_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_business_units_org_normalized_name ON public.business_units USING btree (organization_id, lower(btrim(business_unit_name))) WHERE (organization_id IS NOT NULL);
+
+
+--
 -- Name: idx_categories_org; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_categories_org ON public.categories USING btree (organization_id);
+
+
+--
+-- Name: uq_categories_org_normalized_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_categories_org_normalized_name ON public.categories USING btree (organization_id, lower(btrim(category_name))) WHERE (organization_id IS NOT NULL);
 
 
 --
@@ -1332,6 +1386,27 @@ CREATE INDEX idx_event_scope_lines_org ON public.event_scope_lines USING btree (
 --
 
 CREATE INDEX idx_organization_settings_updated_by ON public.organization_settings USING btree (updated_by);
+
+
+--
+-- Name: idx_project_updates_created_by; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_updates_created_by ON public.project_updates USING btree (created_by);
+
+
+--
+-- Name: idx_project_updates_event_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_updates_event_created ON public.project_updates USING btree (event_id, created_at DESC);
+
+
+--
+-- Name: idx_project_updates_org_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_project_updates_org_created ON public.project_updates USING btree (organization_id, created_at DESC);
 
 
 --
@@ -1963,6 +2038,30 @@ ALTER TABLE ONLY public.profiles
 
 ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: project_updates project_updates_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_updates
+    ADD CONSTRAINT project_updates_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
+--
+-- Name: project_updates project_updates_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_updates
+    ADD CONSTRAINT project_updates_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.sourcing_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: project_updates project_updates_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.project_updates
+    ADD CONSTRAINT project_updates_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -2851,6 +2950,28 @@ CREATE POLICY profiles_update_self ON public.profiles FOR UPDATE TO authenticate
 
 
 --
+-- Name: project_updates; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.project_updates ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: project_updates project_updates_insert_org_author; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY project_updates_insert_org_author ON public.project_updates FOR INSERT TO authenticated WITH CHECK (((organization_id = ( SELECT public.current_org_id() AS current_org_id)) AND (created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM public.sourcing_events event
+  WHERE ((event.id = project_updates.event_id) AND (event.organization_id = project_updates.organization_id))))));
+
+
+--
+-- Name: project_updates project_updates_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY project_updates_select_org ON public.project_updates FOR SELECT TO authenticated USING ((organization_id = ( SELECT public.current_org_id() AS current_org_id)));
+
+
+--
 -- Name: realization_periods; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -3101,6 +3222,14 @@ GRANT ALL ON TABLE public.organizations TO service_role;
 GRANT ALL ON TABLE public.profiles TO anon;
 GRANT ALL ON TABLE public.profiles TO authenticated;
 GRANT ALL ON TABLE public.profiles TO service_role;
+
+
+--
+-- Name: TABLE project_updates; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,INSERT ON TABLE public.project_updates TO authenticated;
+GRANT ALL ON TABLE public.project_updates TO service_role;
 
 
 --
