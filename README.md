@@ -164,9 +164,8 @@ workspace isolation, Google sign-in, schedules, and fiscal-year reporting are
 working. Current priorities are:
 
 1. Package reproducible fresh-database setup.
-2. Remove the production build's dependency on downloading Google Fonts.
-3. Reduce TypeScript and React lint debt.
-4. Complete accessibility and end-to-end browser testing.
+2. Reduce TypeScript and React lint debt.
+3. Complete accessibility and end-to-end browser testing.
 
 ## Contributing
 
