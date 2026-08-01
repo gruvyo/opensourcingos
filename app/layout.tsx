@@ -43,13 +43,6 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: ['/og-image.png'],
   },
-  icons: {
-    icon: [
-      {
-        url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%234f46e5"/><text x="50" y="70" font-size="50" font-weight="bold" fill="white" text-anchor="middle" font-family="system-ui">OS</text></svg>',
-      },
-    ],
-  },
 }
 
 export default function RootLayout({
