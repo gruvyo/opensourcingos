@@ -98,6 +98,7 @@ export function EditProjectModal({
     cost_center_id: project.cost_center_id || '',
     incumbent_supplier_id: project.incumbent_supplier_id || '',
     event_start_date: project.event_start_date || '',
+    project_due_date: project.project_due_date || '',
     event_close_date: project.event_close_date || '',
     // The contract start is what "Savings start" defaults from on the
     // Calculations tab, which in turn seeds the savings schedule. It was
@@ -122,6 +123,7 @@ export function EditProjectModal({
       event_status: form.event_status,
       buyer_name: form.buyer_name || null,
       event_start_date: form.event_start_date || null,
+      project_due_date: form.project_due_date || null,
       event_close_date: form.event_close_date || null,
       contract_start_date: form.contract_start_date || null,
       contract_end_date: form.contract_end_date || null,
@@ -257,13 +259,17 @@ export function EditProjectModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="ep-start" className={labelClass}>{isSupport ? 'Start Date' : 'Project Start Date'}</label>
               <Input id="ep-start" type="date" value={form.event_start_date} onChange={(e) => handleChange('event_start_date', e.target.value)} />
             </div>
             <div>
-              <label htmlFor="ep-close" className={labelClass}>{isSupport ? 'Due Date' : 'Project Close Date'}</label>
+              <label htmlFor="ep-due" className={labelClass}>Project Due Date</label>
+              <Input id="ep-due" type="date" value={form.project_due_date} onChange={(e) => handleChange('project_due_date', e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="ep-close" className={labelClass}>Completion Date</label>
               <Input id="ep-close" type="date" value={form.event_close_date} onChange={(e) => handleChange('event_close_date', e.target.value)} />
             </div>
           </div>

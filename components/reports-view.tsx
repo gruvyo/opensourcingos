@@ -17,6 +17,7 @@ type EventRow = {
   project_type: string | null
   buyer_name: string | null
   event_start_date: string | null
+  project_due_date: string | null
   event_close_date: string | null
   contract_start_date: string | null
   contract_end_date: string | null
@@ -128,13 +129,13 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
   }
 
   const exportEvents = () => {
-    const headers = ['Project Name', 'Type', 'Status', 'Owner', 'Category', 'Business Unit', 'Supplier', 'Event Start', 'Due Date', 'Contract Start', 'Contract End']
+    const headers = ['Project Name', 'Type', 'Status', 'Owner', 'Category', 'Business Unit', 'Supplier', 'Project Start', 'Project Due Date', 'Completion Date', 'Contract Start', 'Contract End']
     const rows = [headers, ...filteredEvents.map(e => [
       e.event_name, e.event_type, e.event_status, e.buyer_name || '',
       getFirst(e.category)?.category_name || '',
       getFirst(e.business_unit)?.business_unit_name || '',
       getFirst(e.awarded_supplier)?.supplier_name || getFirst(e.incumbent_supplier)?.supplier_name || '',
-      e.event_start_date || '', e.event_close_date || '',
+      e.event_start_date || '', e.project_due_date || '', e.event_close_date || '',
       e.contract_start_date || '', e.contract_end_date || '',
     ])]
     downloadCSV('procurement_projects.csv', rows)
@@ -326,7 +327,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
                   <td className="px-4 py-3 text-sm text-[var(--text-2)]">{e.buyer_name || '—'}</td>
                   <td className="px-4 py-3 text-sm text-[var(--text-2)]">{getFirst(e.business_unit)?.business_unit_name || '—'}</td>
                   <td className="px-4 py-3 text-sm text-[var(--text-2)]">{getFirst(e.awarded_supplier)?.supplier_name || getFirst(e.incumbent_supplier)?.supplier_name || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-2)]">{formatDate(e.event_close_date)}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--text-2)]">{formatDate(e.project_due_date)}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(e.event_status)}`}>
                       {e.event_status}

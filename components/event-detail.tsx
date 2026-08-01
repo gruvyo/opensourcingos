@@ -33,6 +33,7 @@ type Event = {
   sourcing_method: string | null
   event_status: string
   event_start_date: string | null
+  project_due_date: string | null
   event_close_date: string | null
   contract_start_date: string | null
   contract_end_date: string | null
@@ -190,7 +191,8 @@ function OverviewTab({ event }: { event: Event }) {
 
   const dates = [
     { label: isSupport ? 'Start Date' : 'Project Start', value: event.event_start_date },
-    { label: isSupport ? 'Due Date' : 'Project Close', value: event.event_close_date },
+    { label: 'Project Due', value: event.project_due_date },
+    { label: 'Completion Date', value: event.event_close_date },
     // The contract start seeds "Savings start" on the Calculations tab, which
     // seeds the savings schedule. It drove three downstream defaults while
     // being invisible on this page.

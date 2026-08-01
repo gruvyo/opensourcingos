@@ -14,6 +14,7 @@ type EventRow = {
   event_status: string
   project_type: string | null
   buyer_name: string | null
+  project_due_date: string | null
   event_close_date: string | null
   contract_start_date: string | null
   contract_end_date: string | null
@@ -105,6 +106,7 @@ export function EventsList({ events }: { events: EventRow[] }) {
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Category</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Business Unit</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Supplier</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Due Date</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Status</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Contract</th>
             </tr>
@@ -112,7 +114,7 @@ export function EventsList({ events }: { events: EventRow[] }) {
           <tbody className="divide-y divide-[var(--border)]">
             {filteredEvents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center">
+                <td colSpan={9} className="px-4 py-12 text-center">
                   <Briefcase className="mx-auto mb-2 h-8 w-8 text-[var(--text-3)]" />
                   <p className="text-sm text-[var(--text-3)]">No projects found</p>
                 </td>
@@ -145,6 +147,7 @@ export function EventsList({ events }: { events: EventRow[] }) {
                     <td className="px-4 py-3 text-sm text-[var(--text-2)]">
                       {getFirst(event.awarded_supplier)?.supplier_name || getFirst(event.incumbent_supplier)?.supplier_name || '—'}
                     </td>
+                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">{formatDate(event.project_due_date)}</td>
                     <td className="px-4 py-3">
                       <span className={clsx('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusColor(event.event_status))}>
                         {event.event_status}
