@@ -8,7 +8,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-savings.mts"
+    "verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-savings.mts",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset --local",
+    "db:test": "supabase test db --local supabase/tests/database",
+    "db:lint": "supabase db lint --local --schema public --level warning --fail-on error",
+    "db:advisors": "supabase db advisors --local --type security --level warn --fail-on error"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

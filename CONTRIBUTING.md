@@ -66,7 +66,9 @@ Any change affecting savings must:
 - Create new Supabase migrations with `supabase migration new <name>`.
 - Review RLS, grants, function execution privileges, and function search paths.
 - Test migrations transactionally before applying them to a hosted project.
-- Run Supabase security advisors after changes.
+- Rebuild from an empty local database with `npm run db:reset`.
+- Run the database security suite with `npm run db:test`.
+- Run `npm run db:lint` and `npm run db:advisors` after changes.
 - Refresh `supabase/schema.sql` after applying a migration.
 
 ## Pull requests
