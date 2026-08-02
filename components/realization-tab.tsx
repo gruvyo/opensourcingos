@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  TrendingUp, Plus, Trash2, CheckCircle, AlertTriangle,
+  TrendingUp, Plus, Trash2, AlertTriangle,
   ShieldCheck, Clock,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -192,7 +192,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
         <Card className="p-12 text-center">
           <TrendingUp className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
           <h3 className="text-sm font-medium text-[var(--text)]">No realization periods yet</h3>
-          <p className="mt-1 text-sm text-[var(--text-3)]">Click "Add Period" to track savings over time.</p>
+          <p className="mt-1 text-sm text-[var(--text-3)]">Click &quot;Add Period&quot; to track savings over time.</p>
         </Card>
       ) : (
         <Card className="overflow-hidden">
@@ -307,7 +307,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
             <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
               <strong>Realized Savings</strong> = Baseline − Actual Invoice Amount<br/>
               <strong>Leakage</strong> = Projected Savings − Realized Savings (if &gt; 0, savings leaked)<br/>
-              Enter the actual invoice amount in the "Actual" column to auto-calculate realized savings and leakage.
+              Enter the actual invoice amount in the &quot;Actual&quot; column to auto-calculate realized savings and leakage.
             </p>
           </div>
         </div>

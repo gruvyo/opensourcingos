@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X } from 'lucide-react'
 import { formatCurrency, formatReduction as money } from '@/lib/utils'
 import {
-  chainSavings, chainWithBaselineQuality, baselineQuality,
+  chainSavings, baselineQuality,
   termRates, generateSchedule, scheduleTotals, scheduleByYear,
   toSchedulePeriods, defaultPeriodCount, periodMonths, monthName, addMonths,
   reportableSavingsPct,

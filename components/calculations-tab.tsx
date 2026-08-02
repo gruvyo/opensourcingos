@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import {
-  chainSavings, chainWithBaselineQuality, baselineQuality, termRates,
+  chainWithBaselineQuality, baselineQuality, termRates,
   reportableSavingsPct, type RateBasis,
 } from '@/lib/savings'
 import { clsx } from 'clsx'

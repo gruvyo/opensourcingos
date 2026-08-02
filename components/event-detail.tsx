@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import {
-  FileText, List, BarChart2, Users, FileCheck,
+  FileText, BarChart2, Users, FileCheck,
   Calculator, CalendarRange, Clock, Pencil,
   Briefcase, LifeBuoy, MessageSquareText, Send,
 } from 'lucide-react'
@@ -182,7 +182,7 @@ export function EventDetail({
         {!isSupport && activeTab === 'scope' && <ScopeLinesTab eventId={event.id} scopeLines={scopeLines} />}
         {!isSupport && activeTab === 'baselines' && <BaselinesTab eventId={event.id} scopeLines={scopeLines} />}
         {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} />}
-        {!isSupport && activeTab === 'awards' && <AwardsTab eventId={event.id} />}
+        {!isSupport && activeTab === 'awards' && <AwardsTab />}
         {!isSupport && activeTab === 'calculations' && <CalculationsTab eventId={event.id} />}
         {!isSupport && activeTab === 'schedule' && <ScheduleTab eventId={event.id} />}
         {!isSupport && activeTab === 'realization' && <RealizationTab eventId={event.id} />}
@@ -382,7 +382,7 @@ function ProjectUpdatesTab({
   )
 }
 
-function AwardsTab({ eventId }: { eventId: string }) {
+function AwardsTab() {
   return (
     <Card className="p-12 text-center">
       <FileCheck className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />

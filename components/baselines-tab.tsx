@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Star, Trash2, ChevronDown, Pencil,
-  ChevronRight, AlertCircle, Shield, TrendingUp, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react'
+  ChevronRight, Shield, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { termRates, baselineQuality } from '@/lib/savings'
-import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
@@ -212,7 +211,6 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       {showForm && (
         <AddBaselineForm
           eventId={eventId}
-          scopeLines={scopeLines}
           isFirstBaseline={baselines.length === 0}
           onSaved={() => { setShowForm(false); fetchBaselines() }}
           onCancel={() => setShowForm(false)}
@@ -222,7 +220,6 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       {editingBaseline && (
         <AddBaselineForm
           eventId={eventId}
-          scopeLines={scopeLines}
           isFirstBaseline={false}
           existing={editingBaseline}
           onSaved={() => { setEditingBaseline(null); fetchBaselines() }}
@@ -235,7 +232,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
         <Card className="p-12 text-center">
           <Calculator className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
           <h3 className="text-sm font-medium text-[var(--text)]">No baselines yet</h3>
-          <p className="mt-1 text-sm text-[var(--text-3)]">Click "Add Baseline" to establish the baseline for this event.</p>
+          <p className="mt-1 text-sm text-[var(--text-3)]">Click &quot;Add Baseline&quot; to establish the baseline for this event.</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -537,9 +534,8 @@ function HardReductionOverride({
 // ============================================
 // Add Baseline Form
 // ============================================
-function AddBaselineForm({ eventId, scopeLines, isFirstBaseline, existing, onSaved, onCancel }: {
+function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel }: {
   eventId: string
-  scopeLines: ScopeLine[]
   isFirstBaseline: boolean
   /** When set, the form edits this baseline instead of creating a new one. */
   existing?: Baseline | null
