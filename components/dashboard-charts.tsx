@@ -4,6 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
+import type { PieLabelRenderProps } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 
@@ -21,11 +22,11 @@ const TOOLTIP_STYLE = {
   color: 'var(--text)',
 }
 
-function currencyFormatter(value: any): string {
+function currencyFormatter(value: unknown): string {
   return formatCurrency(Number(value) || 0)
 }
 
-function compactFormatter(value: any): string {
+function compactFormatter(value: unknown): string {
   const num = Number(value) || 0
   return `$${(num / 1000).toFixed(0)}k`
 }
@@ -66,7 +67,7 @@ export function EventsByStatusChart({ data }: { data: { name: string; value: num
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={(entry: any) => `${entry.name}: ${entry.value}`}
+            label={(entry: PieLabelRenderProps) => `${entry.name}: ${entry.value}`}
             outerRadius={80}
             fill="#8884d8"
             dataKey="value"
