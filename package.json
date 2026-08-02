@@ -13,7 +13,8 @@
     "db:reset": "supabase db reset --local",
     "db:test": "supabase test db --local supabase/tests/database",
     "db:lint": "supabase db lint --local --schema public --level warning --fail-on error",
-    "db:advisors": "supabase db advisors --local --type security --level warn --fail-on error"
+    "db:advisors": "supabase db advisors --local --type security --level warn --fail-on error",
+    "db:types": "bash scripts/generate-database-types.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

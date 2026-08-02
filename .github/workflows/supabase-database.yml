@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - 'supabase/**'
+      - 'lib/database.types.ts'
+      - 'scripts/generate-database-types.sh'
+      - 'package.json'
       - '.github/workflows/supabase-database.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/**'
+      - 'lib/database.types.ts'
+      - 'scripts/generate-database-types.sh'
+      - 'package.json'
       - '.github/workflows/supabase-database.yml'
 
 permissions:
@@ -39,6 +45,19 @@ jobs:
 
       - name: Rebuild from migrations and seed
         run: supabase db reset --local
+
+      - name: Generate database types
+        run: npm run db:types
+
+      - name: Verify generated database types are current
+        shell: bash
+        run: |
+          if [[ -n "$(git status --short -- lib/database.types.ts)" ]]; then
+            git diff -- lib/database.types.ts
+            echo "lib/database.types.ts does not match the local database schema."
+            echo "Run npm run db:types and commit the result."
+            exit 1
+          fi
 
       - name: Run database security and bootstrap tests
         run: supabase test db --local supabase/tests/database
