@@ -81,7 +81,8 @@ production service or a system of record for confidential procurement data.
 
 - Node.js 20.9 or newer
 - npm
-- Access to a compatible Supabase project
+- Supabase CLI 2.110.0
+- Docker Desktop or Podman for the local database
 
 ### Setup
 
@@ -90,16 +91,23 @@ git clone https://github.com/gruvyo/opensourcingos.git
 cd opensourcingos
 npm ci
 cp .env.example .env.local
+npm run db:start
+npm run db:reset
+npm run db:test
 ```
 
-Fill in `.env.local` with the URL and modern publishable key from your Supabase
-project, then start the development server:
+Run `supabase status`, then fill in `.env.local` with the local API URL and
+modern publishable key. Start the development server:
 
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+The public landing page and database tests work without OAuth credentials.
+Google sign-in needs your own local provider configuration; follow
+[`supabase/README.md`](supabase/README.md#google-sign-in).
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` retains its historical name because the
 Supabase client reads it throughout the application. Its value should be a
@@ -114,11 +122,11 @@ policies, and grants. Reviewed forward migrations live under
 [`supabase/migrations`](supabase/migrations). See
 [`supabase/README.md`](supabase/README.md) before changing either.
 
-A safe, one-command bootstrap for a completely new Supabase project is not yet
-packaged. The generated schema intentionally excludes Supabase-managed schemas,
-including the signup trigger on `auth.users`, and should not be pasted blindly
-into an existing project. Until bootstrap packaging lands, the hosted demo is
-the supported evaluation path and fresh self-hosting is an advanced task.
+The repository now packages a reviewed foundational migration, the missing
+signup trigger on `auth.users`, fictional local seed data, and database security
+tests. A clean `npm run db:reset` rebuilds the local database from scratch.
+Hosted setup still requires the deployer's own Google OAuth configuration and
+must follow the production safeguards in [`supabase/README.md`](supabase/README.md).
 
 ## Verification
 
@@ -163,9 +171,8 @@ OpenSourcingOS is an MVP and public beta. The core savings methodology,
 workspace isolation, Google sign-in, schedules, and fiscal-year reporting are
 working. Current priorities are:
 
-1. Package reproducible fresh-database setup.
-2. Reduce TypeScript and React lint debt.
-3. Complete accessibility and end-to-end browser testing.
+1. Reduce TypeScript and React lint debt.
+2. Complete accessibility and end-to-end browser testing.
 
 ## Contributing
 

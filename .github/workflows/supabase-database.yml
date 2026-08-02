@@ -1,0 +1,77 @@
+name: Supabase database
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-database.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-database.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fresh-database:
+    name: Fresh database and isolation checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.110.0
+
+      - name: Start clean local Supabase
+        run: supabase start
+
+      - name: Rebuild from migrations and seed
+        run: supabase db reset --local
+
+      - name: Run database security and bootstrap tests
+        run: supabase test db --local supabase/tests/database
+
+      - name: Lint database functions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          lint_report="${RUNNER_TEMP}/supabase-db-lint.json"
+          supabase db lint --local --schema public --level warning --fail-on none > "${lint_report}"
+          cat "${lint_report}"
+
+          # clone_org_data() uses a runtime temp table and dynamic SQL. The
+          # underlying plpgsql_check tool cannot model that combination and
+          # reports _idmap as missing even though the pgTAP suite executes the
+          # function successfully. Ignore only that exact false-positive;
+          # every other lint error remains blocking.
+          jq -e '
+            [
+              .[] as $function
+              | $function.issues[]
+              | select(
+                  .level == "error"
+                  and (
+                    $function.function != "public.clone_org_data"
+                    or .sqlState != "42P01"
+                    or .message != "relation \"_idmap\" does not exist"
+                  )
+                )
+            ]
+            | length == 0
+          ' "${lint_report}"
+
+      - name: Run database security advisors
+        run: supabase db advisors --local --type security --level warn --fail-on error
