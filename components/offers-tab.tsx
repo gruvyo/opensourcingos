@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, CheckCircle, XCircle,
-  Award, GitCompare, Users, FileText, Pencil
+  Award, GitCompare, Users, Pencil
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { grossSavings, savingsPct as savingsPctOf, termRates } from '@/lib/savings'
@@ -62,7 +62,6 @@ export function OffersTab({
   const [showCompare, setShowCompare] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [offerLines, setOfferLines] = useState<Record<string, any[]>>({})
-  const [selectedForAward, setSelectedForAward] = useState<string | null>(null)
   const [editingOffer, setEditingOffer] = useState<any | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
@@ -166,93 +165,6 @@ export function OffersTab({
     fetchOffers()
   }
 
-  const selectForAward = async (offer: Offer) => {
-    // Unselect all other offers
-    const others = offers.filter(o => o.id !== offer.id && o.selected_for_award_flag)
-    for (const other of others) {
-      await supabase.from('supplier_offers').update({ selected_for_award_flag: false }).eq('id', other.id)
-    }
-    // Toggle this offer
-    await supabase
-      .from('supplier_offers')
-      .update({ selected_for_award_flag: !offer.selected_for_award_flag })
-      .eq('id', offer.id)
-    fetchOffers()
-  }
-
-  const createAward = async (offer: Offer) => {
-    if (!confirm(`Create award from ${offer.supplier?.supplier_name}'s offer?`)) return
-
-    // Fetch offer lines
-    const { data: lines } = await supabase
-      .from('supplier_offer_lines')
-      .select('*')
-      .eq('offer_id', offer.id)
-      .order('line_number', { ascending: true })
-
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user!.id)
-      .single()
-
-    const awardName = `Award - ${offer.supplier?.supplier_name || 'Supplier'}`
-
-    const { data: award, error } = await supabase
-      .from('awards')
-      .insert({
-        organization_id: profile?.organization_id,
-        event_id: eventId,
-        supplier_id: offer.supplier_id,
-        offer_id: offer.id,
-        award_name: awardName,
-        award_date: new Date().toISOString().split('T')[0],
-        award_total_amount: offer.offer_total_amount,
-        award_status: 'Recommended',
-        created_by: user?.id,
-      })
-      .select('id')
-      .single()
-
-    if (!error && award) {
-      // Record WHO won on the project itself. sourcing_events.awarded_supplier_id is
-      // read by the Projects list, event detail, Reports and Suppliers, but nothing
-      // ever wrote it — so every post-award screen kept showing the incumbent.
-      await supabase
-        .from('sourcing_events')
-        .update({ awarded_supplier_id: offer.supplier_id })
-        .eq('id', eventId)
-    }
-
-    if (!error && award && lines) {
-      // Create award lines from offer lines
-      for (const line of lines) {
-        await supabase.from('award_lines').insert({
-          organization_id: profile?.organization_id,
-          award_id: award.id,
-          event_id: eventId,
-          scope_line_id: line.scope_line_id,
-          line_number: line.line_number,
-          awarded_unit_price: line.offer_unit_price,
-          awarded_quantity: line.offer_quantity,
-          awarded_extended_amount: line.offer_extended_amount,
-          awarded_recurring_amount: line.offer_recurring_amount,
-          awarded_one_time_amount: line.offer_one_time_amount,
-          awarded_term_months: line.offer_term_months,
-          annualized_award_amount: line.annualized_offer_amount,
-        })
-      }
-      // Mark offer as selected for award
-      await supabase
-        .from('supplier_offers')
-        .update({ selected_for_award_flag: true })
-        .eq('id', offer.id)
-      fetchOffers()
-      alert(`Award created: ${awardName}`)
-    }
-  }
-
   const handleDelete = async (offerId: string) => {
     if (!confirm('Delete this offer and all its lines?')) return
     setActionError(null)
@@ -310,7 +222,6 @@ export function OffersTab({
       {showForm && (
         <AddOfferForm
           eventId={eventId}
-          scopeLines={scopeLines}
           suppliers={supplierList}
           onSupplierAdded={refreshSuppliers}
           onSaved={() => { setShowForm(false); fetchOffers() }}
@@ -321,7 +232,6 @@ export function OffersTab({
       {editingOffer && (
         <AddOfferForm
           eventId={eventId}
-          scopeLines={scopeLines}
           suppliers={supplierList}
           onSupplierAdded={refreshSuppliers}
           existing={editingOffer}
@@ -335,7 +245,7 @@ export function OffersTab({
         <Card className="p-12 text-center">
           <Users className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
           <h3 className="text-sm font-medium text-[var(--text)]">No offers yet</h3>
-          <p className="mt-1 text-sm text-[var(--text-3)]">Click "Add Offer" to capture supplier pricing.</p>
+          <p className="mt-1 text-sm text-[var(--text-3)]">Click &quot;Add Offer&quot; to capture supplier pricing.</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -487,9 +397,8 @@ export function OffersTab({
 // ============================================
 // Add Offer Form
 // ============================================
-function AddOfferForm({ eventId, scopeLines, suppliers, existing, onSupplierAdded, onSaved, onCancel }: {
+function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, onCancel }: {
   eventId: string
-  scopeLines: ScopeLine[]
   suppliers: Supplier[]
   onSupplierAdded?: () => void
   /** When set, the form edits this offer instead of creating a new one. */
@@ -932,7 +841,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
 
       {lines.length === 0 ? (
         <p className="py-6 text-center text-xs text-[var(--text-3)]">
-          No offer lines yet. Click "Add Line" to add pricing.
+          No offer lines yet. Click &quot;Add Line&quot; to add pricing.
         </p>
       ) : (
         <div className="overflow-x-auto">

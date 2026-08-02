@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2, AlertTriangle, CheckCircle } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
@@ -213,7 +212,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
             {scopeLines.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-sm text-[var(--text-3)]">
-                  No scope lines yet. Click "Add Scope Line" to define what's being sourced.
+                  No scope lines yet. Click &quot;Add Scope Line&quot; to define what&apos;s being sourced.
                 </td>
               </tr>
             ) : (
