@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - 'supabase/**'
+      - 'lib/database.types.ts'
+      - 'scripts/generate-database-types.sh'
+      - 'package.json'
       - '.github/workflows/supabase-database.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/**'
+      - 'lib/database.types.ts'
+      - 'scripts/generate-database-types.sh'
+      - 'package.json'
       - '.github/workflows/supabase-database.yml'
 
 permissions:
@@ -42,12 +48,6 @@ jobs:
 
       - name: Generate database types
         run: npm run db:types
-
-      - name: Upload generated database types
-        uses: actions/upload-artifact@v4
-        with:
-          name: database-types
-          path: lib/database.types.ts
 
       - name: Verify generated database types are current
         shell: bash
