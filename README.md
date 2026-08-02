@@ -94,6 +94,7 @@ cp .env.example .env.local
 npm run db:start
 npm run db:reset
 npm run db:test
+npm run db:types
 ```
 
 Run `supabase status`, then fill in `.env.local` with the local API URL and
@@ -121,6 +122,10 @@ live `public` schema. It includes tables, functions, Row Level Security,
 policies, and grants. Reviewed forward migrations live under
 [`supabase/migrations`](supabase/migrations). See
 [`supabase/README.md`](supabase/README.md) before changing either.
+
+[`lib/database.types.ts`](lib/database.types.ts) is generated from the rebuilt
+local database with `npm run db:types`. It contains schema types only—no data or
+credentials—and CI verifies that it remains synchronized with the migrations.
 
 The repository now packages a reviewed foundational migration, the missing
 signup trigger on `auth.users`, fictional local seed data, and database security

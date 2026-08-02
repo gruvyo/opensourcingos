@@ -40,6 +40,25 @@ jobs:
       - name: Rebuild from migrations and seed
         run: supabase db reset --local
 
+      - name: Generate database types
+        run: npm run db:types
+
+      - name: Upload generated database types
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-types
+          path: lib/database.types.ts
+
+      - name: Verify generated database types are current
+        shell: bash
+        run: |
+          if [[ -n "$(git status --short -- lib/database.types.ts)" ]]; then
+            git diff -- lib/database.types.ts
+            echo "lib/database.types.ts does not match the local database schema."
+            echo "Run npm run db:types and commit the result."
+            exit 1
+          fi
+
       - name: Run database security and bootstrap tests
         run: supabase test db --local supabase/tests/database
 
