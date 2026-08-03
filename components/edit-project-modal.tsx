@@ -5,8 +5,29 @@ import { createClient } from '@/lib/supabase/client'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
+import type { Tables } from '@/lib/database.types'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string }
+type Project = Pick<
+  Tables<'sourcing_events'>,
+  | 'id'
+  | 'project_type'
+  | 'event_name'
+  | 'event_description'
+  | 'event_type'
+  | 'event_status'
+  | 'buyer_name'
+  | 'category_id'
+  | 'business_unit_id'
+  | 'cost_center_id'
+  | 'incumbent_supplier_id'
+  | 'event_start_date'
+  | 'project_due_date'
+  | 'event_close_date'
+  | 'contract_start_date'
+  | 'contract_end_date'
+  | 'notes'
+>
 
 const SOURCING_STATUSES = [
   'Pipeline', 'Scoped', 'Baseline Pending', 'Baseline Approved',
@@ -28,7 +49,7 @@ export function EditProjectModal({
   onClose,
   onSaved,
 }: {
-  project: any
+  project: Project
   categories: Option[]
   businessUnits: Option[]
   costCenters: Option[]
@@ -116,7 +137,7 @@ export function EditProjectModal({
     setLoading(true)
     setError(null)
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, string | null> = {
       event_name: form.event_name,
       event_description: form.event_description || null,
       event_type: form.event_type || null,

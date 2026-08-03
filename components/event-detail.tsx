@@ -72,6 +72,10 @@ type Event = {
   project_type: string | null
   buyer_name: string | null
   notes: string | null
+  category_id: string | null
+  business_unit_id: string | null
+  cost_center_id: string | null
+  incumbent_supplier_id: string | null
   category: ToOneRelation<CategoryRelation>
   business_unit: ToOneRelation<BusinessUnitRelation>
   cost_center: ToOneRelation<CostCenterRelation>
