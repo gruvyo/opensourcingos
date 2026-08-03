@@ -25,6 +25,26 @@ type CategoryRelation = Pick<Tables<'categories'>, 'category_name'>
 type BusinessUnitRelation = Pick<Tables<'business_units'>, 'business_unit_name'>
 type CostCenterRelation = Pick<Tables<'cost_centers'>, 'cost_center_name'>
 type SupplierRelation = Pick<Tables<'suppliers'>, 'supplier_name'>
+type ScopeLine = Pick<
+  Tables<'event_scope_lines'>,
+  'id' | 'line_number' | 'item_service_name' | 'uom'
+>
+type DormantScopeLine = ScopeLine & Pick<
+  Tables<'event_scope_lines'>,
+  | 'item_description'
+  | 'baseline_quantity'
+  | 'forecast_quantity'
+  | 'final_quantity'
+  | 'scope_change_description'
+> & {
+  scope_change_flag: boolean
+  business_equivalency_confirmed: boolean
+  category: CategoryRelation | null
+}
+type SupplierOption = Pick<Tables<'suppliers'>, 'id' | 'supplier_name'>
+type CategoryOption = Pick<Tables<'categories'>, 'id' | 'category_name'>
+type BusinessUnitOption = Pick<Tables<'business_units'>, 'id' | 'business_unit_name'>
+type CostCenterOption = Pick<Tables<'cost_centers'>, 'id' | 'cost_center_name'>
 
 function getFirst<T>(obj: ToOneRelation<T>): T | null {
   if (!obj) return null
@@ -107,11 +127,11 @@ export function EventDetail({
   currentProfile,
 }: {
   event: Event
-  scopeLines: any[]
-  suppliers: any[]
-  categories: any[]
-  businessUnits: any[]
-  costCenters: any[]
+  scopeLines: ScopeLine[]
+  suppliers: SupplierOption[]
+  categories: CategoryOption[]
+  businessUnits: BusinessUnitOption[]
+  costCenters: CostCenterOption[]
   updates: ProjectUpdate[]
   currentProfile: CurrentProfile
 }) {
@@ -185,7 +205,10 @@ export function EventDetail({
             currentProfile={currentProfile}
           />
         )}
-        {!isSupport && activeTab === 'scope' && <ScopeLinesTab eventId={event.id} scopeLines={scopeLines} />}
+        {/* The hidden Scope tab needs a wider query before its navigation entry is restored. */}
+        {!isSupport && activeTab === 'scope' && (
+          <ScopeLinesTab eventId={event.id} scopeLines={scopeLines as DormantScopeLine[]} />
+        )}
         {!isSupport && activeTab === 'baselines' && <BaselinesTab eventId={event.id} scopeLines={scopeLines} />}
         {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} />}
         {!isSupport && activeTab === 'awards' && <AwardsTab />}
@@ -213,14 +236,14 @@ export function EventDetail({
 function OverviewTab({ event }: { event: Event }) {
   const isSupport = event.project_type === 'Support'
 
-  const details = [
+  const details: { label: string; value: string | null | undefined }[] = [
     { label: 'Project Type', value: isSupport ? 'Support / Non-Commercial' : 'Sourcing' },
     { label: 'Owner / Buyer', value: event.buyer_name },
     { label: 'Category', value: getFirst(event.category)?.category_name },
     { label: 'Business Unit', value: getFirst(event.business_unit)?.business_unit_name },
     { label: 'Cost Center', value: getFirst(event.cost_center)?.cost_center_name },
     { label: 'Incumbent Supplier', value: getFirst(event.incumbent_supplier)?.supplier_name },
-  ].filter(Boolean) as { label: string; value: any }[]
+  ]
 
   const dates = [
     { label: isSupport ? 'Start Date' : 'Project Start', value: event.event_start_date },
