@@ -4,8 +4,14 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Search, Briefcase, LifeBuoy } from 'lucide-react'
 import { formatDate, statusColor } from '@/lib/utils'
+import type { Tables } from '@/lib/database.types'
 import { Input, Select } from '@/components/ui/input'
 import { clsx } from 'clsx'
+
+type ToOneRelation<T> = T | T[] | null
+type CategoryRelation = Pick<Tables<'categories'>, 'category_name'>
+type BusinessUnitRelation = Pick<Tables<'business_units'>, 'business_unit_name'>
+type SupplierRelation = Pick<Tables<'suppliers'>, 'supplier_name'>
 
 type EventRow = {
   id: string
@@ -18,13 +24,13 @@ type EventRow = {
   event_close_date: string | null
   contract_start_date: string | null
   contract_end_date: string | null
-  category: any
-  business_unit: any
-  incumbent_supplier: any
-  awarded_supplier: any
+  category: ToOneRelation<CategoryRelation>
+  business_unit: ToOneRelation<BusinessUnitRelation>
+  incumbent_supplier: ToOneRelation<SupplierRelation>
+  awarded_supplier: ToOneRelation<SupplierRelation>
 }
 
-function getFirst(obj: any): any {
+function getFirst<T>(obj: ToOneRelation<T>): T | null {
   if (!obj) return null
   if (Array.isArray(obj)) return obj[0] || null
   return obj
