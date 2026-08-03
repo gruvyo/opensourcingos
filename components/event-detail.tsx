@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatDate, statusColor } from '@/lib/utils'
+import type { Tables } from '@/lib/database.types'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,8 +20,13 @@ import { ScheduleTab } from './schedule-tab'
 import { RealizationTab } from './realization-tab'
 import { EditProjectModal } from './edit-project-modal'
 
+type ToOneRelation<T> = T | T[] | null
+type CategoryRelation = Pick<Tables<'categories'>, 'category_name'>
+type BusinessUnitRelation = Pick<Tables<'business_units'>, 'business_unit_name'>
+type CostCenterRelation = Pick<Tables<'cost_centers'>, 'cost_center_name'>
+type SupplierRelation = Pick<Tables<'suppliers'>, 'supplier_name'>
 
-function getFirst(obj: any): any {
+function getFirst<T>(obj: ToOneRelation<T>): T | null {
   if (!obj) return null
   if (Array.isArray(obj)) return obj[0] || null
   return obj
@@ -46,11 +52,11 @@ type Event = {
   project_type: string | null
   buyer_name: string | null
   notes: string | null
-  category: any
-  business_unit: any
-  cost_center: any
-  incumbent_supplier: any
-  awarded_supplier: any
+  category: ToOneRelation<CategoryRelation>
+  business_unit: ToOneRelation<BusinessUnitRelation>
+  cost_center: ToOneRelation<CostCenterRelation>
+  incumbent_supplier: ToOneRelation<SupplierRelation>
+  awarded_supplier: ToOneRelation<SupplierRelation>
 }
 
 type ProjectUpdate = {
