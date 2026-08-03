@@ -10,6 +10,7 @@ import { termRates, baselineQuality } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
+import type { Tables, TablesInsert } from '@/lib/database.types'
 
 type Baseline = {
   id: string
@@ -40,6 +41,21 @@ type ScopeLine = {
   uom: string | null
 }
 
+type ScopeLineRelation = Pick<Tables<'event_scope_lines'>, 'item_service_name' | 'uom'>
+type BaselineLine = Tables<'baseline_lines'> & {
+  scope_line: ScopeLineRelation | null
+}
+type BaselinePayload = Pick<
+  TablesInsert<'baselines'>,
+  | 'baseline_name'
+  | 'baseline_type'
+  | 'baseline_source'
+  | 'baseline_period_start'
+  | 'baseline_period_end'
+  | 'baseline_total_amount'
+  | 'baseline_term_months'
+>
+
 const BASELINE_TYPES = [
   'Current Contract',
   'Prior 12-Month Actual',
@@ -67,7 +83,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [baselineLines, setBaselineLines] = useState<Record<string, any[]>>({})
+  const [baselineLines, setBaselineLines] = useState<Record<string, BaselineLine[]>>({})
   const [editingBaseline, setEditingBaseline] = useState<Baseline | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
@@ -423,7 +439,7 @@ function HardReductionOverride({
   onChanged,
   onError,
 }: {
-  baseline: any
+  baseline: Baseline
   onChanged: () => void
   onError: (m: string | null) => void
 }) {
@@ -573,7 +589,7 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
     // type plus the source already identify a baseline. Derive it.
     const derivedName = [form.baseline_type, form.baseline_source].filter(Boolean).join(' - ')
 
-    const payload: Record<string, any> = {
+    const payload: BaselinePayload = {
       baseline_name: derivedName || form.baseline_type || 'Baseline',
       baseline_type: form.baseline_type,
       baseline_source: form.baseline_source || null,
@@ -695,7 +711,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   baselineId: string
   eventId: string
   scopeLines: ScopeLine[]
-  lines: any[]
+  lines: BaselineLine[]
   onLinesChanged: () => void
   isLocked: boolean
 }) {
@@ -820,7 +836,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     await refreshLinesAndTotal()
   }
 
-  const updateBaselineTotal = async (currentLines: any[]) => {
+  const updateBaselineTotal = async (currentLines: BaselineLine[]) => {
     const total = currentLines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
     // MONEY write — this total is the minuend of every savings calculation downstream.
     const { error: updateError } = await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
