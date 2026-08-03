@@ -4,6 +4,26 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { realizationRollup, getFirst } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { TrendingUp, ArrowRight } from 'lucide-react'
+import type { Tables } from '@/lib/database.types'
+
+type EventRelation = Pick<Tables<'sourcing_events'>, 'id' | 'event_name'>
+type RealizationPeriod = Pick<
+  Tables<'realization_periods'>,
+  | 'id'
+  | 'period_name'
+  | 'period_start_date'
+  | 'period_end_date'
+  | 'baseline_amount'
+  | 'projected_savings'
+  | 'actual_amount'
+  | 'realized_savings'
+  | 'leakage_amount'
+  | 'realization_status'
+  | 'finance_validated'
+  | 'event_id'
+> & {
+  event: EventRelation | EventRelation[] | null
+}
 
 // Dark-safe status pills for realization periods.
 const STATUS_PILL: Record<string, string> = {
@@ -29,8 +49,8 @@ export default async function RealizationPage() {
     `)
     .order('period_start_date', { ascending: true })
 
-  const rows = periods || []
-  const rollup = realizationRollup(rows as any)
+  const rows = (periods || []) as RealizationPeriod[]
+  const rollup = realizationRollup(rows)
 
   return (
     <div className="p-8">
@@ -91,8 +111,8 @@ export default async function RealizationPage() {
                 </td>
               </tr>
             ) : (
-              rows.map((p: any) => {
-                const event = getFirst<any>(p.event)
+              rows.map((p) => {
+                const event = getFirst<EventRelation>(p.event)
                 return (
                   <tr key={p.id} className="transition-colors hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3">
@@ -110,9 +130,9 @@ export default async function RealizationPage() {
                     <td className="px-4 py-3 text-right text-sm font-medium text-[var(--text)]">{formatCurrency(p.projected_savings)}</td>
                     <td className="px-4 py-3 text-right text-sm text-[var(--text-2)]">{formatCurrency(p.actual_amount)}</td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">{formatCurrency(p.realized_savings)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{p.leakage_amount > 0 ? formatCurrency(p.leakage_amount) : '—'}</td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{(p.leakage_amount ?? 0) > 0 ? formatCurrency(p.leakage_amount) : '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PILL[p.realization_status] || STATUS_PILL['Pending']}`}>
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PILL[p.realization_status ?? ''] || STATUS_PILL['Pending']}`}>
                         {p.realization_status}
                       </span>
                     </td>
