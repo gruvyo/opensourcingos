@@ -22,7 +22,7 @@ const navGroups = [
     label: 'Portfolio',
     items: [
       { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'Sourcing Events', href: '/events', icon: Briefcase },
+      { label: 'Projects', href: '/events', icon: Briefcase },
       { label: 'Savings', href: '/savings', icon: Calculator },
       { label: 'Realization', href: '/realization', icon: TrendingUp },
     ],
