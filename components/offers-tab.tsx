@@ -492,6 +492,16 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (showNewSupplier) {
+      setError('Add the new supplier or cancel before creating the offer.')
+      return
+    }
+    if (!form.supplier_id) {
+      setError('Select a supplier before creating the offer.')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -559,15 +569,21 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
             </button>
           </div>
           {showNewSupplier ? (
-            <div className="mt-1 flex gap-2">
-              <Input aria-label="New supplier name" type="text" value={newSupplierName} autoFocus
-                onChange={(e) => setNewSupplierName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSupplier() } }}
-                placeholder="New supplier name" />
-              <Button type="button" size="sm" disabled={addingSupplier || !newSupplierName.trim()}
-                onClick={handleAddSupplier}>
-                {addingSupplier ? 'Adding...' : 'Add'}
-              </Button>
+            <div className="mt-1">
+              <div className="flex gap-2">
+                <Input aria-label="New supplier name" aria-describedby="new-supplier-help"
+                  type="text" value={newSupplierName} autoFocus
+                  onChange={(e) => setNewSupplierName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSupplier() } }}
+                  placeholder="New supplier name" />
+                <Button type="button" size="sm" disabled={addingSupplier || !newSupplierName.trim()}
+                  onClick={handleAddSupplier}>
+                  {addingSupplier ? 'Adding...' : 'Add'}
+                </Button>
+              </div>
+              <p id="new-supplier-help" className="mt-1 text-xs text-[var(--text-3)]">
+                Select Add to create and choose this supplier before creating the offer.
+              </p>
             </div>
           ) : (
             <Select aria-label="Supplier" required value={form.supplier_id}
@@ -639,8 +655,8 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Offer'}
+        <Button type="submit" disabled={loading || addingSupplier || showNewSupplier}>
+          {loading ? 'Saving...' : showNewSupplier ? 'Add Supplier First' : isEdit ? 'Save Changes' : 'Create Offer'}
         </Button>
       </div>
     </form>
