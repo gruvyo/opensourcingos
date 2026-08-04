@@ -106,6 +106,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                       <Link
                         href={item.href}
                         onClick={onClose}
+                        aria-current={isActive ? 'page' : undefined}
                         className={clsx(
                           'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
                           isActive
@@ -133,6 +134,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         )}
         <ThemeToggle inverted />
         <button
+          type="button"
           onClick={handleLogout}
           className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
         >
@@ -160,7 +162,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             className="absolute inset-0 bg-black/50"
             onClick={onClose}
           />
-          <aside className="absolute left-0 top-0 flex h-full w-60 flex-col overflow-hidden bg-[var(--nav-bg)]">
+          <aside id="mobile-navigation" className="absolute left-0 top-0 flex h-full w-60 flex-col overflow-hidden bg-[var(--nav-bg)]">
             {sidebarContent}
           </aside>
         </div>

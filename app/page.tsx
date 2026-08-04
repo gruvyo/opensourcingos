@@ -29,7 +29,7 @@ const features = [
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f8f8ff] text-[#11162f] dark:bg-[#090d1b] dark:text-white">
+    <main id="main-content" tabIndex={-1} className="min-h-screen overflow-hidden bg-[#f8f8ff] text-[#11162f] dark:bg-[#090d1b] dark:text-white">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[720px] bg-[radial-gradient(circle_at_78%_12%,rgba(79,70,229,0.18),transparent_42%)]" />
 
       <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">

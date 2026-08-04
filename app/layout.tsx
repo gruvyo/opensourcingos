@@ -50,6 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <ThemeProvider>
           <AppShell>{children}</AppShell>
         </ThemeProvider>

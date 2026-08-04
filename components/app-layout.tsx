@@ -22,9 +22,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile top bar */}
         <div className="flex h-14 items-center gap-3 border-b border-white/10 bg-[var(--nav-bg)] px-4 text-white lg:hidden">
           <button
+            type="button"
             onClick={() => setSidebarOpen(true)}
             className="rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
             aria-label="Open menu"
+            aria-expanded={sidebarOpen}
+            aria-controls="mobile-navigation"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="4" x2="20" y1="6" y2="6"/>
@@ -41,7 +44,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Main content */}
-        <main className="app-canvas flex-1 overflow-y-auto">
+        <main id="main-content" tabIndex={-1} className="app-canvas flex-1 overflow-y-auto">
           {children}
         </main>
       </div>
