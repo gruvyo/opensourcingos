@@ -11,6 +11,33 @@ import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
+import type { Tables, TablesUpdate } from '@/lib/database.types'
+
+type CalculationOption = Pick<
+  Tables<'savings_calculations'>,
+  'id' | 'calculation_name' | 'savings_type' | 'gross_savings_amount' | 'baseline_total_amount'
+>
+
+type RealizationPeriod = Omit<
+  Tables<'realization_periods'>,
+  'baseline_amount' | 'projected_savings' | 'leakage_amount' | 'realization_status' | 'finance_validated'
+> & {
+  baseline_amount: number
+  projected_savings: number
+  leakage_amount: number
+  realization_status: string
+  finance_validated: boolean
+  savings_calculation: Pick<Tables<'savings_calculations'>, 'calculation_name' | 'savings_type'> | null
+}
+
+type PeriodForm = {
+  savings_calculation_id: string
+  period_name: string
+  period_start_date: string
+  period_end_date: string
+  baseline_amount: string
+  projected_savings: string
+}
 
 const REALIZATION_STATUS_COLORS: Record<string, string> = {
   'Pending': 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300',
@@ -24,8 +51,8 @@ const REALIZATION_STATUS_COLORS: Record<string, string> = {
 const REALIZATION_STATUSES = ['Pending', 'In Progress', 'Realized', 'Partially Realized', 'Not Realized', 'Leaked']
 
 export function RealizationTab({ eventId }: { eventId: string }) {
-  const [periods, setPeriods] = useState<any[]>([])
-  const [calculations, setCalculations] = useState<any[]>([])
+  const [periods, setPeriods] = useState<RealizationPeriod[]>([])
+  const [calculations, setCalculations] = useState<CalculationOption[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const supabase = createClient()
@@ -39,7 +66,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
       `)
       .eq('event_id', eventId)
       .order('period_start_date', { ascending: true })
-    setPeriods(data || [])
+    setPeriods((data || []) as RealizationPeriod[])
     setLoading(false)
   }, [eventId, supabase])
 
@@ -87,9 +114,9 @@ export function RealizationTab({ eventId }: { eventId: string }) {
     fetchPeriods()
   }
 
-  const toggleFinanceValidated = async (period: any) => {
+  const toggleFinanceValidated = async (period: RealizationPeriod) => {
     const { data: { user } } = await supabase.auth.getUser()
-    const updates: any = { finance_validated: !period.finance_validated }
+    const updates: TablesUpdate<'realization_periods'> = { finance_validated: !period.finance_validated }
     if (!period.finance_validated) {
       updates.finance_validated_by = user?.id
       updates.finance_validation_date = new Date().toISOString()
@@ -104,7 +131,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
     setPeriods(periods.filter(p => p.id !== periodId))
   }
 
-  const handleAdd = async (form: any) => {
+  const handleAdd = async (form: PeriodForm) => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase
       .from('profiles')
@@ -325,8 +352,8 @@ export function RealizationTab({ eventId }: { eventId: string }) {
 // Add Period Form
 // ============================================
 function AddPeriodForm({ calculations, onSaved, onCancel }: {
-  calculations: any[]
-  onSaved: (form: any) => void
+  calculations: CalculationOption[]
+  onSaved: (form: PeriodForm) => void
   onCancel: () => void
 }) {
   const [form, setForm] = useState({
