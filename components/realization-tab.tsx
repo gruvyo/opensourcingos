@@ -232,6 +232,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Input
+                        aria-label={`Actual spend for ${period.period_name}`}
                         type="number"
                         step="0.01"
                         defaultValue={period.actual_amount || ''}
@@ -250,6 +251,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <Select
+                        aria-label={`Status for ${period.period_name}`}
                         value={period.realization_status}
                         onChange={(e) => updateStatus(period.id, e.target.value)}
                         className={clsx('w-auto rounded-full border-0 px-2.5 py-1 text-xs font-medium',
@@ -345,13 +347,13 @@ function AddPeriodForm({ calculations, onSaved, onCancel }: {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className={labelClass}>Period Name *</label>
-          <Input type="text" required value={form.period_name}
+          <Input aria-label="Period Name" type="text" required value={form.period_name}
             onChange={(e) => setForm({ ...form, period_name: e.target.value })}
             className="mt-1" placeholder="e.g. Q1 FY2026 (Apr-Jun)" />
         </div>
         <div>
           <label className={labelClass}>Linked Calculation</label>
-          <Select value={form.savings_calculation_id}
+          <Select aria-label="Linked Calculation" value={form.savings_calculation_id}
             onChange={(e) => {
               const id = e.target.value
               const calc = calculations.find((c) => c.id === id)
@@ -375,25 +377,25 @@ function AddPeriodForm({ calculations, onSaved, onCancel }: {
         <div></div>
         <div>
           <label className={labelClass}>Period Start Date *</label>
-          <Input type="date" required value={form.period_start_date}
+          <Input aria-label="Period Start Date" type="date" required value={form.period_start_date}
             onChange={(e) => setForm({ ...form, period_start_date: e.target.value })}
             className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Period End Date *</label>
-          <Input type="date" required value={form.period_end_date}
+          <Input aria-label="Period End Date" type="date" required value={form.period_end_date}
             onChange={(e) => setForm({ ...form, period_end_date: e.target.value })}
             className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Baseline Amount *</label>
-          <Input type="number" step="0.01" required value={form.baseline_amount}
+          <Input aria-label="Baseline Amount" type="number" step="0.01" required value={form.baseline_amount}
             onChange={(e) => setForm({ ...form, baseline_amount: e.target.value })}
             className="mt-1" placeholder="0.00" />
         </div>
         <div>
           <label className={labelClass}>Projected Savings *</label>
-          <Input type="number" step="0.01" required value={form.projected_savings}
+          <Input aria-label="Projected Savings" type="number" step="0.01" required value={form.projected_savings}
             onChange={(e) => setForm({ ...form, projected_savings: e.target.value })}
             className="mt-1" placeholder="0.00" />
         </div>

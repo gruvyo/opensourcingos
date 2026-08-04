@@ -292,6 +292,7 @@ export function EventForm({
           <div className="md:col-span-2">
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Event' : 'Project'} Name *</label>
             <Input
+              aria-label={`${projectType === 'Sourcing' ? 'Event' : 'Project'} Name`}
               type="text"
               required
               value={form.event_name}
@@ -303,6 +304,7 @@ export function EventForm({
           <div className="md:col-span-2">
             <label className={labelClass}>Description</label>
             <textarea
+              aria-label="Description"
               value={form.event_description}
               onChange={(e) => handleChange('event_description', e.target.value)}
               className={textareaClass}
@@ -313,6 +315,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Event Type' : 'Support Type'} *</label>
             <Select
+              aria-label={projectType === 'Sourcing' ? 'Event Type' : 'Support Type'}
               required
               value={form.event_type}
               onChange={(e) => handleChange('event_type', e.target.value)}
@@ -327,6 +330,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>Status</label>
             <Select
+              aria-label="Status"
               value={form.event_status}
               onChange={(e) => handleChange('event_status', e.target.value)}
               className="mt-1"
@@ -339,6 +343,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>Owner / Buyer</label>
             <Input
+              aria-label="Owner or Buyer"
               type="text"
               value={form.buyer_name}
               onChange={(e) => handleChange('buyer_name', e.target.value)}
@@ -356,6 +361,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>Category</label>
             <Select
+              aria-label="Category"
               value={form.category_id}
               onChange={(e) => handleChange('category_id', e.target.value)}
               className="mt-1"
@@ -369,6 +375,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>Business Unit</label>
             <Select
+              aria-label="Business Unit"
               value={form.business_unit_id}
               onChange={(e) => handleChange('business_unit_id', e.target.value)}
               className="mt-1"
@@ -382,6 +389,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>Cost Center</label>
             <Select
+              aria-label="Cost Center"
               value={form.cost_center_id}
               onChange={(e) => handleChange('cost_center_id', e.target.value)}
               className="mt-1"
@@ -396,6 +404,7 @@ export function EventForm({
             <label className={labelClass}>Incumbent Supplier</label>
             <div className="mt-1 flex gap-2">
               <Select
+                aria-label="Incumbent Supplier"
                 value={form.incumbent_supplier_id}
                 onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)}
                 className="flex-1"
@@ -420,6 +429,7 @@ export function EventForm({
             {showAddSupplier && (
               <div className="mt-2 flex gap-2">
                 <Input
+                  aria-label="New supplier name"
                   type="text"
                   value={newSupplierName}
                   onChange={(e) => setNewSupplierName(e.target.value)}
@@ -448,6 +458,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Project Start Date' : 'Start Date'}</label>
             <Input
+              aria-label={projectType === 'Sourcing' ? 'Project Start Date' : 'Start Date'}
               type="date"
               value={form.event_start_date}
               onChange={(e) => handleChange('event_start_date', e.target.value)}
@@ -460,6 +471,7 @@ export function EventForm({
           <div>
             <label className={labelClass}>Project Due Date</label>
             <Input
+              aria-label="Project Due Date"
               type="date"
               value={form.project_due_date}
               onChange={(e) => handleChange('project_due_date', e.target.value)}
@@ -482,6 +494,7 @@ export function EventForm({
           Optional. This becomes the first dated entry in the project&apos;s update history.
         </p>
         <textarea
+          aria-label="Initial Project Update"
           value={form.notes}
           onChange={(e) => handleChange('notes', e.target.value)}
           className={textareaClass}

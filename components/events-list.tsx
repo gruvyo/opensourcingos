@@ -76,6 +76,7 @@ export function EventsList({ events }: { events: EventRow[] }) {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-3)]" />
           <Input
+            aria-label="Search projects"
             type="text"
             placeholder="Search projects..."
             value={search}
@@ -83,18 +84,18 @@ export function EventsList({ events }: { events: EventRow[] }) {
             className="pl-10"
           />
         </div>
-        <Select value={projectTypeFilter} onChange={(e) => setProjectTypeFilter(e.target.value)} className="w-auto">
+        <Select aria-label="Filter by project type" value={projectTypeFilter} onChange={(e) => setProjectTypeFilter(e.target.value)} className="w-auto">
           <option value="">All Projects</option>
           <option value="Sourcing">Sourcing</option>
           <option value="Support">Support</option>
         </Select>
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto">
+        <Select aria-label="Filter by status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto">
           <option value="">All Statuses</option>
           {EVENT_STATUSES.map((status) => (
             <option key={status} value={status}>{status}</option>
           ))}
         </Select>
-        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto">
+        <Select aria-label="Filter by event type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto">
           <option value="">All Types</option>
           {EVENT_TYPES.map((type) => (
             <option key={type} value={type}>{type}</option>

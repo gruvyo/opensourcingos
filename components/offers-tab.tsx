@@ -303,7 +303,7 @@ export function OffersTab({
                     </p>
                     {editingTotalId === offer.id ? (
                       <div className="mt-0.5 flex items-center gap-1">
-                        <Input type="number" step="0.01" autoFocus value={editTotalValue}
+                        <Input aria-label={`Edit total for ${offer.supplier?.supplier_name || 'supplier offer'}`} type="number" step="0.01" autoFocus value={editTotalValue}
                           onChange={(e) => setEditTotalValue(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') { e.preventDefault(); saveOfferTotal(offer.id) }
@@ -539,7 +539,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
           </div>
           {showNewSupplier ? (
             <div className="mt-1 flex gap-2">
-              <Input type="text" value={newSupplierName} autoFocus
+              <Input aria-label="New supplier name" type="text" value={newSupplierName} autoFocus
                 onChange={(e) => setNewSupplierName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSupplier() } }}
                 placeholder="New supplier name" />
@@ -549,7 +549,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
               </Button>
             </div>
           ) : (
-            <Select required value={form.supplier_id}
+            <Select aria-label="Supplier" required value={form.supplier_id}
               onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
               className="mt-1">
               <option value="">Select supplier...</option>
@@ -561,13 +561,13 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
         </div>
         <div>
           <label className={labelClass}>Offer Total ($) *</label>
-          <Input type="number" step="0.01" required value={form.offer_total_amount}
+          <Input aria-label="Offer Total" type="number" step="0.01" required value={form.offer_total_amount}
             onChange={(e) => setForm({ ...form, offer_total_amount: e.target.value })}
             className="mt-1" placeholder="e.g. 1200000" />
         </div>
         <div>
           <label className={labelClass}>Term (months) *</label>
-          <Input type="number" step="1" min="1" required value={form.offer_term_months}
+          <Input aria-label="Term in months" type="number" step="1" min="1" required value={form.offer_term_months}
             onChange={(e) => setForm({ ...form, offer_term_months: e.target.value })}
             className="mt-1" placeholder="12" />
           {(() => {
@@ -583,7 +583,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
         </div>
         <div>
           <label className={labelClass}>Offer Type</label>
-          <Select value={form.offer_type}
+          <Select aria-label="Offer Type" value={form.offer_type}
             onChange={(e) => setForm({ ...form, offer_type: e.target.value })}
             className="mt-1">
             {OFFER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -591,25 +591,25 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
         </div>
         <div>
           <label className={labelClass}>Round</label>
-          <Input type="number" min="1" value={form.offer_round}
+          <Input aria-label="Round" type="number" min="1" value={form.offer_round}
             onChange={(e) => setForm({ ...form, offer_round: e.target.value })}
             className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Offer Date</label>
-          <Input type="date" value={form.offer_date}
+          <Input aria-label="Offer Date" type="date" value={form.offer_date}
             onChange={(e) => setForm({ ...form, offer_date: e.target.value })}
             className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Valid Until</label>
-          <Input type="date" value={form.offer_valid_until}
+          <Input aria-label="Valid Until" type="date" value={form.offer_valid_until}
             onChange={(e) => setForm({ ...form, offer_valid_until: e.target.value })}
             className="mt-1" />
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Notes</label>
-          <textarea value={form.notes}
+          <textarea aria-label="Notes" value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             className={inputClass} rows={2} />
         </div>
@@ -784,7 +784,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="md:col-span-3">
               <label className={labelClass}>Scope Line</label>
-              <Select value={newLine.scope_line_id}
+              <Select aria-label="Scope Line" value={newLine.scope_line_id}
                 onChange={(e) => setNewLine({ ...newLine, scope_line_id: e.target.value })}>
                 <option value="">None</option>
                 {scopeLines.map((sl) => (
@@ -795,20 +795,20 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
               </Select>
             </div>
             <div>
-              <label className={labelClass}>Unit Price</label>
-              <Input type="number" step="0.0001" required value={newLine.offer_unit_price}
+              <label className={labelClass}>Unit Price *</label>
+              <Input aria-label="Unit Price" type="number" step="0.0001" required value={newLine.offer_unit_price}
                 onChange={(e) => setNewLine({ ...newLine, offer_unit_price: e.target.value })}
                 placeholder="0.00" />
             </div>
             <div>
-              <label className={labelClass}>Quantity</label>
-              <Input type="number" step="0.01" required value={newLine.offer_quantity}
+              <label className={labelClass}>Quantity *</label>
+              <Input aria-label="Quantity" type="number" step="0.01" required value={newLine.offer_quantity}
                 onChange={(e) => setNewLine({ ...newLine, offer_quantity: e.target.value })}
                 placeholder="0" />
             </div>
             <div>
               <label className={labelClass}>Term (months)</label>
-              <Input type="number" step="0.01" value={newLine.offer_term_months}
+              <Input aria-label="Term in months" type="number" step="0.01" value={newLine.offer_term_months}
                 onChange={(e) => setNewLine({ ...newLine, offer_term_months: e.target.value })} />
             </div>
             <div>
@@ -822,13 +822,13 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
             </div>
             <div>
               <label className={labelClass}>One-Time Amount</label>
-              <Input type="number" step="0.01" value={newLine.offer_one_time_amount}
+              <Input aria-label="One-Time Amount" type="number" step="0.01" value={newLine.offer_one_time_amount}
                 onChange={(e) => setNewLine({ ...newLine, offer_one_time_amount: e.target.value })}
                 placeholder="0" />
             </div>
             <div>
               <label className={labelClass}>Compliance</label>
-              <Select value={newLine.compliance_status}
+              <Select aria-label="Compliance" value={newLine.compliance_status}
                 onChange={(e) => setNewLine({ ...newLine, compliance_status: e.target.value })}>
                 <option value="Compliant">Compliant</option>
                 <option value="Non-Compliant">Non-Compliant</option>

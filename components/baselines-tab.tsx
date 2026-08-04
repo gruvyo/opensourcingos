@@ -294,7 +294,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                     </p>
                     {editingTotalId === baseline.id ? (
                       <div className="mt-0.5 flex items-center gap-1">
-                        <Input type="number" step="0.01" autoFocus value={editTotalValue}
+                        <Input aria-label={`Edit total for ${baseline.baseline_name}`} type="number" step="0.01" autoFocus value={editTotalValue}
                           onChange={(e) => setEditTotalValue(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') { e.preventDefault(); saveTotal(baseline.id) }
@@ -646,7 +646,7 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className={labelClass}>Baseline Type *</label>
-          <Select required value={form.baseline_type}
+          <Select aria-label="Baseline Type" required value={form.baseline_type}
             onChange={(e) => setForm({ ...form, baseline_type: e.target.value })}
             className="mt-1">
             <option value="">Select type...</option>
@@ -657,19 +657,19 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
         </div>
         <div>
           <label className={labelClass}>Source</label>
-          <Input type="text" value={form.baseline_source}
+          <Input aria-label="Source" type="text" value={form.baseline_source}
             onChange={(e) => setForm({ ...form, baseline_source: e.target.value })}
             className="mt-1" placeholder="e.g. Existing contract rate card" />
         </div>
         <div>
           <label className={labelClass}>Baseline Total ($) *</label>
-          <Input type="number" step="0.01" required value={form.baseline_total_amount}
+          <Input aria-label="Baseline Total" type="number" step="0.01" required value={form.baseline_total_amount}
             onChange={(e) => setForm({ ...form, baseline_total_amount: e.target.value })}
             className="mt-1" placeholder="e.g. 1000000" />
         </div>
         <div>
           <label className={labelClass}>Term (months) *</label>
-          <Input type="number" step="1" min="1" required value={form.baseline_term_months}
+          <Input aria-label="Term in months" type="number" step="1" min="1" required value={form.baseline_term_months}
             onChange={(e) => setForm({ ...form, baseline_term_months: e.target.value })}
             className="mt-1" placeholder="12" />
         </div>
@@ -687,13 +687,13 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
         </div>
         <div>
           <label className={labelClass}>Period Start</label>
-          <Input type="date" value={form.baseline_period_start}
+          <Input aria-label="Period Start" type="date" value={form.baseline_period_start}
             onChange={(e) => setForm({ ...form, baseline_period_start: e.target.value })}
             className="mt-1" />
         </div>
         <div>
           <label className={labelClass}>Period End</label>
-          <Input type="date" value={form.baseline_period_end}
+          <Input aria-label="Period End" type="date" value={form.baseline_period_end}
             onChange={(e) => setForm({ ...form, baseline_period_end: e.target.value })}
             className="mt-1" />
         </div>
@@ -884,7 +884,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div className="md:col-span-4">
               <label className={labelClass}>Scope Line (optional — link to existing scope)</label>
-              <Select value={newLine.scope_line_id}
+              <Select aria-label="Scope Line" value={newLine.scope_line_id}
                 onChange={(e) => setNewLine({ ...newLine, scope_line_id: e.target.value })}
                 className="px-2 py-1 text-xs">
                 <option value="">None</option>
@@ -896,20 +896,20 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
               </Select>
             </div>
             <div>
-              <label className={labelClass}>Unit Price</label>
-              <Input type="number" step="0.0001" required value={newLine.baseline_unit_price}
+              <label className={labelClass}>Unit Price *</label>
+              <Input aria-label="Unit Price" type="number" step="0.0001" required value={newLine.baseline_unit_price}
                 onChange={(e) => setNewLine({ ...newLine, baseline_unit_price: e.target.value })}
                 className="px-2 py-1 text-xs" placeholder="0.00" />
             </div>
             <div>
-              <label className={labelClass}>Quantity</label>
-              <Input type="number" step="0.01" required value={newLine.baseline_quantity}
+              <label className={labelClass}>Quantity *</label>
+              <Input aria-label="Quantity" type="number" step="0.01" required value={newLine.baseline_quantity}
                 onChange={(e) => setNewLine({ ...newLine, baseline_quantity: e.target.value })}
                 className="px-2 py-1 text-xs" placeholder="0" />
             </div>
             <div>
               <label className={labelClass}>Term (months)</label>
-              <Input type="number" step="0.01" value={newLine.baseline_term_months}
+              <Input aria-label="Term in months" type="number" step="0.01" value={newLine.baseline_term_months}
                 onChange={(e) => setNewLine({ ...newLine, baseline_term_months: e.target.value })}
                 className="px-2 py-1 text-xs" placeholder="12" />
             </div>
@@ -924,7 +924,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
             </div>
             <div>
               <label className={labelClass}>One-Time Amount</label>
-              <Input type="number" step="0.01" value={newLine.baseline_one_time_amount}
+              <Input aria-label="One-Time Amount" type="number" step="0.01" value={newLine.baseline_one_time_amount}
                 onChange={(e) => setNewLine({ ...newLine, baseline_one_time_amount: e.target.value })}
                 className="px-2 py-1 text-xs" placeholder="0" />
             </div>

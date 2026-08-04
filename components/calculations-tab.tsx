@@ -256,7 +256,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           <div className="flex items-center gap-2">
             {/* A lens, not a decision — the saved figure is always whole-term. */}
             <span className="text-xs text-[var(--text-3)]">View as</span>
-            <Select value={basis} onChange={(e) => setBasis(e.target.value as RateBasis)}
+            <Select aria-label="Display rate basis" value={basis} onChange={(e) => setBasis(e.target.value as RateBasis)}
               className="w-auto px-2 py-1 text-xs">
               <option value="perYear">Per year</option>
               <option value="perMonth">Per month</option>
@@ -384,7 +384,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Stage</label>
-                <Select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1">
+                <Select aria-label="Stage" value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1">
                   {CALC_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </Select>
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">
@@ -393,7 +393,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Savings start</label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1" />
+                <Input aria-label="Savings start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1" />
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">When the new pricing takes effect.</p>
               </div>
               <div>
