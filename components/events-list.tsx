@@ -104,6 +104,7 @@ export function EventsList({ events }: { events: EventRow[] }) {
 
       <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <table className="w-full min-w-[800px]">
+          <caption className="sr-only">Projects matching the current filters</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Name</th>

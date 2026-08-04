@@ -198,6 +198,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+              <caption className="sr-only">Project savings realization periods</caption>
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs uppercase text-[var(--text-3)]">
                   <th className="px-4 py-3">Period</th>

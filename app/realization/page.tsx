@@ -88,6 +88,7 @@ export default async function RealizationPage() {
           <h3 className="text-sm font-semibold text-[var(--text)]">Realization Periods</h3>
         </div>
         <table className="w-full min-w-[900px]">
+          <caption className="sr-only">Savings realization periods across projects</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">
               <th className="px-4 py-3">Project</th>

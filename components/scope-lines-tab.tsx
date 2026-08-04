@@ -196,6 +196,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
       {/* Scope Lines Table */}
       <Card className="overflow-hidden">
         <table className="w-full">
+          <caption className="sr-only">Project scope lines</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">#</th>
