@@ -858,16 +858,16 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
             <caption className="sr-only">Supplier offer pricing lines</caption>
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--text-3)]">
-                <th className="px-2 py-2">#</th>
-                <th className="px-2 py-2">Scope Line</th>
-                <th className="px-2 py-2 text-right">Unit Price</th>
-                <th className="px-2 py-2 text-right">Qty</th>
-                <th className="px-2 py-2 text-right">Extended</th>
-                <th className="px-2 py-2 text-right">One-Time</th>
-                <th className="px-2 py-2 text-right">Term</th>
-                <th className="px-2 py-2 text-right">Annualized</th>
-                <th className="px-2 py-2 text-center">Compliance</th>
-                <th className="px-2 py-2"></th>
+                <th scope="col" className="px-2 py-2">#</th>
+                <th scope="col" className="px-2 py-2">Scope Line</th>
+                <th scope="col" className="px-2 py-2 text-right">Unit Price</th>
+                <th scope="col" className="px-2 py-2 text-right">Qty</th>
+                <th scope="col" className="px-2 py-2 text-right">Extended</th>
+                <th scope="col" className="px-2 py-2 text-right">One-Time</th>
+                <th scope="col" className="px-2 py-2 text-right">Term</th>
+                <th scope="col" className="px-2 py-2 text-right">Annualized</th>
+                <th scope="col" className="px-2 py-2 text-center">Compliance</th>
+                <th scope="col" aria-label="Actions" className="px-2 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -1047,11 +1047,11 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
           <caption className="sr-only">Side-by-side baseline and supplier offer comparison</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
-              <th className="sticky left-0 bg-[var(--surface)] px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">
+              <th scope="col" className="sticky left-0 bg-[var(--surface)] px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">
                 Scope Line
               </th>
               {baselines[0] && (
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">
                   <div className="text-[var(--text-2)]">Baseline</div>
                   <div className="text-xs font-normal text-[var(--text-3)]">{baselines[0].baseline_name}</div>
                 </th>
@@ -1061,7 +1061,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                 const cmp2 = offers.filter((o: any) => termRates(o.offer_total_amount, o.offer_term_months).known)
                 const isLowest = cmp2.length > 0 && annualOf2(offer) === Math.min(...cmp2.map(annualOf2))
                 return (
-                  <th key={offer.id} className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">
+                  <th scope="col" key={offer.id} className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">
                     <div className="flex items-center justify-end gap-1">
                       {offer.supplier?.supplier_name}
                       {isLowest && <Badge tone="success">Lowest</Badge>}

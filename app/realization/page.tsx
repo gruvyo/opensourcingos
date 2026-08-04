@@ -91,13 +91,13 @@ export default async function RealizationPage() {
           <caption className="sr-only">Savings realization periods across projects</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">
-              <th className="px-4 py-3">Project</th>
-              <th className="px-4 py-3">Period</th>
-              <th className="px-4 py-3 text-right">Projected</th>
-              <th className="px-4 py-3 text-right">Actual</th>
-              <th className="px-4 py-3 text-right">Realized</th>
-              <th className="px-4 py-3 text-right">Leakage</th>
-              <th className="px-4 py-3">Status</th>
+              <th scope="col" className="px-4 py-3">Project</th>
+              <th scope="col" className="px-4 py-3">Period</th>
+              <th scope="col" className="px-4 py-3 text-right">Projected</th>
+              <th scope="col" className="px-4 py-3 text-right">Actual</th>
+              <th scope="col" className="px-4 py-3 text-right">Realized</th>
+              <th scope="col" className="px-4 py-3 text-right">Leakage</th>
+              <th scope="col" className="px-4 py-3">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">

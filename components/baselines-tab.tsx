@@ -951,16 +951,16 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
             <caption className="sr-only">Baseline pricing lines</caption>
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--text-3)]">
-                <th className="px-2 py-2">#</th>
-                <th className="px-2 py-2">Scope Line</th>
-                <th className="px-2 py-2 text-right">Unit Price</th>
-                <th className="px-2 py-2 text-right">Qty</th>
-                <th className="px-2 py-2 text-right">Extended</th>
-                <th className="px-2 py-2 text-right">Recurring</th>
-                <th className="px-2 py-2 text-right">One-Time</th>
-                <th className="px-2 py-2 text-right">Term (mo)</th>
-                <th className="px-2 py-2 text-right">Annualized</th>
-                {!isLocked && <th className="px-2 py-2"></th>}
+                <th scope="col" className="px-2 py-2">#</th>
+                <th scope="col" className="px-2 py-2">Scope Line</th>
+                <th scope="col" className="px-2 py-2 text-right">Unit Price</th>
+                <th scope="col" className="px-2 py-2 text-right">Qty</th>
+                <th scope="col" className="px-2 py-2 text-right">Extended</th>
+                <th scope="col" className="px-2 py-2 text-right">Recurring</th>
+                <th scope="col" className="px-2 py-2 text-right">One-Time</th>
+                <th scope="col" className="px-2 py-2 text-right">Term (mo)</th>
+                <th scope="col" className="px-2 py-2 text-right">Annualized</th>
+                {!isLocked && <th scope="col" aria-label="Actions" className="px-2 py-2"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">

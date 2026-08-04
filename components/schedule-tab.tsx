@@ -453,11 +453,11 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                     <caption className="sr-only">Scheduled savings totals by year</caption>
                     <thead>
                       <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-3)]">
-                        <th className="py-2 pr-3 font-medium">Year</th>
-                        <th className="py-2 pr-3 text-right font-medium">Months</th>
-                        <th className="py-2 pr-3 text-right font-medium">Cost Reduction</th>
-                        <th className="py-2 pr-3 text-right font-medium">Cost Avoidance</th>
-                        <th className="py-2 text-right font-medium">Total</th>
+                        <th scope="col" className="py-2 pr-3 font-medium">Year</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Months</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Cost Reduction</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Cost Avoidance</th>
+                        <th scope="col" className="py-2 text-right font-medium">Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -510,15 +510,15 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                     <caption className="sr-only">Savings schedule periods</caption>
                     <thead>
                       <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-3)]">
-                        <th className="py-2 pr-3 font-medium">#</th>
-                        <th className="py-2 pr-3 font-medium">Period</th>
-                        <th className="py-2 pr-3 text-right font-medium">Baseline</th>
-                        <th className="py-2 pr-3 text-right font-medium">Opening</th>
-                        <th className="py-2 pr-3 text-right font-medium">Final</th>
-                        <th className="py-2 pr-3 text-right font-medium">Cost Reduction</th>
-                        <th className="py-2 pr-3 text-right font-medium">Cost Avoidance</th>
-                        <th className="py-2 pr-3 text-right font-medium">Total</th>
-                        <th className="py-2 w-20" />
+                        <th scope="col" className="py-2 pr-3 font-medium">#</th>
+                        <th scope="col" className="py-2 pr-3 font-medium">Period</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Baseline</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Opening</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Final</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Cost Reduction</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Cost Avoidance</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Total</th>
+                        <th scope="col" aria-label="Actions" className="py-2 w-20" />
                       </tr>
                     </thead>
                     <tbody>
