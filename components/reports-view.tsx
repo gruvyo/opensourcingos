@@ -377,7 +377,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             <h2 className="text-sm font-semibold text-[var(--text)]">Portfolio filters</h2>
           </div>
           {filtersActive && (
-            <button onClick={resetFilters} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--brand-ink)] hover:underline">
+            <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--brand-ink)] hover:underline">
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               Clear filters
             </button>

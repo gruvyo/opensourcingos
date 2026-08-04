@@ -47,6 +47,33 @@ body {
     sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
+/* Keyboard navigation: keep the skip link off-screen until focused and give
+   plain links/buttons a visible focus indicator. Component primitives retain
+   their more specific focus-ring styles. */
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: .5rem;
+  background: var(--brand);
+  color: var(--on-brand);
+  padding: .625rem 1rem;
+  font-size: .875rem;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 /* Dark theme: token values only. Form controls and surfaces are styled by the
    design-token classes on the components themselves (see components/ui/*), so
    the legacy element-level and !important overrides are no longer needed. */

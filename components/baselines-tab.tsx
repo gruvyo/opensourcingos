@@ -331,7 +331,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         <Star className="h-3 w-3 fill-current" /> Baseline
                       </span>
                     ) : (
-                      <button onClick={() => selectBaseline(baseline.id)}
+                      <button type="button" onClick={() => selectBaseline(baseline.id)}
                         className="rounded border border-[var(--border-strong)] px-2 py-1 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                         title="Use this as the baseline for the savings chain">
                         Use as baseline
@@ -388,7 +388,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         no baseline-approval concept, and the savings calculation no longer
                         depends on which baseline is flagged official. Baselines stay editable. */}
                     <div className="flex items-center justify-end gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
-                      <button onClick={() => setEditingBaseline(baseline)}
+                      <button type="button" onClick={() => setEditingBaseline(baseline)}
                         className="flex items-center gap-1 text-xs font-medium text-[var(--brand-ink)] hover:underline">
                         <Pencil className="h-3.5 w-3.5" /> Edit baseline
                       </button>
@@ -865,7 +865,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
           </p>
         </div>
         {!isLocked && (
-          <button onClick={() => setShowAddLine(!showAddLine)}
+          <button type="button" onClick={() => setShowAddLine(!showAddLine)}
             className="flex items-center gap-1 rounded bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
             <Plus className="h-3 w-3" /> Add Line
           </button>

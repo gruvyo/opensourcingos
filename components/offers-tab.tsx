@@ -190,6 +190,7 @@ export function OffersTab({
         <div className="flex gap-2">
           {offers.length >= 2 && (
             <button
+              type="button"
               onClick={() => setShowCompare(!showCompare)}
               className="flex items-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 px-4 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
             >
@@ -332,6 +333,7 @@ export function OffersTab({
 
                   {/* Compliance Badge */}
                   <button
+                    type="button"
                     onClick={() => toggleCompliance(offer)}
                     className={clsx(
                       'flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
@@ -368,7 +370,7 @@ export function OffersTab({
                         { role: 'opening' as const, label: 'Opening proposal', hint: 'The vendor first ask. Drives Cost Avoidance.' },
                         { role: 'final' as const, label: 'Final offer', hint: 'What was signed. Drives Cost Reduction.' },
                       ]).map(({ role, label, hint }) => (
-                        <button key={role} title={hint}
+                        <button type="button" key={role} title={hint}
                           onClick={() => setRole(offer.id, offer.offer_role === role ? null : role)}
                           className={clsx(
                             'rounded px-2.5 py-1 text-xs font-medium transition-colors',
@@ -764,7 +766,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
         <h5 className="text-sm font-medium text-[var(--text-2)]">Offer Lines</h5>
-        <button onClick={() => setShowAddLine(!showAddLine)}
+        <button type="button" onClick={() => setShowAddLine(!showAddLine)}
           className="flex items-center gap-1 rounded bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
           <Plus className="h-3 w-3" /> Add Line
         </button>

@@ -57,7 +57,7 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center gap-2">
           <span className="text-3xl font-bold text-[var(--text)]">OpenSourcing</span>
@@ -75,6 +75,7 @@ function LoginPageContent() {
           </p>
 
           <button
+            type="button"
             onClick={signInWithGoogle}
             disabled={loading}
             className="mt-6 flex w-full items-center justify-center gap-3 rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -142,14 +143,14 @@ function LoginPageContent() {
           </a>
         </nav>
       </div>
-    </div>
+    </main>
   )
 }
 
 function LoginPageFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
       <p className="text-sm text-[var(--text-2)]">Loading sign in…</p>
-    </div>
+    </main>
   )
 }

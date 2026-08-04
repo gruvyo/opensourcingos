@@ -209,7 +209,7 @@ export function EditProjectModal({
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <h2 id={titleId} className="text-xl font-bold text-[var(--text)]">Edit Project</h2>
-          <button onClick={onClose} aria-label="Close dialog" className="rounded-md p-1 text-[var(--text-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]">
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="rounded-md p-1 text-[var(--text-3)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]">
             <X className="h-5 w-5" />
           </button>
         </div>

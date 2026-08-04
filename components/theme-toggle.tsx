@@ -19,6 +19,7 @@ export function ThemeToggle({ inverted = false }: { inverted?: boolean }) {
 
   return (
     <button
+      type="button"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       className={clsx(
         'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
