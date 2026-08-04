@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Tables, TablesInsert } from '@/lib/database.types'
 import {
@@ -435,12 +435,19 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
   const [error, setError] = useState<string | null>(null)
   // Most projects involve a first-time vendor, so a supplier must be creatable
   // right here rather than only on the New Project screen.
-  const [localSuppliers, setLocalSuppliers] = useState<Supplier[]>(suppliers)
+  const [addedSuppliers, setAddedSuppliers] = useState<Supplier[]>([])
   const [showNewSupplier, setShowNewSupplier] = useState(false)
   const [newSupplierName, setNewSupplierName] = useState('')
   const [addingSupplier, setAddingSupplier] = useState(false)
 
-  useEffect(() => { setLocalSuppliers(suppliers) }, [suppliers])
+  const localSuppliers = useMemo(() => {
+    const suppliersById = new Map(
+      [...suppliers, ...addedSuppliers].map(supplier => [supplier.id, supplier])
+    )
+    return Array.from(suppliersById.values()).sort((a, b) =>
+      a.supplier_name.localeCompare(b.supplier_name)
+    )
+  }, [suppliers, addedSuppliers])
 
   const handleAddSupplier = async () => {
     const name = newSupplierName.trim()
@@ -465,7 +472,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
     setAddingSupplier(false)
     if (insertError) { setError(insertError.message); return }
 
-    setLocalSuppliers(prev => [...prev, data as Supplier])
+    setAddedSuppliers(prev => [...prev, data as Supplier])
     setForm(prev => ({ ...prev, supplier_id: data.id }))
     setNewSupplierName('')
     setShowNewSupplier(false)
