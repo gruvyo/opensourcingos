@@ -409,6 +409,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 
                     {/* Baseline Lines Table */}
                     <BaselineLinesTable
+                      key={`${baseline.id}:${lines.map(line => line.id).join(',')}`}
                       baselineId={baseline.id}
                       eventId={eventId}
                       scopeLines={scopeLines}
@@ -735,8 +736,6 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     baseline_recurring_amount: '',
     baseline_one_time_amount: '',
   })
-
-  useEffect(() => { setLines(initialLines) }, [initialLines])
 
   // Auto-calculate extended amount
   const calcExtended = (price: number, qty: number) => price * qty
