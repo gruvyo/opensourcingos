@@ -261,7 +261,13 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
               <Card key={baseline.id} className="overflow-hidden">
                 {/* Baseline Header Row */}
                 <div className="flex items-center gap-4 p-4">
-                  <button onClick={() => toggleExpand(baseline.id)} className="text-[var(--text-3)] hover:text-[var(--text-2)]">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(baseline.id)}
+                    aria-expanded={isExpanded}
+                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} baseline ${baseline.baseline_name}`}
+                    className="text-[var(--text-3)] hover:text-[var(--text-2)]"
+                  >
                     {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                   </button>
 
@@ -386,8 +392,8 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         className="flex items-center gap-1 text-xs font-medium text-[var(--brand-ink)] hover:underline">
                         <Pencil className="h-3.5 w-3.5" /> Edit baseline
                       </button>
-                      <button onClick={() => handleDelete(baseline.id)}
-                        title="Delete this baseline"
+                      <button type="button" onClick={() => handleDelete(baseline.id)}
+                        aria-label={`Delete baseline ${baseline.baseline_name}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -987,7 +993,8 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
                   </td>
                   {!isLocked && (
                     <td className="px-2 py-2 text-right">
-                      <button onClick={() => handleDeleteLine(line.id)}
+                      <button type="button" onClick={() => handleDeleteLine(line.id)}
+                        aria-label={`Delete baseline line ${line.line_number}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
