@@ -66,7 +66,7 @@ export function num(x: unknown): number {
 }
 
 /** Supabase embeds to-one relations as an array OR an object; normalize. */
-export function getFirst<T = any>(obj: unknown): T | null {
+export function getFirst<T = Record<string, unknown>>(obj: unknown): T | null {
   if (!obj) return null
   if (Array.isArray(obj)) return (obj[0] as T) ?? null
   return obj as T
