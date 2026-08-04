@@ -17,7 +17,6 @@ import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
-import { formatDate } from '@/lib/utils'
 
 export type SupplierSummary = {
   id: string
@@ -29,7 +28,7 @@ export type SupplierSummary = {
   incumbentProjects: number
   awardedProjects: number
   linkedProjects: number
-  createdAt: string | null
+  addedOn: string
 }
 
 type SupplierFilter = 'all' | 'preferred' | 'diverse' | 'attention'
@@ -250,7 +249,7 @@ export function SuppliersView({ suppliers }: { suppliers: SupplierSummary[] }) {
                     <td className="px-4 py-3"><Badge tone={riskTone(supplier.risk)}>{supplier.risk || 'Unrated'}</Badge></td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{supplier.linkedProjects}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{supplier.awardedProjects}</td>
-                    <td className="px-5 py-3 text-[var(--text-3)] sm:px-6">{formatDate(supplier.createdAt)}</td>
+                    <td className="px-5 py-3 text-[var(--text-3)] sm:px-6">{supplier.addedOn}</td>
                   </tr>
                 ))}
               </tbody>

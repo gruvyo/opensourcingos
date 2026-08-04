@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { SuppliersView, type SupplierSummary } from '@/components/suppliers-view'
 import { PageHeader } from '@/components/ui/page-header'
+import { formatDate } from '@/lib/utils'
 
 type RelatedEvent = { id: string }
 
@@ -48,7 +49,9 @@ export default async function SuppliersPage() {
       incumbentProjects: incumbentEvents.length,
       awardedProjects: awardedEvents.length,
       linkedProjects: linkedEventIds.size,
-      createdAt: supplier.created_at,
+      // Format timestamps on the server so hydration cannot change the date
+      // when the browser is in a different timezone.
+      addedOn: formatDate(supplier.created_at),
     }
   })
 
