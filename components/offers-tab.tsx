@@ -855,6 +855,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">Supplier offer pricing lines</caption>
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--text-3)]">
                 <th className="px-2 py-2">#</th>
@@ -1043,6 +1044,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
 
       <div className="overflow-x-auto">
         <table className="w-full">
+          <caption className="sr-only">Side-by-side baseline and supplier offer comparison</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
               <th className="sticky left-0 bg-[var(--surface)] px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">

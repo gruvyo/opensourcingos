@@ -450,6 +450,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[520px] text-sm">
+                    <caption className="sr-only">Scheduled savings totals by year</caption>
                     <thead>
                       <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-3)]">
                         <th className="py-2 pr-3 font-medium">Year</th>
@@ -506,6 +507,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[860px] text-sm">
+                    <caption className="sr-only">Savings schedule periods</caption>
                     <thead>
                       <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-3)]">
                         <th className="py-2 pr-3 font-medium">#</th>

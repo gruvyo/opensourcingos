@@ -111,6 +111,7 @@ export default async function SavingsPage() {
           <h3 className="text-sm font-semibold text-[var(--text)]">All Savings Calculations</h3>
         </div>
         <table className="w-full min-w-[1000px]">
+          <caption className="sr-only">All savings calculations</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Event</th>
