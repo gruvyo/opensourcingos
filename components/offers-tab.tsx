@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { TablesInsert } from '@/lib/database.types'
+import type { Tables, TablesInsert } from '@/lib/database.types'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, CheckCircle, XCircle,
   Award, GitCompare, Users, Pencil
@@ -40,6 +40,10 @@ type ScopeLine = {
   uom: string | null
 }
 
+type OfferLine = Tables<'supplier_offer_lines'> & {
+  scope_line: Pick<Tables<'event_scope_lines'>, 'item_service_name' | 'uom'> | null
+}
+
 const OFFER_TYPES = ['Initial', 'Revised', 'Best and Final (BAFO)', 'Counter', 'Final']
 const COMPLIANCE_STATUS_COLORS: Record<string, string> = {
   'Compliant': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
@@ -62,7 +66,7 @@ export function OffersTab({
   const [showForm, setShowForm] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [offerLines, setOfferLines] = useState<Record<string, any[]>>({})
+  const [offerLines, setOfferLines] = useState<Record<string, OfferLine[]>>({})
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
@@ -636,7 +640,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
   offerId: string
   eventId: string
   scopeLines: ScopeLine[]
-  lines: any[]
+  lines: OfferLine[]
   onLinesChanged: () => void
 }) {
   const supabase = createClient()
@@ -752,7 +756,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     }
   }
 
-  const updateOfferTotal = async (currentLines: any[]) => {
+  const updateOfferTotal = async (currentLines: OfferLine[]) => {
     const total = currentLines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
     const { error } = await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
     if (error) setLineError(error.message)
@@ -899,7 +903,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
                   </td>
                   <td className="px-2 py-2 text-center">
                     <span className={clsx('rounded px-2 py-0.5 text-xs font-medium',
-                      COMPLIANCE_STATUS_COLORS[line.compliance_status] || 'bg-[var(--surface-2)] text-[var(--text-2)]'
+                      COMPLIANCE_STATUS_COLORS[line.compliance_status ?? ''] || 'bg-[var(--surface-2)] text-[var(--text-2)]'
                     )}>
                       {line.compliance_status}
                     </span>
@@ -935,7 +939,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
 // ============================================
 function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   offers: Offer[]
-  offerLines: Record<string, any[]>
+  offerLines: Record<string, OfferLine[]>
   fetchOfferLines: (id: string) => void
   eventId: string
 }) {
@@ -978,8 +982,8 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   const allScopeLines = new Map<string, string>()
   offers.forEach(offer => {
     const lines = offerLines[offer.id] || []
-    lines.forEach((line: any) => {
-      if (line.scope_line?.item_service_name) {
+    lines.forEach(line => {
+      if (line.scope_line_id && line.scope_line?.item_service_name) {
         allScopeLines.set(line.scope_line_id, line.scope_line.item_service_name)
       }
     })
@@ -990,13 +994,13 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   // Get line amount for a specific offer and scope line
   const getLineAmount = (offerId: string, scopeLineId: string) => {
     const lines = offerLines[offerId] || []
-    const line = lines.find((l: any) => l.scope_line_id === scopeLineId)
+    const line = lines.find(l => l.scope_line_id === scopeLineId)
     return line ? line.offer_extended_amount : null
   }
 
   const getLineUnitPrice = (offerId: string, scopeLineId: string) => {
     const lines = offerLines[offerId] || []
-    const line = lines.find((l: any) => l.scope_line_id === scopeLineId)
+    const line = lines.find(l => l.scope_line_id === scopeLineId)
     return line ? line.offer_unit_price : null
   }
 
@@ -1026,7 +1030,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   }
 
   const getLineAnnual = (offerId: string, scopeLineId: string) => {
-    const line = (offerLines[offerId] || []).find((l: any) => l.scope_line_id === scopeLineId)
+    const line = (offerLines[offerId] || []).find(l => l.scope_line_id === scopeLineId)
     return line ? (line.annualized_offer_amount ?? null) : null
   }
 
