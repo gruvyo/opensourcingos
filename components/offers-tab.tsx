@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { TablesInsert } from '@/lib/database.types'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, CheckCircle, XCircle,
   Award, GitCompare, Users, Pencil
@@ -62,7 +63,7 @@ export function OffersTab({
   const [showCompare, setShowCompare] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [offerLines, setOfferLines] = useState<Record<string, any[]>>({})
-  const [editingOffer, setEditingOffer] = useState<any | null>(null)
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null)
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
@@ -413,7 +414,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
   suppliers: Supplier[]
   onSupplierAdded?: () => void
   /** When set, the form edits this offer instead of creating a new one. */
-  existing?: any | null
+  existing?: Offer | null
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -485,7 +486,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
       .eq('id', user!.id)
       .single()
 
-    const payload: Record<string, any> = {
+    const payload: TablesInsert<'supplier_offers'> = {
       supplier_id: form.supplier_id,
       offer_type: form.offer_type,
       offer_round: parseInt(form.offer_round) || 1,
