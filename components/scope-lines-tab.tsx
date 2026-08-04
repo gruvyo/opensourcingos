@@ -126,13 +126,13 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-2">
               <label className={labelClass}>Item / Service Name *</label>
-              <Input type="text" required value={newLine.item_service_name}
+              <Input aria-label="Item or Service Name" type="text" required value={newLine.item_service_name}
                 onChange={(e) => setNewLine({ ...newLine, item_service_name: e.target.value })}
                 placeholder="e.g. CRM Enterprise License" />
             </div>
             <div>
               <label className={labelClass}>UOM</label>
-              <Select value={newLine.uom}
+              <Select aria-label="Unit of Measure" value={newLine.uom}
                 onChange={(e) => setNewLine({ ...newLine, uom: e.target.value })}>
                 <option value="">Select...</option>
                 {UOM_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -140,23 +140,23 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
             </div>
             <div className="md:col-span-3">
               <label className={labelClass}>Description</label>
-              <Input type="text" value={newLine.item_description}
+              <Input aria-label="Description" type="text" value={newLine.item_description}
                 onChange={(e) => setNewLine({ ...newLine, item_description: e.target.value })}
                 placeholder="Brief description" />
             </div>
             <div>
               <label className={labelClass}>Baseline Qty</label>
-              <Input type="number" step="0.01" value={newLine.baseline_quantity}
+              <Input aria-label="Baseline Quantity" type="number" step="0.01" value={newLine.baseline_quantity}
                 onChange={(e) => setNewLine({ ...newLine, baseline_quantity: e.target.value })} />
             </div>
             <div>
               <label className={labelClass}>Forecast Qty</label>
-              <Input type="number" step="0.01" value={newLine.forecast_quantity}
+              <Input aria-label="Forecast Quantity" type="number" step="0.01" value={newLine.forecast_quantity}
                 onChange={(e) => setNewLine({ ...newLine, forecast_quantity: e.target.value })} />
             </div>
             <div>
               <label className={labelClass}>Final Qty</label>
-              <Input type="number" step="0.01" value={newLine.final_quantity}
+              <Input aria-label="Final Quantity" type="number" step="0.01" value={newLine.final_quantity}
                 onChange={(e) => setNewLine({ ...newLine, final_quantity: e.target.value })} />
             </div>
             <div className="md:col-span-3 flex items-center gap-6">
@@ -176,7 +176,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
             {newLine.scope_change_flag && (
               <div className="md:col-span-3">
                 <label className={labelClass}>Scope Change Description</label>
-                <Input type="text" value={newLine.scope_change_description}
+                <Input aria-label="Scope Change Description" type="text" value={newLine.scope_change_description}
                   onChange={(e) => setNewLine({ ...newLine, scope_change_description: e.target.value })}
                   placeholder="Explain the scope change" />
               </div>

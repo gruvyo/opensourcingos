@@ -42,8 +42,8 @@ export function SettingsForm({ values, canEdit }: { values: SettingsValues; canE
           <h2 className="text-sm font-semibold text-[var(--text)]">Workspace identity</h2>
           <p className="mt-1 text-xs text-[var(--text-3)]">Names shown in navigation, reporting, and activity history.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field label="Organization name"><Input name="organizationName" defaultValue={values.organizationName} required /></Field>
-            <Field label="Your display name"><Input name="fullName" defaultValue={values.fullName} required /></Field>
+            <Field label="Organization name *"><Input name="organizationName" defaultValue={values.organizationName} required /></Field>
+            <Field label="Your display name *"><Input name="fullName" defaultValue={values.fullName} required /></Field>
           </div>
         </section>
 

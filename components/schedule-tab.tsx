@@ -356,18 +356,18 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Start month</label>
-                <Select value={startMonth} onChange={e => setStartMonth(Number(e.target.value))} className="mt-1">
+                <Select aria-label="Start month" value={startMonth} onChange={e => setStartMonth(Number(e.target.value))} className="mt-1">
                   {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </Select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Start year</label>
-                <Input type="number" min={2000} max={2100} value={startYear}
+                <Input aria-label="Start year" type="number" min={2000} max={2100} value={startYear}
                   onChange={e => setStartYear(Number(e.target.value))} className="mt-1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Period type</label>
-                <Select value={periodType} onChange={e => changeType(e.target.value as PeriodType)} className="mt-1">
+                <Select aria-label="Period type" value={periodType} onChange={e => changeType(e.target.value as PeriodType)} className="mt-1">
                   {PERIOD_TYPES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </Select>
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">
@@ -383,7 +383,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Period count</label>
-                <Input type="number" min={1} max={600} value={periodCount}
+                <Input aria-label="Period count" type="number" min={1} max={600} value={periodCount}
                   onChange={e => setPeriodCount(Number(e.target.value))} className="mt-1" />
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">
                   {defaultPeriodCount(periodType, dealMonths)} covers the {dealMonths}-month deal.
@@ -543,17 +543,17 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                             {editing ? (
                               <>
                                 <td className="py-1 pr-3">
-                                  <Input type="number" step="0.01" value={draft.baseline} placeholder="none"
+                                  <Input aria-label={`Baseline for ${monthName(r.period_month)} ${r.period_year}`} type="number" step="0.01" value={draft.baseline} placeholder="none"
                                     onChange={e => setDraft(d => ({ ...d, baseline: e.target.value }))}
                                     className="px-2 py-1 text-right text-xs" />
                                 </td>
                                 <td className="py-1 pr-3">
-                                  <Input type="number" step="0.01" value={draft.opening} placeholder="none"
+                                  <Input aria-label={`Opening amount for ${monthName(r.period_month)} ${r.period_year}`} type="number" step="0.01" value={draft.opening} placeholder="none"
                                     onChange={e => setDraft(d => ({ ...d, opening: e.target.value }))}
                                     className="px-2 py-1 text-right text-xs" />
                                 </td>
                                 <td className="py-1 pr-3">
-                                  <Input type="number" step="0.01" value={draft.final}
+                                  <Input aria-label={`Final amount for ${monthName(r.period_month)} ${r.period_year}`} type="number" step="0.01" value={draft.final}
                                     onChange={e => setDraft(d => ({ ...d, final: e.target.value }))}
                                     className="px-2 py-1 text-right text-xs" />
                                 </td>

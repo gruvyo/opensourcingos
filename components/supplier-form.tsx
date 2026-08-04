@@ -40,7 +40,7 @@ export function SupplierForm({ supplierId, values, owners }: { supplierId?: stri
     <form action={formAction} className="space-y-6">
       <fieldset disabled={pending} className="space-y-6 disabled:opacity-70">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Supplier name"><Input name="supplierName" defaultValue={values.supplierName} required autoFocus={!supplierId} /></Field>
+          <Field label="Supplier name *"><Input name="supplierName" defaultValue={values.supplierName} required autoFocus={!supplierId} /></Field>
           <Field label="Relationship owner"><Select name="relationshipOwnerId" defaultValue={values.relationshipOwnerId}><option value="">Unassigned</option>{owners.map(owner => <option key={owner.id} value={owner.id}>{owner.label}</option>)}</Select></Field>
           <Field label="Status"><Select name="supplierStatus" defaultValue={values.supplierStatus}>{['Active', 'Inactive', 'Prospective', 'Blocked', 'Under Review'].map(value => <option key={value}>{value}</option>)}</Select></Field>
           <Field label="Risk rating"><Select name="riskRating" defaultValue={values.riskRating}><option value="">Unrated</option>{['Low', 'Medium', 'High'].map(value => <option key={value}>{value}</option>)}</Select></Field>
