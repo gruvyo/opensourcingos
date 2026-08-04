@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Tables, TablesInsert } from '@/lib/database.types'
 import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
@@ -74,37 +74,45 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const [basis, setBasis] = useState<RateBasis>('perYear')
   const [status, setStatus] = useState('identified')
   const [startDate, setStartDate] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const load = useCallback(async () => {
-    const [{ data: bases }, { data: offers }, { data: calcs }, { data: ev }] = await Promise.all([
-      supabase.from('baselines')
-        .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected, hard_reduction_override, hard_reduction_override_reason')
-        .eq('event_id', eventId),
-      supabase.from('supplier_offers')
-        .select('id, offer_total_amount, offer_term_months, offer_role, offer_type, offer_round, supplier:suppliers(supplier_name)')
-        .eq('event_id', eventId),
-      supabase.from('savings_calculations').select('*').eq('event_id', eventId)
-        .order('created_at', { ascending: true }),
-      supabase.from('sourcing_events').select('contract_start_date, contract_end_date').eq('id', eventId).maybeSingle(),
-    ])
+  useEffect(() => {
+    let cancelled = false
 
-    setBaseline((bases || []).find(b => b.is_selected) ?? null)
-    setOpening((offers || []).find(o => o.offer_role === 'opening') ?? null)
-    setFinal((offers || []).find(o => o.offer_role === 'final') ?? null)
+    const load = async () => {
+      const [{ data: bases }, { data: offers }, { data: calcs }, { data: ev }] = await Promise.all([
+        supabase.from('baselines')
+          .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected, hard_reduction_override, hard_reduction_override_reason')
+          .eq('event_id', eventId),
+        supabase.from('supplier_offers')
+          .select('id, offer_total_amount, offer_term_months, offer_role, offer_type, offer_round, supplier:suppliers(supplier_name)')
+          .eq('event_id', eventId),
+        supabase.from('savings_calculations').select('*').eq('event_id', eventId)
+          .order('created_at', { ascending: true }),
+        supabase.from('sourcing_events').select('contract_start_date, contract_end_date').eq('id', eventId).maybeSingle(),
+      ])
 
-    const calc = (calcs || [])[0] ?? null
-    setExisting(calc)
-    if (calc) {
-      setStatus(calc.calculation_status || 'identified')
-      setStartDate(calc.savings_start_date || '')
-      setSavedAt(calc.updated_at || calc.created_at || null)
-    } else {
-      setStartDate(ev?.contract_start_date || '')
+      if (cancelled) return
+
+      setBaseline((bases || []).find(b => b.is_selected) ?? null)
+      setOpening((offers || []).find(o => o.offer_role === 'opening') ?? null)
+      setFinal((offers || []).find(o => o.offer_role === 'final') ?? null)
+
+      const calc = (calcs || [])[0] ?? null
+      setExisting(calc)
+      if (calc) {
+        setStatus(calc.calculation_status || 'identified')
+        setStartDate(calc.savings_start_date || '')
+        setSavedAt(calc.updated_at || calc.created_at || null)
+      } else {
+        setStartDate(ev?.contract_start_date || '')
+      }
+      setLoading(false)
     }
-    setLoading(false)
-  }, [eventId, supabase])
 
-  useEffect(() => { load() }, [load])
+    void load()
+    return () => { cancelled = true }
+  }, [eventId, supabase, refreshKey])
 
   const supplierName = (o: CalculationOffer | null) =>
     (Array.isArray(o?.supplier) ? o.supplier[0] : o?.supplier)?.supplier_name || 'Supplier'
@@ -241,7 +249,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     setSaving(false)
     if (res.error) { setError(res.error.message); return }
     setSavedAt(new Date().toISOString())
-    load()
+    setRefreshKey(key => key + 1)
   }
 
   if (loading) {
