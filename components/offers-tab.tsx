@@ -44,6 +44,10 @@ type OfferLine = Tables<'supplier_offer_lines'> & {
   scope_line: Pick<Tables<'event_scope_lines'>, 'item_service_name' | 'uom'> | null
 }
 
+type ComparisonBaseline = Tables<'baselines'> & {
+  baseline_lines: Tables<'baseline_lines'>[]
+}
+
 const OFFER_TYPES = ['Initial', 'Revised', 'Best and Final (BAFO)', 'Counter', 'Final']
 const COMPLIANCE_STATUS_COLORS: Record<string, string> = {
   'Compliant': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
@@ -944,7 +948,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   eventId: string
 }) {
   const supabase = createClient()
-  const [baselines, setBaselines] = useState<any[]>([])
+  const [baselines, setBaselines] = useState<ComparisonBaseline[]>([])
   const [baselineError, setBaselineError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1014,7 +1018,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   const baselineLines = baselines[0]?.baseline_lines || []
 
   const getBaselineLineAmount = (scopeLineId: string) => {
-    const line = baselineLines.find((l: any) => l.scope_line_id === scopeLineId)
+    const line = baselineLines.find(l => l.scope_line_id === scopeLineId)
     return line ? line.baseline_extended_amount : null
   }
 
@@ -1025,7 +1029,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   // Same column, opposite verdicts. Both tables already store the annualized
   // figure; only the row comparison was ignoring it.
   const getBaselineLineAnnual = (scopeLineId: string) => {
-    const line = baselineLines.find((l: any) => l.scope_line_id === scopeLineId)
+    const line = baselineLines.find(l => l.scope_line_id === scopeLineId)
     return line ? (line.annualized_baseline_amount ?? null) : null
   }
 
@@ -1064,8 +1068,8 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
                 </th>
               )}
               {offers.map((offer) => {
-                const annualOf2 = (o: any) => termRates(o.offer_total_amount, o.offer_term_months).perYear
-                const cmp2 = offers.filter((o: any) => termRates(o.offer_total_amount, o.offer_term_months).known)
+                const annualOf2 = (o: Offer) => termRates(o.offer_total_amount, o.offer_term_months).perYear
+                const cmp2 = offers.filter(o => termRates(o.offer_total_amount, o.offer_term_months).known)
                 const isLowest = cmp2.length > 0 && annualOf2(offer) === Math.min(...cmp2.map(annualOf2))
                 return (
                   <th scope="col" key={offer.id} className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">
