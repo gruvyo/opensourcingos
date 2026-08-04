@@ -35,7 +35,7 @@ export default async function SavingsPage() {
   const now = new Date()
 
   // Single source of truth for every headline/breakdown number.
-  const rollup = portfolioRollup(calcs, eventList as any, { now })
+  const rollup = portfolioRollup(calcs, eventList, { now })
 
   // The savings TYPE split comes from the two amount columns, never from the
   // derived savings_type label — a negotiation produces both legs, and the
@@ -48,7 +48,7 @@ export default async function SavingsPage() {
 
   // For per-row realized/accrued badges, use the SAME canonical rule.
   const contractStartByEventId = new Map<string, string | null>()
-  for (const e of eventList) contractStartByEventId.set((e as any).id, (e as any).contract_start_date ?? null)
+  for (const e of eventList) contractStartByEventId.set(e.id, e.contract_start_date ?? null)
 
   return (
     <div className="p-8">
@@ -137,8 +137,8 @@ export default async function SavingsPage() {
                 </td>
               </tr>
             ) : (
-              calcs.map((calc: any) => {
-                const event = getFirst<any>(calc.event)
+              calcs.map((calc) => {
+                const event = getFirst<{ event_name: string; contract_start_date: string | null }>(calc.event)
                 const totalForCalc = reportedSavings(calc)
                 const isRealized = classifyRealization(calc, contractStartByEventId, now) === 'Realized'
                 return (
