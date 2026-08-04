@@ -78,14 +78,17 @@ export function OffersTab({
   const supabase = createClient()
   // The `suppliers` prop is a server-render snapshot from page load. A supplier
   // created inline must show up in the next dropdown without a page refresh, so
-  // the tab owns the list and refetches on demand.
-  const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers)
-  useEffect(() => { setSupplierList(suppliers) }, [suppliers])
+  // combine that snapshot with the latest on-demand refresh. Deriving the list
+  // keeps prop updates visible without copying props into state in an effect.
+  const [refreshedSuppliers, setRefreshedSuppliers] = useState<Supplier[]>([])
+  const supplierList = Array.from(
+    new Map([...suppliers, ...refreshedSuppliers].map(supplier => [supplier.id, supplier])).values(),
+  ).sort((a, b) => a.supplier_name.localeCompare(b.supplier_name))
 
   const refreshSuppliers = useCallback(async () => {
     const { data } = await supabase
       .from('suppliers').select('id, supplier_name').order('supplier_name')
-    if (data) setSupplierList(data as Supplier[])
+    if (data) setRefreshedSuppliers(data as Supplier[])
   }, [supabase])
 
   // An offer's role IS the decision: marking one 'final' replaces the whole
