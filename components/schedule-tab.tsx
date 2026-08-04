@@ -318,7 +318,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
       </div>
 
       {error && (
-        <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>
+        <div role="alert" className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>
       )}
 
       {!calc ? (

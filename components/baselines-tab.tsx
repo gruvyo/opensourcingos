@@ -183,7 +183,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       </div>
 
       {actionError && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
           <strong>Could not save:</strong> {actionError}
           {actionError.includes('does not exist') && (
             <span> — this usually means a database migration has not been run yet.</span>
@@ -642,7 +642,7 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
       <h4 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Baseline' : 'New Baseline'}</h4>
-      {error && <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
+      {error && <div role="alert" className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className={labelClass}>Baseline Type *</label>
@@ -873,7 +873,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       </div>
 
       {error && (
-        <div className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">
+        <div role="alert" className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">
           {error}
         </div>
       )}

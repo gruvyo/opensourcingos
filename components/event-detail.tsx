@@ -180,17 +180,22 @@ export function EventDetail({
       </div>
 
       <div className="border-b border-[var(--border)]">
-        <nav className="flex gap-1 overflow-x-auto">
+        <nav aria-label="Project sections" className="flex gap-1 overflow-x-auto">
           {TABS.map((tab) => {
             const Icon = tab.icon
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button
+                key={tab.id}
+                type="button"
+                aria-pressed={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 className={clsx(
                   'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap',
                   activeTab === tab.id
                     ? 'border-[var(--brand)] text-[var(--brand-ink)]'
                     : 'border-transparent text-[var(--text-3)] hover:text-[var(--text)]'
-                )}>
+                )}
+              >
                 <Icon className="h-4 w-4" />
                 {tab.label}
               </button>

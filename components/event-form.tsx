@@ -237,7 +237,7 @@ export function EventForm({
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-6">
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">
+        <div role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">
           {error}
         </div>
       )}
@@ -248,6 +248,7 @@ export function EventForm({
         <div className="flex gap-3">
           <button
             type="button"
+            aria-pressed={projectType === 'Sourcing'}
             onClick={() => handleProjectTypeChange('Sourcing')}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
               projectType === 'Sourcing'
@@ -265,6 +266,7 @@ export function EventForm({
           </button>
           <button
             type="button"
+            aria-pressed={projectType === 'Support'}
             onClick={() => handleProjectTypeChange('Support')}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
               projectType === 'Support'
