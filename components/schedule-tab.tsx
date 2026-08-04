@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Tables } from '@/lib/database.types'
 import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X } from 'lucide-react'
 import { formatCurrency, formatReduction as money } from '@/lib/utils'
 import {
@@ -17,6 +18,24 @@ import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) }))
+
+type ScheduleBaseline = Pick<Tables<'baselines'>,
+  | 'id'
+  | 'baseline_total_amount'
+  | 'baseline_term_months'
+  | 'baseline_type'
+  | 'baseline_source'
+  | 'is_selected'
+  | 'hard_reduction_override'
+  | 'hard_reduction_override_reason'
+>
+
+type ScheduleOffer = Pick<Tables<'supplier_offers'>,
+  'id' | 'offer_total_amount' | 'offer_term_months' | 'offer_role'
+>
+
+type ScheduleCalculation = Tables<'savings_calculations'>
+type SavedScheduleRow = Tables<'savings_periods'>
 
 /** Money as typed: '' means the anchor is not captured, never zero. */
 const toAnchor = (v: string): number | null => (v.trim() === '' ? null : Number(v))
@@ -37,11 +56,11 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [baseline, setBaseline] = useState<any | null>(null)
-  const [opening, setOpening] = useState<any | null>(null)
-  const [final, setFinal] = useState<any | null>(null)
-  const [calc, setCalc] = useState<any | null>(null)
-  const [rows, setRows] = useState<any[]>([])
+  const [baseline, setBaseline] = useState<ScheduleBaseline | null>(null)
+  const [opening, setOpening] = useState<ScheduleOffer | null>(null)
+  const [final, setFinal] = useState<ScheduleOffer | null>(null)
+  const [calc, setCalc] = useState<ScheduleCalculation | null>(null)
+  const [rows, setRows] = useState<SavedScheduleRow[]>([])
 
   // Schedule settings (the header). Seeded from the saved schedule, else from
   // the savings start date, else from today.
@@ -68,9 +87,9 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
     const firstError = bases.error || offers.error || calcs.error
     if (firstError) { setError(firstError.message); setLoading(false); return }
 
-    const b = (bases.data || []).find((x: any) => x.is_selected) ?? null
-    const o = (offers.data || []).find((x: any) => x.offer_role === 'opening') ?? null
-    const f = (offers.data || []).find((x: any) => x.offer_role === 'final') ?? null
+    const b = (bases.data || []).find(x => x.is_selected) ?? null
+    const o = (offers.data || []).find(x => x.offer_role === 'opening') ?? null
+    const f = (offers.data || []).find(x => x.offer_role === 'final') ?? null
     const c = (calcs.data || [])[0] ?? null
     setBaseline(b); setOpening(o); setFinal(f); setCalc(c)
 
@@ -223,7 +242,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   // -------------------------------------------------------------------
   // Per-row editing. Only the three anchors; the split is always derived.
   // -------------------------------------------------------------------
-  const startEdit = (r: any) => {
+  const startEdit = (r: SavedScheduleRow) => {
     setEditingId(r.id)
     setDraft({
       baseline: r.baseline_amount === null || r.baseline_amount === undefined ? '' : String(r.baseline_amount),
@@ -236,7 +255,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
     baseline: toAnchor(draft.baseline), opening: toAnchor(draft.opening), final: Number(draft.final) || 0,
   })
 
-  const saveRow = async (r: any) => {
+  const saveRow = async (r: SavedScheduleRow) => {
     setBusy(true); setError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const res = await supabase.from('savings_periods').update({
@@ -258,7 +277,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   }
 
   /** Put one hand-edited row back to what the generator says it should be. */
-  const resetRow = async (r: any) => {
+  const resetRow = async (r: SavedScheduleRow) => {
     const g = preview[Number(r.period_number) - 1]
     if (!g) { setError('That period is outside the current schedule settings — regenerate instead.'); return }
     setBusy(true); setError(null)
