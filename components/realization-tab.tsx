@@ -261,20 +261,22 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                       </Select>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => toggleFinanceValidated(period)}
+                      <button type="button" onClick={() => toggleFinanceValidated(period)}
+                        aria-pressed={period.finance_validated}
+                        aria-label={`${period.finance_validated ? 'Remove' : 'Mark'} finance validation for ${period.period_name}`}
                         className={clsx(
                           'inline-flex items-center justify-center rounded-full p-1',
                           period.finance_validated
                             ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
                             : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--border)]'
                         )}
-                        title="Toggle Finance Validation"
                       >
                         {period.finance_validated ? <ShieldCheck className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleDelete(period.id)}
+                      <button type="button" onClick={() => handleDelete(period.id)}
+                        aria-label={`Delete realization period ${period.period_name}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
                         <Trash2 className="h-4 w-4" />
                       </button>

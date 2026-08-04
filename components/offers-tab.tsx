@@ -264,7 +264,13 @@ export function OffersTab({
               <Card key={offer.id} className="overflow-hidden">
                 {/* Offer Header */}
                 <div className="flex items-center gap-4 p-4">
-                  <button onClick={() => toggleExpand(offer.id)} className="text-[var(--text-3)] hover:text-[var(--text-2)]">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(offer.id)}
+                    aria-expanded={isExpanded}
+                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} offer from ${offer.supplier?.supplier_name || 'unknown supplier'}`}
+                    className="text-[var(--text-3)] hover:text-[var(--text-2)]"
+                  >
                     {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                   </button>
 
@@ -339,11 +345,14 @@ export function OffersTab({
                   </button>
 
                   {/* Delete */}
-                  <button onClick={() => setEditingOffer(offer)} title="Edit offer"
+                  <button type="button" onClick={() => setEditingOffer(offer)}
+                    aria-label={`Edit offer from ${offer.supplier?.supplier_name || 'unknown supplier'}`}
                     className="text-[var(--text-3)] hover:text-[var(--brand-ink)]">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button onClick={() => handleDelete(offer.id)} className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
+                  <button type="button" onClick={() => handleDelete(offer.id)}
+                    aria-label={`Delete offer from ${offer.supplier?.supplier_name || 'unknown supplier'}`}
+                    className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -892,7 +901,8 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
                     </span>
                   </td>
                   <td className="px-2 py-2 text-right">
-                    <button onClick={() => handleDeleteLine(line.id)}
+                    <button type="button" onClick={() => handleDeleteLine(line.id)}
+                      aria-label={`Delete offer line ${line.line_number}`}
                       className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

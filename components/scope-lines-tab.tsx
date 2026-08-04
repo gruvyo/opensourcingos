@@ -242,7 +242,8 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => handleDelete(line.id)}
+                    <button type="button" onClick={() => handleDelete(line.id)}
+                      aria-label={`Delete scope line ${line.line_number}: ${line.item_service_name}`}
                       className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                       <Trash2 className="h-4 w-4" />
                     </button>
