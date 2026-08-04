@@ -201,15 +201,15 @@ export function RealizationTab({ eventId }: { eventId: string }) {
               <caption className="sr-only">Project savings realization periods</caption>
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs uppercase text-[var(--text-3)]">
-                  <th className="px-4 py-3">Period</th>
-                  <th className="px-4 py-3 text-right">Baseline</th>
-                  <th className="px-4 py-3 text-right">Projected</th>
-                  <th className="px-4 py-3 text-right">Actual</th>
-                  <th className="px-4 py-3 text-right">Realized</th>
-                  <th className="px-4 py-3 text-right">Leakage</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-center">Finance</th>
-                  <th className="px-4 py-3"></th>
+                  <th scope="col" className="px-4 py-3">Period</th>
+                  <th scope="col" className="px-4 py-3 text-right">Baseline</th>
+                  <th scope="col" className="px-4 py-3 text-right">Projected</th>
+                  <th scope="col" className="px-4 py-3 text-right">Actual</th>
+                  <th scope="col" className="px-4 py-3 text-right">Realized</th>
+                  <th scope="col" className="px-4 py-3 text-right">Leakage</th>
+                  <th scope="col" className="px-4 py-3 text-center">Status</th>
+                  <th scope="col" className="px-4 py-3 text-center">Finance</th>
+                  <th scope="col" aria-label="Actions" className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">

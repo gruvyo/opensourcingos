@@ -199,14 +199,14 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
           <caption className="sr-only">Project scope lines</caption>
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">#</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">Item / Service</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">UOM</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">Baseline Qty</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">Forecast Qty</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">Final Qty</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[var(--text-3)]">Scope Change</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[var(--text-3)]">Actions</th>
+              <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">#</th>
+              <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">Item / Service</th>
+              <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-3)]">UOM</th>
+              <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">Baseline Qty</th>
+              <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">Forecast Qty</th>
+              <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--text-3)]">Final Qty</th>
+              <th scope="col" className="px-4 py-3 text-center text-xs font-semibold uppercase text-[var(--text-3)]">Scope Change</th>
+              <th scope="col" className="px-4 py-3 text-center text-xs font-semibold uppercase text-[var(--text-3)]">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
