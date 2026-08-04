@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Tables, TablesInsert } from '@/lib/database.types'
 import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import {
@@ -28,6 +29,29 @@ type Anchor = {
   missing: boolean
 }
 
+type CalculationBaseline = Pick<Tables<'baselines'>,
+  | 'id'
+  | 'baseline_name'
+  | 'baseline_type'
+  | 'baseline_source'
+  | 'baseline_total_amount'
+  | 'baseline_term_months'
+  | 'is_selected'
+  | 'hard_reduction_override'
+  | 'hard_reduction_override_reason'
+>
+
+type SupplierName = { supplier_name: string }
+
+type CalculationOffer = Pick<Tables<'supplier_offers'>,
+  | 'id'
+  | 'offer_total_amount'
+  | 'offer_term_months'
+  | 'offer_role'
+  | 'offer_type'
+  | 'offer_round'
+> & { supplier: SupplierName | SupplierName[] | null }
+
 /**
  * The savings calculation is DERIVED from three selected anchors, never typed:
  *   Opening -> Baseline -> Final
@@ -42,10 +66,10 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
 
-  const [baseline, setBaseline] = useState<any | null>(null)
-  const [opening, setOpening] = useState<any | null>(null)
-  const [final, setFinal] = useState<any | null>(null)
-  const [existing, setExisting] = useState<any | null>(null)
+  const [baseline, setBaseline] = useState<CalculationBaseline | null>(null)
+  const [opening, setOpening] = useState<CalculationOffer | null>(null)
+  const [final, setFinal] = useState<CalculationOffer | null>(null)
+  const [existing, setExisting] = useState<Tables<'savings_calculations'> | null>(null)
 
   const [basis, setBasis] = useState<RateBasis>('perYear')
   const [status, setStatus] = useState('identified')
@@ -64,9 +88,9 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       supabase.from('sourcing_events').select('contract_start_date, contract_end_date').eq('id', eventId).maybeSingle(),
     ])
 
-    setBaseline((bases || []).find((b: any) => b.is_selected) ?? null)
-    setOpening((offers || []).find((o: any) => o.offer_role === 'opening') ?? null)
-    setFinal((offers || []).find((o: any) => o.offer_role === 'final') ?? null)
+    setBaseline((bases || []).find(b => b.is_selected) ?? null)
+    setOpening((offers || []).find(o => o.offer_role === 'opening') ?? null)
+    setFinal((offers || []).find(o => o.offer_role === 'final') ?? null)
 
     const calc = (calcs || [])[0] ?? null
     setExisting(calc)
@@ -82,7 +106,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
 
   useEffect(() => { load() }, [load])
 
-  const supplierName = (o: any) =>
+  const supplierName = (o: CalculationOffer | null) =>
     (Array.isArray(o?.supplier) ? o.supplier[0] : o?.supplier)?.supplier_name || 'Supplier'
 
   const bRates = termRates(baseline?.baseline_total_amount, baseline?.baseline_term_months)
@@ -186,7 +210,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     // Denominator is BASELINE spend, never the opening ask. Null when there
     // is no baseline -- see reportableSavingsPct.
     const baselineOverTerm = overTerm(bRates, !!baseline)
-    const payload: Record<string, any> = {
+    const payload: TablesInsert<'savings_calculations'> = {
       event_id: eventId,
       baseline_id: baseline?.id ?? null,
       calculation_name: `${dealMonths}-month deal savings`,
