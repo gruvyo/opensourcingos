@@ -153,9 +153,8 @@ Run linting:
 npm run lint
 ```
 
-The methodology and TypeScript checks pass on `main`. The repository still has
-known lint debt, mostly loose database-row types and several React effect
-patterns; see the public-beta status below.
+The methodology, TypeScript, and lint checks pass on `main`. Savings-related
+changes should always run the complete methodology suite before review.
 
 ## Security model
 
@@ -173,11 +172,16 @@ Please report suspected vulnerabilities privately as described in
 ## Project status
 
 OpenSourcingOS is an MVP and public beta. The core savings methodology,
-workspace isolation, Google sign-in, schedules, and fiscal-year reporting are
-working. Current priorities are:
+workspace isolation, Google sign-in, schedules, fiscal-year reporting,
+accessibility foundations, and desktop/mobile browser journeys are working.
+Current priorities are:
 
-1. Reduce TypeScript and React lint debt.
-2. Complete accessibility and end-to-end browser testing.
+1. Preserve methodology traceability, workspace isolation, accessibility, and
+   cross-browser confidence as the product evolves.
+2. Add administrator controls for modules, optional project fields, and
+   workspace-managed selection lists.
+3. Expand dashboards, collaboration workflows, and supplier administration,
+   risk, performance, and reporting capabilities.
 
 ## Contributing
 
