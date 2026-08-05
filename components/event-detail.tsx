@@ -146,12 +146,12 @@ export function EventDetail({
   const TABS = isSupport ? SUPPORT_TABS : SOURCING_TABS
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-[var(--text)]">{event.event_name}</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="min-w-0 break-words text-2xl font-bold text-[var(--text)]">{event.event_name}</h1>
               <span className={clsx(
                 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
                 isSupport
@@ -166,13 +166,15 @@ export function EventDetail({
               {event.event_type || '—'}
             </p>
           </div>
-          <span className={clsx('inline-flex shrink-0 rounded-full px-3 py-1 text-sm font-medium', statusColor(event.event_status))}>
-            {event.event_status}
-          </span>
-          <Button variant="secondary" size="sm" onClick={() => setShowEditModal(true)}>
-            <Pencil className="h-3.5 w-3.5" />
-            Edit
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+            <span className={clsx('inline-flex rounded-full px-3 py-1 text-sm font-medium', statusColor(event.event_status))}>
+              {event.event_status}
+            </span>
+            <Button variant="secondary" size="sm" onClick={() => setShowEditModal(true)}>
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+          </div>
         </div>
         {event.event_description && (
           <p className="mt-3 text-sm text-[var(--text-2)]">{event.event_description}</p>
