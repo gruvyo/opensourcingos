@@ -15,6 +15,7 @@ import {
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) }))
@@ -55,6 +56,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
 
   const [baseline, setBaseline] = useState<ScheduleBaseline | null>(null)
   const [opening, setOpening] = useState<ScheduleOffer | null>(null)
@@ -241,9 +243,6 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   // -------------------------------------------------------------------
   const generate = async () => {
     if (!calc) return
-    if (editedCount > 0 && !confirm(
-      `${editedCount} row${editedCount === 1 ? ' has' : 's have'} been edited by hand. ` +
-      'Regenerating discards those edits. Continue?')) return
 
     setBusy(true); setError(null)
     const { data: { user } } = await supabase.auth.getUser()
@@ -484,7 +483,10 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                   </p>
                 )}
               </div>
-              <Button onClick={generate} disabled={busy}>
+              <Button
+                onClick={() => editedCount > 0 ? setShowRegenerateConfirm(true) : void generate()}
+                disabled={busy}
+              >
                 {busy ? 'Working...' : saved.length ? 'Regenerate schedule' : 'Generate schedule'}
               </Button>
             </div>
@@ -699,6 +701,16 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
             </>
           )}
         </>
+      )}
+      {showRegenerateConfirm && (
+        <ConfirmDialog
+          title="Regenerate this schedule?"
+          description={`${editedCount} row${editedCount === 1 ? ' has' : 's have'} been edited by hand. Regenerating discards those edits and replaces the saved schedule.`}
+          confirmLabel="Regenerate Schedule"
+          pendingLabel="Regenerating..."
+          onConfirm={generate}
+          onCancel={() => setShowRegenerateConfirm(false)}
+        />
       )}
     </div>
   )

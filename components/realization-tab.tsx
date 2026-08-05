@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import type { Tables, TablesUpdate } from '@/lib/database.types'
 
@@ -57,6 +58,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [periodToDelete, setPeriodToDelete] = useState<RealizationPeriod | null>(null)
   const supabase = createClient()
 
   const fetchPeriods = useCallback(async (failureMessage = 'Realization data could not be refreshed') => {
@@ -208,7 +210,6 @@ export function RealizationTab({ eventId }: { eventId: string }) {
   }
 
   const handleDelete = async (periodId: string) => {
-    if (!confirm('Delete this realization period?')) return
     setBusy(true)
     setError(null)
     const { data: deletedPeriod, error: deleteError } = await supabase
@@ -439,7 +440,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button type="button" onClick={() => handleDelete(period.id)}
+                      <button type="button" onClick={() => setPeriodToDelete(period)}
                         disabled={busy}
                         aria-label={`Delete realization period ${period.period_name}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
@@ -479,6 +480,16 @@ export function RealizationTab({ eventId }: { eventId: string }) {
           </div>
         </div>
       </div>
+      {periodToDelete && (
+        <ConfirmDialog
+          title="Delete this realization period?"
+          description={`This permanently removes ${periodToDelete.period_name} and its recorded realization amounts. This cannot be undone.`}
+          confirmLabel="Delete Period"
+          pendingLabel="Deleting Period..."
+          onConfirm={() => handleDelete(periodToDelete.id)}
+          onCancel={() => setPeriodToDelete(null)}
+        />
+      )}
     </div>
   )
 }
