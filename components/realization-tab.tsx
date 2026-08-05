@@ -71,16 +71,35 @@ export function RealizationTab({ eventId }: { eventId: string }) {
   }, [eventId, supabase])
 
   useEffect(() => {
-    fetchPeriods()
-    const fetchCalcs = async () => {
-      const { data } = await supabase
-        .from('savings_calculations')
-        .select('id, calculation_name, savings_type, gross_savings_amount, baseline_total_amount')
-        .eq('event_id', eventId)
-      setCalculations(data || [])
+    let cancelled = false
+
+    const loadInitialData = async () => {
+      const [periodResult, calculationResult] = await Promise.all([
+        supabase
+          .from('realization_periods')
+          .select(`
+            *,
+            savings_calculation:savings_calculations(calculation_name, savings_type)
+          `)
+          .eq('event_id', eventId)
+          .order('period_start_date', { ascending: true }),
+        supabase
+          .from('savings_calculations')
+          .select('id, calculation_name, savings_type, gross_savings_amount, baseline_total_amount')
+          .eq('event_id', eventId),
+      ])
+
+      if (cancelled) return
+
+      setPeriods((periodResult.data || []) as RealizationPeriod[])
+      setCalculations(calculationResult.data || [])
+      setLoading(false)
     }
-    fetchCalcs()
-  }, [fetchPeriods, eventId, supabase])
+
+    void loadInitialData()
+
+    return () => { cancelled = true }
+  }, [eventId, supabase])
 
   const updateActualAmount = async (periodId: string, actualAmount: string) => {
     const actual = parseFloat(actualAmount) || 0
