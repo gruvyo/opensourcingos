@@ -54,11 +54,13 @@ export function RealizationTab({ eventId }: { eventId: string }) {
   const [periods, setPeriods] = useState<RealizationPeriod[]>([])
   const [calculations, setCalculations] = useState<CalculationOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const supabase = createClient()
 
-  const fetchPeriods = useCallback(async () => {
-    const { data } = await supabase
+  const fetchPeriods = useCallback(async (failureMessage = 'Realization data could not be refreshed') => {
+    const { data, error: loadError } = await supabase
       .from('realization_periods')
       .select(`
         *,
@@ -66,8 +68,16 @@ export function RealizationTab({ eventId }: { eventId: string }) {
       `)
       .eq('event_id', eventId)
       .order('period_start_date', { ascending: true })
+
+    if (loadError) {
+      setError(`${failureMessage}: ${loadError.message}`)
+      setLoading(false)
+      return false
+    }
+
     setPeriods((data || []) as RealizationPeriod[])
     setLoading(false)
+    return true
   }, [eventId, supabase])
 
   useEffect(() => {
@@ -91,6 +101,13 @@ export function RealizationTab({ eventId }: { eventId: string }) {
 
       if (cancelled) return
 
+      const loadError = periodResult.error || calculationResult.error
+      if (loadError) {
+        setError(`Realization data could not be loaded: ${loadError.message}`)
+        setLoading(false)
+        return
+      }
+
       setPeriods((periodResult.data || []) as RealizationPeriod[])
       setCalculations(calculationResult.data || [])
       setLoading(false)
@@ -104,7 +121,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
   const updateActualAmount = async (periodId: string, actualAmount: string) => {
     const actual = parseFloat(actualAmount) || 0
     const period = periods.find(p => p.id === periodId)
-    if (!period) return
+    if (!period) return false
 
     const realized = period.baseline_amount - actual
     const leakage = period.projected_savings - realized
@@ -116,7 +133,9 @@ export function RealizationTab({ eventId }: { eventId: string }) {
       else status = 'Leaked'
     }
 
-    await supabase
+    setBusy(true)
+    setError(null)
+    const { data: updatedPeriod, error: updateError } = await supabase
       .from('realization_periods')
       .update({
         actual_amount: actual,
@@ -125,59 +144,141 @@ export function RealizationTab({ eventId }: { eventId: string }) {
         realization_status: status,
       })
       .eq('id', periodId)
-    fetchPeriods()
+      .select('id')
+      .maybeSingle()
+    if (updateError || !updatedPeriod) {
+      setError(`Actual spend could not be saved: ${updateError?.message || 'The realization period was not updated'}`)
+      setBusy(false)
+      return false
+    }
+
+    const refreshed = await fetchPeriods('Actual spend was saved, but realization data could not be refreshed')
+    setBusy(false)
+    return refreshed
   }
 
   const updateStatus = async (periodId: string, status: string) => {
-    await supabase.from('realization_periods').update({ realization_status: status }).eq('id', periodId)
-    fetchPeriods()
+    setBusy(true)
+    setError(null)
+    const { data: updatedPeriod, error: updateError } = await supabase
+      .from('realization_periods')
+      .update({ realization_status: status })
+      .eq('id', periodId)
+      .select('id')
+      .maybeSingle()
+    if (updateError || !updatedPeriod) {
+      setError(`Realization status could not be saved: ${updateError?.message || 'The realization period was not updated'}`)
+      setBusy(false)
+      return
+    }
+
+    await fetchPeriods('Realization status was saved, but realization data could not be refreshed')
+    setBusy(false)
   }
 
   const toggleFinanceValidated = async (period: RealizationPeriod) => {
-    const { data: { user } } = await supabase.auth.getUser()
+    setBusy(true)
+    setError(null)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      setError(`Finance validation could not be saved: ${userError?.message || 'Not logged in'}`)
+      setBusy(false)
+      return
+    }
+
     const updates: TablesUpdate<'realization_periods'> = { finance_validated: !period.finance_validated }
     if (!period.finance_validated) {
-      updates.finance_validated_by = user?.id
+      updates.finance_validated_by = user.id
       updates.finance_validation_date = new Date().toISOString()
     }
-    await supabase.from('realization_periods').update(updates).eq('id', period.id)
-    fetchPeriods()
+    const { data: updatedPeriod, error: updateError } = await supabase
+      .from('realization_periods')
+      .update(updates)
+      .eq('id', period.id)
+      .select('id')
+      .maybeSingle()
+    if (updateError || !updatedPeriod) {
+      setError(`Finance validation could not be saved: ${updateError?.message || 'The realization period was not updated'}`)
+      setBusy(false)
+      return
+    }
+
+    await fetchPeriods('Finance validation was saved, but realization data could not be refreshed')
+    setBusy(false)
   }
 
   const handleDelete = async (periodId: string) => {
     if (!confirm('Delete this realization period?')) return
-    await supabase.from('realization_periods').delete().eq('id', periodId)
-    setPeriods(periods.filter(p => p.id !== periodId))
+    setBusy(true)
+    setError(null)
+    const { data: deletedPeriod, error: deleteError } = await supabase
+      .from('realization_periods')
+      .delete()
+      .eq('id', periodId)
+      .select('id')
+      .maybeSingle()
+    if (deleteError || !deletedPeriod) {
+      setError(`Realization period could not be deleted: ${deleteError?.message || 'The realization period was not deleted'}`)
+      setBusy(false)
+      return
+    }
+
+    setPeriods(current => current.filter(period => period.id !== periodId))
+    setBusy(false)
   }
 
   const handleAdd = async (form: PeriodForm) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase
+    setBusy(true)
+    setError(null)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      setError(`Realization period could not be added: ${userError?.message || 'Not logged in'}`)
+      setBusy(false)
+      return
+    }
+
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', user!.id)
+      .eq('id', user.id)
       .single()
+    if (profileError || !profile?.organization_id) {
+      setError(`Realization period could not be added: ${profileError?.message || 'Workspace not found'}`)
+      setBusy(false)
+      return
+    }
 
     const baseline = parseFloat(form.baseline_amount) || 0
     const projected = parseFloat(form.projected_savings) || 0
 
-    await supabase.from('realization_periods').insert({
-      organization_id: profile?.organization_id,
-      event_id: eventId,
-      savings_calculation_id: form.savings_calculation_id || null,
-      period_name: form.period_name,
-      period_start_date: form.period_start_date,
-      period_end_date: form.period_end_date,
-      baseline_amount: baseline,
-      projected_savings: projected,
-      actual_amount: 0,
-      realized_savings: 0,
-      leakage_amount: 0,
-      realization_status: 'Pending',
-      created_by: user?.id,
-    })
+    const { data: insertedPeriod, error: insertError } = await supabase
+      .from('realization_periods')
+      .insert({
+        organization_id: profile.organization_id,
+        event_id: eventId,
+        savings_calculation_id: form.savings_calculation_id || null,
+        period_name: form.period_name,
+        period_start_date: form.period_start_date,
+        period_end_date: form.period_end_date,
+        baseline_amount: baseline,
+        projected_savings: projected,
+        actual_amount: 0,
+        realized_savings: 0,
+        leakage_amount: 0,
+        realization_status: 'Pending',
+        created_by: user.id,
+      })
+      .select('id')
+      .maybeSingle()
+    if (insertError || !insertedPeriod) {
+      setError(`Realization period could not be added: ${insertError?.message || 'The realization period was not created'}`)
+      setBusy(false)
+      return
+    }
+
     setShowForm(false)
-    fetchPeriods()
+    await fetchPeriods('Realization period was added, but realization data could not be refreshed')
+    setBusy(false)
   }
 
   if (loading) {
@@ -192,13 +293,19 @@ export function RealizationTab({ eventId }: { eventId: string }) {
 
   return (
     <div>
+      {error && (
+        <div role="alert" className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-[var(--text)]">Realization Tracking</h3>
           <p className="text-sm text-[var(--text-2)]">Track actual savings vs projected savings over time</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
+        <Button disabled={busy} onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Period
         </Button>
@@ -230,6 +337,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
           calculations={calculations}
           onSaved={handleAdd}
           onCancel={() => setShowForm(false)}
+          busy={busy}
         />
       )}
 
@@ -282,7 +390,12 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                         type="number"
                         step="0.01"
                         defaultValue={period.actual_amount || ''}
-                        onBlur={(e) => updateActualAmount(period.id, e.target.value)}
+                        disabled={busy}
+                        onBlur={async (e) => {
+                          const input = e.currentTarget
+                          const saved = await updateActualAmount(period.id, input.value)
+                          if (!saved) input.value = period.actual_amount == null ? '' : String(period.actual_amount)
+                        }}
                         placeholder="0"
                         className="w-28"
                       />
@@ -299,6 +412,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                       <Select
                         aria-label={`Status for ${period.period_name}`}
                         value={period.realization_status}
+                        disabled={busy}
                         onChange={(e) => updateStatus(period.id, e.target.value)}
                         className={clsx('w-auto rounded-full border-0 px-2.5 py-1 text-xs font-medium',
                           REALIZATION_STATUS_COLORS[period.realization_status]
@@ -311,6 +425,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button type="button" onClick={() => toggleFinanceValidated(period)}
+                        disabled={busy}
                         aria-pressed={period.finance_validated}
                         aria-label={`${period.finance_validated ? 'Remove' : 'Mark'} finance validation for ${period.period_name}`}
                         className={clsx(
@@ -325,6 +440,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button type="button" onClick={() => handleDelete(period.id)}
+                        disabled={busy}
                         aria-label={`Delete realization period ${period.period_name}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
                         <Trash2 className="h-4 w-4" />
@@ -370,10 +486,11 @@ export function RealizationTab({ eventId }: { eventId: string }) {
 // ============================================
 // Add Period Form
 // ============================================
-function AddPeriodForm({ calculations, onSaved, onCancel }: {
+function AddPeriodForm({ calculations, onSaved, onCancel, busy }: {
   calculations: CalculationOption[]
-  onSaved: (form: PeriodForm) => void
+  onSaved: (form: PeriodForm) => Promise<void>
   onCancel: () => void
+  busy: boolean
 }) {
   const [form, setForm] = useState({
     savings_calculation_id: '',
@@ -447,11 +564,11 @@ function AddPeriodForm({ calculations, onSaved, onCancel }: {
         </div>
       </div>
       <div className="mt-4 flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
-        <Button type="submit">
-          Add Period
+        <Button type="submit" disabled={busy}>
+          {busy ? 'Adding...' : 'Add Period'}
         </Button>
       </div>
     </form>
