@@ -1,42 +1,67 @@
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { SuppliersView, type SupplierSummary } from '@/components/suppliers-view'
 import { PageHeader } from '@/components/ui/page-header'
 import { formatDate } from '@/lib/utils'
 
-type RelatedEvent = { id: string }
-
-function relatedEvents(value: unknown): RelatedEvent[] {
-  if (!Array.isArray(value)) return []
-  return value.filter((event): event is RelatedEvent => (
-    typeof event === 'object'
-    && event !== null
-    && typeof (event as { id?: unknown }).id === 'string'
-  ))
+type RelatedEvent = {
+  id: string
+  incumbent_supplier_id: string | null
+  awarded_supplier_id: string | null
 }
 
 export default async function SuppliersPage() {
   const supabase = await createClient()
 
-  const { data: suppliers, error: suppliersError } = await supabase
-    .from('suppliers')
-    .select(`
-      id, supplier_name, supplier_status, preferred_flag, diversity_flag,
-      risk_rating, created_at,
-      events_as_incumbent:sourcing_events!sourcing_events_incumbent_supplier_id_fkey(id),
-      events_as_awarded:sourcing_events!sourcing_events_awarded_supplier_id_fkey(id)
-    `)
-    .order('supplier_name', { ascending: true })
+  const [
+    { data: suppliers, error: suppliersError },
+    { data: events, error: eventsError },
+  ] = await Promise.all([
+    fetchPortfolioRows('Suppliers', (from, to) => (
+      supabase
+        .from('suppliers')
+        .select(`
+          id, supplier_name, supplier_status, preferred_flag, diversity_flag,
+          risk_rating, created_at
+        `, { count: 'exact' })
+        .order('supplier_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Projects', (from, to) => (
+      supabase
+        .from('sourcing_events')
+        .select('id, incumbent_supplier_id, awarded_supplier_id', { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+  ])
 
-  const loadError = suppliersError?.message || null
+  const loadError = suppliersError?.message || eventsError?.message || null
+
+  const incumbentProjectsBySupplier = new Map<string, Set<string>>()
+  const awardedProjectsBySupplier = new Map<string, Set<string>>()
+  for (const event of (events || []) as RelatedEvent[]) {
+    if (event.incumbent_supplier_id) {
+      const ids = incumbentProjectsBySupplier.get(event.incumbent_supplier_id) ?? new Set<string>()
+      ids.add(event.id)
+      incumbentProjectsBySupplier.set(event.incumbent_supplier_id, ids)
+    }
+    if (event.awarded_supplier_id) {
+      const ids = awardedProjectsBySupplier.get(event.awarded_supplier_id) ?? new Set<string>()
+      ids.add(event.id)
+      awardedProjectsBySupplier.set(event.awarded_supplier_id, ids)
+    }
+  }
 
   const supplierSummaries: SupplierSummary[] = (suppliers || []).map(supplier => {
-    const incumbentEvents = relatedEvents(supplier.events_as_incumbent)
-    const awardedEvents = relatedEvents(supplier.events_as_awarded)
+    const incumbentEvents = incumbentProjectsBySupplier.get(supplier.id) ?? new Set<string>()
+    const awardedEvents = awardedProjectsBySupplier.get(supplier.id) ?? new Set<string>()
     const linkedEventIds = new Set([
-      ...incumbentEvents.map(event => event.id),
-      ...awardedEvents.map(event => event.id),
+      ...incumbentEvents,
+      ...awardedEvents,
     ])
 
     return {
@@ -46,8 +71,8 @@ export default async function SuppliersPage() {
       preferred: Boolean(supplier.preferred_flag),
       diverse: Boolean(supplier.diversity_flag),
       risk: supplier.risk_rating,
-      incumbentProjects: incumbentEvents.length,
-      awardedProjects: awardedEvents.length,
+      incumbentProjects: incumbentEvents.size,
+      awardedProjects: awardedEvents.size,
       linkedProjects: linkedEventIds.size,
       // Format timestamps on the server so hydration cannot change the date
       // when the browser is in a different timezone.

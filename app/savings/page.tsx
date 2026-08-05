@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import Link from 'next/link'
 import { formatCurrency, formatReduction, formatDate } from '@/lib/utils'
 import { portfolioRollup, reportedSavings, classifyRealization, getFirst } from '@/lib/savings'
@@ -13,17 +14,27 @@ export default async function SavingsPage() {
     { data: savingsCalcs, error: savingsCalcsError },
     { data: events, error: eventsError },
   ] = await Promise.all([
-    supabase.from('savings_calculations').select(`
-      id, calculation_name, savings_type, gross_savings_amount, savings_percentage,
-      calculation_status,
-      cost_reduction_amount, cost_avoidance_amount,
-      savings_start_date, savings_end_date,
-      created_at, event_id,
-      event:sourcing_events(event_name, contract_start_date),
-      baseline:baselines(baseline_name),
-      award:awards(award_name)
-    `).order('created_at', { ascending: false }),
-    supabase.from('sourcing_events').select('id, contract_start_date'),
+    fetchPortfolioRows('Savings calculations', (from, to) => (
+      supabase.from('savings_calculations').select(`
+        id, calculation_name, savings_type, gross_savings_amount, savings_percentage,
+        calculation_status,
+        cost_reduction_amount, cost_avoidance_amount,
+        savings_start_date, savings_end_date,
+        created_at, event_id,
+        event:sourcing_events(event_name, contract_start_date),
+        baseline:baselines(baseline_name),
+        award:awards(award_name)
+      `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Projects', (from, to) => (
+      supabase.from('sourcing_events')
+        .select('id, contract_start_date', { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
   ])
 
   // A failed query here would render as "$0 savings", which is indistinguishable

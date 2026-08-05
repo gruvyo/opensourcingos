@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { EventsList } from '@/components/events-list'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
@@ -6,16 +7,23 @@ import { Plus } from 'lucide-react'
 export default async function EventsPage() {
   const supabase = await createClient()
 
-  const { data: events, error: eventsError } = await supabase
-    .from('sourcing_events')
-    .select(`
-      *,
-      category:categories(category_name),
-      business_unit:business_units(business_unit_name),
-      incumbent_supplier:suppliers!sourcing_events_incumbent_supplier_id_fkey(supplier_name),
-      awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(supplier_name)
-    `)
-    .order('created_at', { ascending: false })
+  const { data: events, error: eventsError } = await fetchPortfolioRows(
+    'Projects',
+    (from, to) => (
+      supabase
+        .from('sourcing_events')
+        .select(`
+          *,
+          category:categories(category_name),
+          business_unit:business_units(business_unit_name),
+          incumbent_supplier:suppliers!sourcing_events_incumbent_supplier_id_fkey(supplier_name),
+          awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(supplier_name)
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+    ),
+  )
 
   // A failed query here would render as "no projects", which is indistinguishable
   // from a genuinely empty list. Say which one it is.

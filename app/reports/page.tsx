@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { ReportsView } from '@/components/reports-view'
 
 export default async function ReportsPage() {
@@ -8,17 +9,27 @@ export default async function ReportsPage() {
     { data: events, error: eventsError },
     { data: savingsCalcs, error: savingsCalcsError },
   ] = await Promise.all([
-    supabase.from('sourcing_events').select(`
-      id, event_name, event_type, event_status, project_type, buyer_name,
-      event_start_date, project_due_date, event_close_date, contract_start_date, contract_end_date,
-      category:categories(category_name),
-      business_unit:business_units(business_unit_name),
-      incumbent_supplier:suppliers!sourcing_events_incumbent_supplier_id_fkey(supplier_name),
-      awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(supplier_name)
-    `).order('created_at', { ascending: false }),
-    supabase.from('savings_calculations').select(`
-      id, event_id, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount
-    `).order('created_at', { ascending: false }),
+    fetchPortfolioRows('Projects', (from, to) => (
+      supabase.from('sourcing_events').select(`
+        id, event_name, event_type, event_status, project_type, buyer_name,
+        event_start_date, project_due_date, event_close_date, contract_start_date, contract_end_date,
+        category:categories(category_name),
+        business_unit:business_units(business_unit_name),
+        incumbent_supplier:suppliers!sourcing_events_incumbent_supplier_id_fkey(supplier_name),
+        awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(supplier_name)
+      `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Savings calculations', (from, to) => (
+      supabase.from('savings_calculations').select(`
+        id, event_id, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount
+      `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+    )),
   ])
 
   // A failed query here would render as an empty report, which is indistinguishable
