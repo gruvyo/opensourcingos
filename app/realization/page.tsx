@@ -85,7 +85,7 @@ export default async function RealizationPage() {
       {/* Periods table */}
       <div className="mt-6 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="border-b border-[var(--border)] px-6 py-4">
-          <h3 className="text-sm font-semibold text-[var(--text)]">Realization Periods</h3>
+          <h2 className="text-sm font-semibold text-[var(--text)]">Realization Periods</h2>
         </div>
         <table className="w-full min-w-[900px]">
           <caption className="sr-only">Savings realization periods across projects</caption>

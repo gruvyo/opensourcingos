@@ -204,7 +204,7 @@ export function OffersTab({
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">Supplier Offers</h3>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Supplier Offers</h2>
           <p className="text-sm text-[var(--text-2)]">Capture and compare supplier pricing</p>
         </div>
         <div className="flex gap-2">
@@ -297,9 +297,9 @@ export function OffersTab({
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-[var(--text)]">
+                      <h3 className="text-sm font-semibold text-[var(--text)]">
                         {offer.supplier?.supplier_name || 'Unknown Supplier'}
-                      </h4>
+                      </h3>
                       {isLowest && (
                         <Badge tone="success">Lowest Bid</Badge>
                       )}
@@ -575,7 +575,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
-      <h4 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Supplier Offer' : 'New Supplier Offer'}</h4>
+      <h3 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Supplier Offer' : 'New Supplier Offer'}</h3>
       {error && <div role="alert" className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
@@ -805,7 +805,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
   return (
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h5 className="text-sm font-medium text-[var(--text-2)]">Offer Lines</h5>
+        <h4 className="text-sm font-medium text-[var(--text-2)]">Offer Lines</h4>
         <button type="button" onClick={() => setShowAddLine(!showAddLine)}
           className="flex items-center gap-1 rounded bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
           <Plus className="h-3 w-3" /> Add Line
@@ -1085,10 +1085,10 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   return (
     <Card className="mb-6 overflow-hidden">
       <div className="border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-        <h4 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
           <GitCompare className="h-4 w-4" />
           Side-by-Side Offer Comparison
-        </h4>
+        </h3>
         <p className="mt-1 text-xs text-[var(--text-3)]">Compared on the annual run-rate, so terms of different lengths line up</p>
         {baselineError && (
           <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">

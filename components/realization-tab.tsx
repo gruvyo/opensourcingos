@@ -303,7 +303,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">Realization Tracking</h3>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Realization Tracking</h2>
           <p className="text-sm text-[var(--text-2)]">Track actual savings vs projected savings over time</p>
         </div>
         <Button disabled={busy} onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
@@ -471,7 +471,7 @@ export function RealizationTab({ eventId }: { eventId: string }) {
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
           <div>
-            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Realization Formula</h4>
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Realization Formula</h3>
             <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
               <strong>Realized Savings</strong> = Baseline − Actual Invoice Amount<br/>
               <strong>Leakage</strong> = Projected Savings − Realized Savings (if &gt; 0, savings leaked)<br/>
@@ -517,7 +517,7 @@ function AddPeriodForm({ calculations, onSaved, onCancel, busy }: {
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSaved(form) }}
       className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-900 dark:bg-indigo-500/10">
-      <h4 className="mb-4 font-medium text-[var(--text)]">New Realization Period</h4>
+      <h3 className="mb-4 font-medium text-[var(--text)]">New Realization Period</h3>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className={labelClass}>Period Name *</label>
