@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(23);
+select plan(32);
 
 select is(
   (
@@ -102,6 +102,80 @@ select ok(
 );
 
 select ok(
+  not (select p.prosecdef from pg_catalog.pg_proc p where p.oid = 'public.set_supplier_normalized_name()'::regprocedure),
+  'supplier name normalization runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.set_supplier_normalized_name()'::regprocedure
+  ),
+  'supplier name normalization has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'suppliers'
+      and t.tgname = 'suppliers_normalize_name'
+      and not t.tgisinternal
+  ),
+  'suppliers has the name-normalization trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.set_supplier_normalized_name()', 'EXECUTE'),
+  'anonymous users cannot execute supplier normalization directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.set_supplier_normalized_name()', 'EXECUTE'),
+  'signed-in users cannot execute supplier normalization directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.set_supplier_normalized_name()', 'EXECUTE'),
+  'service role can execute supplier normalization'
+);
+
+insert into public.suppliers (id, organization_id, supplier_name)
+values (
+  '00000000-0000-4000-8000-000000000014',
+  '00000000-0000-4000-8000-000000000001',
+  '  Normalized-Supplier, LLC  '
+);
+
+select is(
+  (
+    select supplier_normalized_name
+    from public.suppliers
+    where id = '00000000-0000-4000-8000-000000000014'
+  ),
+  'normalized supplier llc',
+  'supplier names are normalized when the writer omits the normalized value'
+);
+
+select throws_ok(
+  $$
+    insert into public.suppliers (id, organization_id, supplier_name)
+    values (
+      '00000000-0000-4000-8000-000000000015',
+      '00000000-0000-4000-8000-000000000001',
+      'NORMALIZED supplier LLC'
+    )
+  $$,
+  '23505',
+  'duplicate key value violates unique constraint "uq_suppliers_org_normalized_name"',
+  'normalized supplier names cannot be duplicated within one workspace'
+);
+
+select ok(
   (
     select bool_and(has_table_privilege('authenticated', format('public.%I', c.relname), 'SELECT'))
     from pg_catalog.pg_class c
@@ -187,6 +261,24 @@ select isnt(
   (select organization_id from public.profiles where id = '10000000-0000-4000-8000-000000000001'),
   (select organization_id from public.profiles where id = '20000000-0000-4000-8000-000000000002'),
   'different signups receive different workspaces'
+);
+
+insert into public.suppliers (id, organization_id, supplier_name)
+select
+  '10000000-0000-4000-8000-000000000014',
+  organization_id,
+  'Normalized Supplier LLC'
+from public.profiles
+where id = '10000000-0000-4000-8000-000000000001';
+
+select is(
+  (
+    select count(*)::bigint
+    from public.suppliers
+    where supplier_normalized_name = 'normalized supplier llc'
+  ),
+  2::bigint,
+  'the same normalized supplier name remains valid in different workspaces'
 );
 
 set local role anon;

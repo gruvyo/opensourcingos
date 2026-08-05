@@ -1701,7 +1701,7 @@ export type Database = {
           relationship_owner_id: string | null
           risk_rating: string | null
           supplier_name: string
-          supplier_normalized_name: string | null
+          supplier_normalized_name: string
           supplier_status: string | null
           updated_at: string | null
           website: string | null
@@ -1718,7 +1718,7 @@ export type Database = {
           relationship_owner_id?: string | null
           risk_rating?: string | null
           supplier_name: string
-          supplier_normalized_name?: string | null
+          supplier_normalized_name?: string
           supplier_status?: string | null
           updated_at?: string | null
           website?: string | null
@@ -1735,7 +1735,7 @@ export type Database = {
           relationship_owner_id?: string | null
           risk_rating?: string | null
           supplier_name?: string
-          supplier_normalized_name?: string | null
+          supplier_normalized_name?: string
           supplier_status?: string | null
           updated_at?: string | null
           website?: string | null

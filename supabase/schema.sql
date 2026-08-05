@@ -249,6 +249,30 @@ $$;
 
 
 --
+-- Name: set_supplier_normalized_name(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_supplier_normalized_name() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+begin
+  new.supplier_name := btrim(new.supplier_name);
+  new.supplier_normalized_name := btrim(
+    regexp_replace(lower(new.supplier_name), '[^a-z0-9]+', ' ', 'g')
+  );
+
+  if new.supplier_normalized_name = '' then
+    raise exception 'Supplier name must contain at least one letter or number'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end
+$$;
+
+
+--
 -- Name: update_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1046,7 +1070,7 @@ CREATE TABLE public.suppliers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     organization_id uuid,
     supplier_name text NOT NULL,
-    supplier_normalized_name text,
+    supplier_normalized_name text DEFAULT ''::text NOT NULL,
     supplier_status text DEFAULT 'Active'::text,
     preferred_flag boolean DEFAULT false,
     diversity_flag boolean DEFAULT false,
@@ -1644,7 +1668,7 @@ CREATE UNIQUE INDEX uq_supplier_offers_selected_award ON public.supplier_offers 
 -- Name: uq_suppliers_org_normalized_name; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uq_suppliers_org_normalized_name ON public.suppliers USING btree (organization_id, supplier_normalized_name) WHERE (supplier_normalized_name IS NOT NULL);
+CREATE UNIQUE INDEX uq_suppliers_org_normalized_name ON public.suppliers USING btree (organization_id, supplier_normalized_name);
 
 
 --
@@ -1736,6 +1760,13 @@ CREATE TRIGGER supplier_offers_updated_at BEFORE UPDATE ON public.supplier_offer
 --
 
 CREATE TRIGGER suppliers_audit AFTER INSERT OR DELETE OR UPDATE ON public.suppliers FOR EACH ROW EXECUTE FUNCTION public.capture_workspace_audit();
+
+
+--
+-- Name: suppliers suppliers_normalize_name; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER suppliers_normalize_name BEFORE INSERT OR UPDATE ON public.suppliers FOR EACH ROW EXECUTE FUNCTION public.set_supplier_normalized_name();
 
 
 --
@@ -3098,6 +3129,14 @@ GRANT ALL ON FUNCTION public.handle_new_user() TO service_role;
 GRANT ALL ON FUNCTION public.prevent_profile_privilege_change() TO anon;
 GRANT ALL ON FUNCTION public.prevent_profile_privilege_change() TO authenticated;
 GRANT ALL ON FUNCTION public.prevent_profile_privilege_change() TO service_role;
+
+
+--
+-- Name: FUNCTION set_supplier_normalized_name(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.set_supplier_normalized_name() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.set_supplier_normalized_name() TO service_role;
 
 
 --
