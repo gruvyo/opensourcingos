@@ -145,6 +145,13 @@ export function OffersTab({
     fetchOffers()
   }, [fetchOffers])
 
+  const handleOfferLinesChanged = (offerId: string, lines: OfferLine[]) => {
+    // Keep one authoritative line list in the parent so the expanded table and
+    // comparison view update together. Offer lines are supporting detail; they
+    // must never overwrite the manually captured, term-specific offer total.
+    setOfferLines(prev => ({ ...prev, [offerId]: lines }))
+  }
+
   const fetchOfferLines = async (offerId: string) => {
     if (offerLines[offerId]) return
     const { data } = await supabase
@@ -404,7 +411,7 @@ export function OffersTab({
                       eventId={eventId}
                       scopeLines={scopeLines}
                       lines={lines}
-                      onLinesChanged={() => fetchOfferLines(offer.id)}
+                      onLinesChanged={(freshLines) => handleOfferLinesChanged(offer.id, freshLines)}
                     />
                   </div>
                 )}
@@ -666,15 +673,14 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
 // ============================================
 // Offer Lines Table
 // ============================================
-function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, onLinesChanged }: {
+function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }: {
   offerId: string
   eventId: string
   scopeLines: ScopeLine[]
   lines: OfferLine[]
-  onLinesChanged: () => void
+  onLinesChanged: (lines: OfferLine[]) => void
 }) {
   const supabase = createClient()
-  const [lines, setLines] = useState(initialLines)
   const [lineError, setLineError] = useState<string | null>(null)
   const [showAddLine, setShowAddLine] = useState(false)
   const [newLine, setNewLine] = useState({
@@ -685,8 +691,6 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     offer_one_time_amount: '',
     compliance_status: 'Compliant',
   })
-
-  useEffect(() => { setLines(initialLines) }, [initialLines])
 
   const calcExtended = (price: number, qty: number) => price * qty
   const calcAnnualized = (extended: number, termMonths: number) => {
@@ -761,13 +765,11 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
       offer_term_months: '12', offer_one_time_amount: '', compliance_status: 'Compliant',
     })
     setShowAddLine(false)
-    onLinesChanged()
-    // Same stale-closure fix as baselines-tab: total the FRESHLY FETCHED rows, not
-    // React state, which two rapid adds could read before it catches up.
+    // Re-query so the table and comparison view receive the same authoritative
+    // rows. The offer total remains the commercial anchor entered on the offer.
     const freshLines = await refetchLines()
     if (freshLines) {
-      setLines(freshLines)
-      updateOfferTotal(freshLines)
+      onLinesChanged(freshLines)
     }
   }
 
@@ -776,20 +778,12 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     setLineError(null)
     const { error } = await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
     if (error) { setLineError(error.message); return }
-    onLinesChanged()
-    // Re-query rather than filter local state: two rapid deletes could otherwise
-    // total a stale array and write the wrong number to the DB.
+    // Re-query rather than filter local state so every view receives the same
+    // authoritative rows after the delete.
     const freshLines = await refetchLines()
     if (freshLines) {
-      setLines(freshLines)
-      updateOfferTotal(freshLines)
+      onLinesChanged(freshLines)
     }
-  }
-
-  const updateOfferTotal = async (currentLines: OfferLine[]) => {
-    const total = currentLines.reduce((sum, l) => sum + (l.offer_extended_amount || 0), 0)
-    const { error } = await supabase.from('supplier_offers').update({ offer_total_amount: total }).eq('id', offerId)
-    if (error) setLineError(error.message)
   }
 
   const labelClass = 'block text-xs font-medium text-[var(--text-3)] mb-1'
@@ -950,7 +944,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)] font-medium">
-                <td colSpan={4} className="px-2 py-2 text-right text-xs text-[var(--text-2)]">Totals:</td>
+                <td colSpan={4} className="px-2 py-2 text-right text-xs text-[var(--text-2)]">Line subtotal:</td>
                 <td className="px-2 py-2 text-right text-xs font-bold text-[var(--text)]">{formatCurrency(totalExtended)}</td>
                 <td colSpan={2} className="px-2 py-2"></td>
                 <td className="px-2 py-2 text-right text-xs font-bold text-indigo-700 dark:text-indigo-300">{formatCurrency(totalAnnualized)}</td>
@@ -958,6 +952,9 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
               </tr>
             </tfoot>
           </table>
+          <p className="px-2 pt-2 text-xs text-[var(--text-3)]">
+            Line subtotals support comparison and do not replace the term-specific offer total.
+          </p>
         </div>
       )}
     </div>
