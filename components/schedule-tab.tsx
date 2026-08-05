@@ -359,7 +359,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   return (
     <div>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-[var(--text)]">Savings Schedule</h3>
+        <h2 className="text-lg font-semibold text-[var(--text)]">Savings Schedule</h2>
         <p className="text-sm text-[var(--text-2)]">
           When the savings land. The deal&apos;s anchors, spread over periods and grouped by year.
         </p>
@@ -419,7 +419,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
         <>
           {/* ---- Settings ------------------------------------------------ */}
           <Card className="mb-4 p-4">
-            <h4 className="mb-3 text-sm font-semibold text-[var(--text)]">Schedule settings</h4>
+            <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">Schedule settings</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Start month</label>
@@ -512,7 +512,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
             <>
               {/* ---- By year: the fiscal-year report ---------------------- */}
               <Card className="mb-4 p-4">
-                <h4 className="mb-1 text-sm font-semibold text-[var(--text)]">By year</h4>
+                <h3 className="mb-1 text-sm font-semibold text-[var(--text)]">By year</h3>
                 <p className="mb-3 text-xs text-[var(--text-3)]">
                   Booked per month from the start month, so a period that crosses a year boundary
                   splits across both. The fiscal year is the calendar year, and this answer does not
@@ -568,7 +568,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
               {/* ---- The schedule ---------------------------------------- */}
               <Card className="p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-sm font-semibold text-[var(--text)]">Periods</h4>
+                  <h3 className="text-sm font-semibold text-[var(--text)]">Periods</h3>
                   {editedCount > 0 && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
                       {editedCount} edited by hand

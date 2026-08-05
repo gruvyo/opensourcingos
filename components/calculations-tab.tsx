@@ -261,7 +261,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   return (
     <div>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-[var(--text)]">Savings Calculation</h3>
+        <h2 className="text-lg font-semibold text-[var(--text)]">Savings Calculation</h2>
         <p className="text-sm text-[var(--text-2)]">
           Derived from the anchors you selected. Nothing here is typed by hand.
         </p>
@@ -284,7 +284,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       {/* The three anchors */}
       <Card className="mb-4 p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-sm font-semibold text-[var(--text)]">Selected anchors</h4>
+          <h3 className="text-sm font-semibold text-[var(--text)]">Selected anchors</h3>
           <div className="flex items-center gap-2">
             {/* A lens, not a decision — the saved figure is always whole-term. */}
             <span className="text-xs text-[var(--text-3)]">View as</span>
@@ -408,7 +408,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           </Card>
 
           <Card className="p-4">
-            <h4 className="mb-1 text-sm font-semibold text-[var(--text)]">Reporting</h4>
+            <h3 className="mb-1 text-sm font-semibold text-[var(--text)]">Reporting</h3>
             <p className="mb-3 text-xs text-[var(--text-3)]">
               How this figure is reported. The savings type is derived from the chain, and the end
               date from the {dealMonths}-month term, so neither can contradict the numbers above.

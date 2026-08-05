@@ -174,7 +174,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">Baselines</h3>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Baselines</h2>
           <p className="text-sm text-[var(--text-2)]">Establish what the company would have paid without procurement action</p>
         </div>
         <Button onClick={() => setShowForm(!showForm)}>
@@ -202,9 +202,9 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                 contradicts the rule the numbers actually follow, which is not a
                 ranking at all but a line: is this money you paid, or a figure
                 somebody quoted? Two groups, not eight rungs. */}
-            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
               What makes a cost reduction hard
-            </h4>
+            </h3>
             <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
               A <strong>hard</strong> Cost Reduction — the figure your CFO can book to the P&amp;L —
               requires a baseline grounded in <strong>your own spend</strong>. Current Contract,
@@ -274,7 +274,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-[var(--text)]">{baseline.baseline_name}</h4>
+                      <h3 className="text-sm font-semibold text-[var(--text)]">{baseline.baseline_name}</h3>
                       <span className="rounded bg-[var(--surface-2)] px-2 py-0.5 text-xs text-[var(--text-2)]">
                         {baseline.baseline_type}
                       </span>
@@ -653,7 +653,7 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
-      <h4 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Baseline' : 'New Baseline'}</h4>
+      <h3 className="mb-4 font-medium text-[var(--text)]">{isEdit ? 'Edit Baseline' : 'New Baseline'}</h3>
       {error && <div role="alert" className="mb-4 rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
@@ -868,7 +868,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h5 className="text-sm font-medium text-[var(--text-2)]">Line detail (optional)</h5>
+          <h4 className="text-sm font-medium text-[var(--text-2)]">Line detail (optional)</h4>
           <p className="text-xs text-[var(--text-3)]">
             Only if you want item-level breakdown. Adding lines replaces the total above with
             their sum. Most deals just need the total.

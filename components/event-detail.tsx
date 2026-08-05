@@ -272,7 +272,7 @@ function OverviewTab({ event }: { event: Event }) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
       <Card className="p-6">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Project Details</h3>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Project Details</h2>
         <dl className="space-y-3">
           {details.map((d) => (
             <div key={d.label} className="flex justify-between">
@@ -283,7 +283,7 @@ function OverviewTab({ event }: { event: Event }) {
         </dl>
       </Card>
       <Card className="p-6">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Key Dates</h3>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Key Dates</h2>
         <dl className="space-y-3">
           {dates.map((d) => (
             <div key={d.label} className="flex justify-between">
@@ -426,7 +426,7 @@ function AwardsTab() {
   return (
     <Card className="p-12 text-center">
       <FileCheck className="mx-auto mb-3 h-10 w-10 text-[var(--text-3)]" />
-      <h3 className="text-lg font-medium text-[var(--text)]">Awards</h3>
+      <h2 className="text-lg font-medium text-[var(--text)]">Awards</h2>
       <p className="mt-1 text-sm text-[var(--text-3)]">
         Create awards from the Supplier Offers tab by expanding an offer and clicking &quot;Create Award from Offer.&quot;
       </p>

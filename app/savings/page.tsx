@@ -90,7 +90,7 @@ export default async function SavingsPage() {
           label only records which one carried the deal. This keeps the split in
           agreement with the three cards above it. */}
       <Card className="mt-4 p-6">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Savings by Type</h3>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]">Savings by Type</h2>
         <div className="flex flex-wrap gap-3">
           {typeSplit.map(({ name, value }) => (
             <div key={name} className="rounded-lg bg-[var(--surface-2)] px-4 py-2">
@@ -108,7 +108,7 @@ export default async function SavingsPage() {
       {/* Calculations table */}
       <Card className="mt-6 overflow-x-auto">
         <div className="border-b border-[var(--border)] px-6 py-4">
-          <h3 className="text-sm font-semibold text-[var(--text)]">All Savings Calculations</h3>
+          <h2 className="text-sm font-semibold text-[var(--text)]">All Savings Calculations</h2>
         </div>
         <table className="w-full min-w-[1000px]">
           <caption className="sr-only">All savings calculations</caption>

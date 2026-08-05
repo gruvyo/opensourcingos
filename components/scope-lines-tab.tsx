@@ -112,7 +112,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">Scope Lines</h3>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Scope Lines</h2>
           <p className="text-sm text-[var(--text-2)]">Define what is being sourced, line by line</p>
         </div>
         <Button onClick={() => setShowForm(!showForm)}>
@@ -123,7 +123,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
 
       {showForm && (
         <form onSubmit={handleAdd} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
-          <h4 className="mb-4 font-medium text-[var(--text)]">New Scope Line</h4>
+          <h3 className="mb-4 font-medium text-[var(--text)]">New Scope Line</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="md:col-span-2">
               <label className={labelClass}>Item / Service Name *</label>
