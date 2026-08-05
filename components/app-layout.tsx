@@ -7,7 +7,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="fixed inset-0 flex min-h-0 overflow-hidden bg-[var(--bg)]">
+    <div className="flex min-h-screen bg-[var(--bg)]">
       {/* Mobile backdrop overlay */}
       {sidebarOpen && (
         <div
@@ -18,9 +18,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <div className="flex h-14 items-center gap-3 border-b border-white/10 bg-[var(--nav-bg)] px-4 text-white lg:hidden">
+        <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-white/10 bg-[var(--nav-bg)] px-4 text-white lg:hidden">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
@@ -44,7 +44,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Main content */}
-        <main id="main-content" tabIndex={-1} className="app-canvas min-h-0 flex-1 overflow-y-auto">
+        <main id="main-content" tabIndex={-1} className="app-canvas min-w-0 flex-1">
           {children}
         </main>
       </div>
