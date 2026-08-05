@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Plus, Trash2, AlertTriangle, CheckCircle } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 
 type ScopeLine = {
@@ -33,6 +34,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
   const [scopeLines, setScopeLines] = useState(initialLines)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [lineToDelete, setLineToDelete] = useState<ScopeLine | null>(null)
   const supabase = createClient()
 
   const [newLine, setNewLine] = useState({
@@ -98,7 +100,6 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this scope line? This cannot be undone.')) return
     const { error } = await supabase.from('event_scope_lines').delete().eq('id', id)
     if (!error) {
       setScopeLines(scopeLines.filter(l => l.id !== id))
@@ -243,7 +244,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button type="button" onClick={() => handleDelete(line.id)}
+                    <button type="button" onClick={() => setLineToDelete(line)}
                       aria-label={`Delete scope line ${line.line_number}: ${line.item_service_name}`}
                       className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                       <Trash2 className="h-4 w-4" />
@@ -260,6 +261,16 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
         <p className="mt-3 text-sm text-[var(--text-3)]">
           {scopeLines.length} scope line{scopeLines.length !== 1 ? 's' : ''}
         </p>
+      )}
+      {lineToDelete && (
+        <ConfirmDialog
+          title="Delete this scope line?"
+          description={`This permanently removes scope line ${lineToDelete.line_number}, ${lineToDelete.item_service_name}. This cannot be undone.`}
+          confirmLabel="Delete Scope Line"
+          pendingLabel="Deleting Scope Line..."
+          onConfirm={() => handleDelete(lineToDelete.id)}
+          onCancel={() => setLineToDelete(null)}
+        />
       )}
     </div>
   )

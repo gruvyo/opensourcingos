@@ -12,6 +12,7 @@ import { grossSavings, savingsPct as savingsPctOf, termRates } from '@/lib/savin
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Input, Select } from '@/components/ui/input'
 
@@ -75,6 +76,7 @@ export function OffersTab({
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [offerToDelete, setOfferToDelete] = useState<Offer | null>(null)
   const supabase = createClient()
   // The `suppliers` prop is a server-render snapshot from page load. A supplier
   // created inline must show up in the next dropdown without a page refresh, so
@@ -185,7 +187,6 @@ export function OffersTab({
   }
 
   const handleDelete = async (offerId: string) => {
-    if (!confirm('Delete this offer and all its lines?')) return
     setActionError(null)
     const { error } = await supabase.from('supplier_offers').delete().eq('id', offerId)
     if (error) { setActionError(error.message); return }
@@ -371,7 +372,7 @@ export function OffersTab({
                     className="text-[var(--text-3)] hover:text-[var(--brand-ink)]">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button type="button" onClick={() => handleDelete(offer.id)}
+                  <button type="button" onClick={() => setOfferToDelete(offer)}
                     aria-label={`Delete offer from ${offer.supplier?.supplier_name || 'unknown supplier'}`}
                     className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                     <Trash2 className="h-4 w-4" />
@@ -419,6 +420,16 @@ export function OffersTab({
             )
           })}
         </div>
+      )}
+      {offerToDelete && (
+        <ConfirmDialog
+          title="Delete this supplier offer?"
+          description={`This removes the offer from ${offerToDelete.supplier?.supplier_name || 'this supplier'} and all of its line detail. This cannot be undone.`}
+          confirmLabel="Delete Offer"
+          pendingLabel="Deleting Offer..."
+          onConfirm={() => handleDelete(offerToDelete.id)}
+          onCancel={() => setOfferToDelete(null)}
+        />
       )}
     </div>
   )
@@ -682,6 +693,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
 }) {
   const supabase = createClient()
   const [lineError, setLineError] = useState<string | null>(null)
+  const [lineToDelete, setLineToDelete] = useState<OfferLine | null>(null)
   const [showAddLine, setShowAddLine] = useState(false)
   const [newLine, setNewLine] = useState({
     scope_line_id: '',
@@ -774,7 +786,6 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
   }
 
   const handleDeleteLine = async (lineId: string) => {
-    if (!confirm('Delete this offer line? This cannot be undone.')) return
     setLineError(null)
     const { error } = await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
     if (error) { setLineError(error.message); return }
@@ -933,7 +944,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
                     </span>
                   </td>
                   <td className="px-2 py-2 text-right">
-                    <button type="button" onClick={() => handleDeleteLine(line.id)}
+                    <button type="button" onClick={() => setLineToDelete(line)}
                       aria-label={`Delete offer line ${line.line_number}`}
                       className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                       <Trash2 className="h-3.5 w-3.5" />
@@ -956,6 +967,16 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
             Line subtotals support comparison and do not replace the term-specific offer total.
           </p>
         </div>
+      )}
+      {lineToDelete && (
+        <ConfirmDialog
+          title="Delete this offer line?"
+          description={`This permanently removes offer line ${lineToDelete.line_number}. This cannot be undone.`}
+          confirmLabel="Delete Line"
+          pendingLabel="Deleting Line..."
+          onConfirm={() => handleDeleteLine(lineToDelete.id)}
+          onCancel={() => setLineToDelete(null)}
+        />
       )}
     </div>
   )

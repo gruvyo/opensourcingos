@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import type { Tables } from '@/lib/database.types'
 
@@ -60,6 +61,7 @@ export function EditProjectModal({
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = 'edit-project-title'
 
@@ -173,7 +175,6 @@ export function EditProjectModal({
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this entire project? This will remove all scope lines, baselines, offers, awards, and savings calculations. This CANNOT be undone.')) return
     setLoading(true)
     setError(null)
 
@@ -197,7 +198,8 @@ export function EditProjectModal({
   const statuses = isSupport ? SUPPORT_STATUSES : SOURCING_STATUSES
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -322,7 +324,7 @@ export function EditProjectModal({
 
         {/* Action buttons */}
         <div className="mt-6 flex items-center justify-between">
-          <Button variant="danger" onClick={handleDelete} disabled={loading}>
+          <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} disabled={loading}>
             Delete Project
           </Button>
           <div className="flex gap-3">
@@ -332,7 +334,18 @@ export function EditProjectModal({
             </Button>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete this project?"
+          description="This removes the project and all of its scope lines, baselines, offers, awards, and savings calculations. This cannot be undone."
+          confirmLabel="Delete Project"
+          pendingLabel="Deleting Project..."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+    </>
   )
 }

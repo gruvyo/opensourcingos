@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { termRates, baselineQuality } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import type { Tables, TablesInsert } from '@/lib/database.types'
 
@@ -88,6 +89,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [baselineToDelete, setBaselineToDelete] = useState<Baseline | null>(null)
   const supabase = createClient()
 
   // Exactly one baseline per project is THE baseline. Clear the others first so
@@ -154,7 +156,6 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
 
 
   const handleDelete = async (baselineId: string) => {
-    if (!confirm('Delete this baseline and all its lines? This cannot be undone.')) return
     setActionError(null)
     const { error } = await supabase.from('baselines').delete().eq('id', baselineId)
     if (error) { setActionError(error.message); return }
@@ -392,7 +393,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         className="flex items-center gap-1 text-xs font-medium text-[var(--brand-ink)] hover:underline">
                         <Pencil className="h-3.5 w-3.5" /> Edit baseline
                       </button>
-                      <button type="button" onClick={() => handleDelete(baseline.id)}
+                      <button type="button" onClick={() => setBaselineToDelete(baseline)}
                         aria-label={`Delete baseline ${baseline.baseline_name}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
                         <Trash2 className="h-4 w-4" />
@@ -423,6 +424,16 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
             )
           })}
         </div>
+      )}
+      {baselineToDelete && (
+        <ConfirmDialog
+          title="Delete this baseline?"
+          description={`This permanently removes ${baselineToDelete.baseline_name} and all of its line detail. This cannot be undone.`}
+          confirmLabel="Delete Baseline"
+          pendingLabel="Deleting Baseline..."
+          onConfirm={() => handleDelete(baselineToDelete.id)}
+          onCancel={() => setBaselineToDelete(null)}
+        />
       )}
     </div>
   )
@@ -728,6 +739,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   // Surfaces errors from the insert/delete/total writes below, same pattern as
   // actionError in the parent BaselinesTab component.
   const [error, setError] = useState<string | null>(null)
+  const [lineToDelete, setLineToDelete] = useState<BaselineLine | null>(null)
   const [newLine, setNewLine] = useState({
     scope_line_id: '',
     baseline_unit_price: '',
@@ -833,7 +845,6 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   }
 
   const handleDeleteLine = async (lineId: string) => {
-    if (!confirm('Delete this baseline line? This cannot be undone.')) return
     setError(null)
     const { error: deleteError } = await supabase.from('baseline_lines').delete().eq('id', lineId)
     if (deleteError) { setError(deleteError.message); return }
@@ -993,7 +1004,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
                   </td>
                   {!isLocked && (
                     <td className="px-2 py-2 text-right">
-                      <button type="button" onClick={() => handleDeleteLine(line.id)}
+                      <button type="button" onClick={() => setLineToDelete(line)}
                         aria-label={`Delete baseline line ${line.line_number}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                         <Trash2 className="h-3.5 w-3.5" />
@@ -1015,6 +1026,16 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
             </tfoot>
           </table>
         </div>
+      )}
+      {lineToDelete && (
+        <ConfirmDialog
+          title="Delete this baseline line?"
+          description={`This permanently removes baseline line ${lineToDelete.line_number}. This cannot be undone.`}
+          confirmLabel="Delete Line"
+          pendingLabel="Deleting Line..."
+          onConfirm={() => handleDeleteLine(lineToDelete.id)}
+          onCancel={() => setLineToDelete(null)}
+        />
       )}
     </div>
   )
