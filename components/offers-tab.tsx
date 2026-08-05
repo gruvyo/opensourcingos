@@ -145,6 +145,14 @@ export function OffersTab({
     fetchOffers()
   }, [fetchOffers])
 
+  const handleOfferLinesChanged = (offerId: string, lines: OfferLine[]) => {
+    // Keep one authoritative line list in the parent so the expanded table and
+    // comparison view update together. Refresh the offer header after the line
+    // total has been written back to supplier_offers.
+    setOfferLines(prev => ({ ...prev, [offerId]: lines }))
+    fetchOffers()
+  }
+
   const fetchOfferLines = async (offerId: string) => {
     if (offerLines[offerId]) return
     const { data } = await supabase
@@ -404,7 +412,7 @@ export function OffersTab({
                       eventId={eventId}
                       scopeLines={scopeLines}
                       lines={lines}
-                      onLinesChanged={() => fetchOfferLines(offer.id)}
+                      onLinesChanged={(freshLines) => handleOfferLinesChanged(offer.id, freshLines)}
                     />
                   </div>
                 )}
@@ -666,15 +674,14 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
 // ============================================
 // Offer Lines Table
 // ============================================
-function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, onLinesChanged }: {
+function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }: {
   offerId: string
   eventId: string
   scopeLines: ScopeLine[]
   lines: OfferLine[]
-  onLinesChanged: () => void
+  onLinesChanged: (lines: OfferLine[]) => void
 }) {
   const supabase = createClient()
-  const [lines, setLines] = useState(initialLines)
   const [lineError, setLineError] = useState<string | null>(null)
   const [showAddLine, setShowAddLine] = useState(false)
   const [newLine, setNewLine] = useState({
@@ -685,8 +692,6 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     offer_one_time_amount: '',
     compliance_status: 'Compliant',
   })
-
-  useEffect(() => { setLines(initialLines) }, [initialLines])
 
   const calcExtended = (price: number, qty: number) => price * qty
   const calcAnnualized = (extended: number, termMonths: number) => {
@@ -761,13 +766,12 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
       offer_term_months: '12', offer_one_time_amount: '', compliance_status: 'Compliant',
     })
     setShowAddLine(false)
-    onLinesChanged()
     // Same stale-closure fix as baselines-tab: total the FRESHLY FETCHED rows, not
     // React state, which two rapid adds could read before it catches up.
     const freshLines = await refetchLines()
     if (freshLines) {
-      setLines(freshLines)
-      updateOfferTotal(freshLines)
+      await updateOfferTotal(freshLines)
+      onLinesChanged(freshLines)
     }
   }
 
@@ -776,13 +780,12 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines: initialLines, on
     setLineError(null)
     const { error } = await supabase.from('supplier_offer_lines').delete().eq('id', lineId)
     if (error) { setLineError(error.message); return }
-    onLinesChanged()
     // Re-query rather than filter local state: two rapid deletes could otherwise
     // total a stale array and write the wrong number to the DB.
     const freshLines = await refetchLines()
     if (freshLines) {
-      setLines(freshLines)
-      updateOfferTotal(freshLines)
+      await updateOfferTotal(freshLines)
+      onLinesChanged(freshLines)
     }
   }
 
