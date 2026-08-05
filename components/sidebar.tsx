@@ -169,7 +169,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       )}
 
       {/* Desktop fixed sidebar */}
-      <aside className="hidden h-full min-h-0 w-60 flex-col border-r border-[var(--nav-border)] bg-[var(--nav-bg)] lg:flex">
+      <aside className="sticky top-0 hidden h-screen min-h-0 w-60 flex-col border-r border-[var(--nav-border)] bg-[var(--nav-bg)] lg:flex">
         {sidebarContent}
       </aside>
     </>
