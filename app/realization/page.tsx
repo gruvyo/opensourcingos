@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { realizationRollup, getFirst } from '@/lib/savings'
@@ -38,16 +39,23 @@ const STATUS_PILL: Record<string, string> = {
 export default async function RealizationPage() {
   const supabase = await createClient()
 
-  const { data: periods } = await supabase
-    .from('realization_periods')
-    .select(`
-      id, period_name, period_start_date, period_end_date,
-      baseline_amount, projected_savings, actual_amount,
-      realized_savings, leakage_amount, realization_status,
-      finance_validated, event_id,
-      event:sourcing_events(id, event_name)
-    `)
-    .order('period_start_date', { ascending: true })
+  const { data: periods, error: periodsError } = await fetchPortfolioRows(
+    'Realization periods',
+    (from, to) => (
+      supabase
+        .from('realization_periods')
+        .select(`
+          id, period_name, period_start_date, period_end_date,
+          baseline_amount, projected_savings, actual_amount,
+          realized_savings, leakage_amount, realization_status,
+          finance_validated, event_id,
+          event:sourcing_events(id, event_name)
+        `, { count: 'exact' })
+        .order('period_start_date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+  )
 
   const rows = (periods || []) as RealizationPeriod[]
   const rollup = realizationRollup(rows)
@@ -60,6 +68,13 @@ export default async function RealizationPage() {
           Actual savings landing vs. projected — across all sourcing projects
         </p>
       </div>
+
+      {periodsError ? (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert">
+          <strong>These figures are incomplete.</strong> A query failed: {periodsError.message}. Do not report
+          from this page until it loads cleanly.
+        </div>
+      ) : null}
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { BriefcaseBusiness, ChevronRight, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { DashboardStats } from '@/components/dashboard-stats'
 import {
   DashboardOverviewChart,
@@ -196,27 +197,45 @@ export default async function DashboardPage({
     { data: periodRows, error: periodsError },
     { data: realizationPeriods, error: realizationError },
   ] = await Promise.all([
-    supabase.from('sourcing_events').select(`
-      id, event_name, event_type, event_status, project_type, buyer_name, contract_start_date,
-      event_start_date, project_due_date, event_close_date,
-      category:categories!sourcing_events_category_id_fkey(category_name),
-      business_unit:business_units(business_unit_name),
-      awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(id, supplier_name)
-    `),
-    supabase.from('savings_calculations').select(`
-      id, savings_type, gross_savings_amount, baseline_total_amount,
-      savings_percentage, cost_reduction_amount, cost_avoidance_amount,
-      savings_start_date, savings_end_date, event_id, calculation_status
-    `),
-    supabase.from('savings_periods').select(`
-      savings_calculation_id, period_number, period_month, period_year, period_months,
-      baseline_amount, opening_amount, final_amount,
-      cost_reduction_amount, cost_avoidance_amount, total_savings_amount
-    `).order('period_number', { ascending: true }),
-    supabase.from('realization_periods').select(`
-      projected_savings, realized_savings, leakage_amount, realization_status,
-      event_id, period_start_date
-    `),
+    fetchPortfolioRows('Projects', (from, to) => (
+      supabase.from('sourcing_events').select(`
+        id, event_name, event_type, event_status, project_type, buyer_name, contract_start_date,
+        event_start_date, project_due_date, event_close_date,
+        category:categories!sourcing_events_category_id_fkey(category_name),
+        business_unit:business_units(business_unit_name),
+        awarded_supplier:suppliers!sourcing_events_awarded_supplier_id_fkey(id, supplier_name)
+      `, { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Savings calculations', (from, to) => (
+      supabase.from('savings_calculations').select(`
+        id, savings_type, gross_savings_amount, baseline_total_amount,
+        savings_percentage, cost_reduction_amount, cost_avoidance_amount,
+        savings_start_date, savings_end_date, event_id, calculation_status
+      `, { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Savings periods', (from, to) => (
+      supabase.from('savings_periods').select(`
+        id, savings_calculation_id, period_number, period_month, period_year, period_months,
+        baseline_amount, opening_amount, final_amount,
+        cost_reduction_amount, cost_avoidance_amount, total_savings_amount
+      `, { count: 'exact' })
+        .order('savings_calculation_id', { ascending: true })
+        .order('period_number', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Realization periods', (from, to) => (
+      supabase.from('realization_periods').select(`
+        id, projected_savings, realized_savings, leakage_amount, realization_status,
+        event_id, period_start_date
+      `, { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
   ])
 
   const loadError = eventsError?.message
