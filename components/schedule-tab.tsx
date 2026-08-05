@@ -113,7 +113,56 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
     setLoading(false)
   }, [eventId, supabase])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    let cancelled = false
+
+    const loadInitialData = async () => {
+      const [bases, offers, calcs] = await Promise.all([
+        supabase.from('baselines')
+          .select('id, baseline_total_amount, baseline_term_months, baseline_type, baseline_source, is_selected, hard_reduction_override, hard_reduction_override_reason')
+          .eq('event_id', eventId),
+        supabase.from('supplier_offers')
+          .select('id, offer_total_amount, offer_term_months, offer_role')
+          .eq('event_id', eventId),
+        supabase.from('savings_calculations').select('*').eq('event_id', eventId)
+          .order('created_at', { ascending: true }),
+      ])
+
+      if (cancelled) return
+
+      const firstError = bases.error || offers.error || calcs.error
+      if (firstError) { setError(firstError.message); setLoading(false); return }
+
+      const b = (bases.data || []).find(x => x.is_selected) ?? null
+      const o = (offers.data || []).find(x => x.offer_role === 'opening') ?? null
+      const f = (offers.data || []).find(x => x.offer_role === 'final') ?? null
+      const c = (calcs.data || [])[0] ?? null
+      setBaseline(b); setOpening(o); setFinal(f); setCalc(c)
+
+      if (c) {
+        const dealMonths = Number(f?.offer_term_months) || Number(b?.baseline_term_months) || 12
+        const type = (c.schedule_period_type as PeriodType) || 'monthly'
+        const fallback = c.savings_start_date ? new Date(c.savings_start_date + 'T00:00:00') : null
+        const periods = await supabase.from('savings_periods').select('*')
+          .eq('savings_calculation_id', c.id).order('period_number', { ascending: true })
+
+        if (cancelled) return
+        if (periods.error) { setError(periods.error.message); setLoading(false); return }
+
+        setPeriodType(type)
+        setPeriodCount(Number(c.schedule_period_count) || defaultPeriodCount(type, dealMonths))
+        setStartMonth(Number(c.schedule_start_month) || (fallback ? fallback.getMonth() + 1 : new Date().getMonth() + 1))
+        setStartYear(Number(c.schedule_start_year) || (fallback ? fallback.getFullYear() : new Date().getFullYear()))
+        setRows(periods.data || [])
+      } else {
+        setRows([])
+      }
+      setLoading(false)
+    }
+
+    void loadInitialData()
+    return () => { cancelled = true }
+  }, [eventId, supabase])
 
   // The deal term is the Final offer's term — that is what was signed.
   const dealMonths = Number(final?.offer_term_months) || Number(baseline?.baseline_term_months) || 12
