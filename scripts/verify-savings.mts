@@ -23,7 +23,6 @@ import {
   scheduleTotals,
   scheduleByYear,
   defaultPeriodCount,
-  prorateByYear,
   monthSpan,
   calcToPeriods,
   portfolioByYear,
@@ -484,10 +483,9 @@ section('11. Month spans, and synthesising periods for an unscheduled deal')
 
 section('12. One method: a synthesised deal matches its own real schedule')
 {
-  // THE POINT OF STEP 4. The dashboard used to weight each calendar year by
-  // DAYS (prorateByYear), which disagrees with the schedule's whole months --
-  // up to 912 apart on this very deal while both still summed to 900,000.
-  // Routing both through scheduleByYear removes the discrepancy by construction.
+  // THE POINT OF STEP 4. The dashboard once weighted each calendar year by
+  // days, which disagreed with the schedule's whole months. Routing both
+  // through scheduleByYear removes the discrepancy by construction.
   const real = schedule('monthly', 36)                     // the actual schedule
   const synth = calcToPeriods({                            // the same deal, undated fallback
     gross_savings_amount: GRAND.total,
@@ -498,19 +496,11 @@ section('12. One method: a synthesised deal matches its own real schedule')
   })
   assertSameYearBuckets('synthesised vs real schedule', scheduleByYear(synth), scheduleByYear(real))
 
-  // And the old day-count method really did differ, so this is not theatre.
-  const { byYear: dayBased } = prorateByYear([{
-    gross_savings_amount: GRAND.total,
-    cost_reduction_amount: GRAND.reduction,
-    cost_avoidance_amount: GRAND.avoidance,
-    savings_start_date: '2026-08-01',
-    savings_end_date: '2029-07-31',
-  }])
   const monthBased = scheduleByYear(synth)
-  const worstDrift = Math.max(...monthBased.map((m, i) => Math.abs(m.total - dayBased[i].total)))
-  eq('the day-count method genuinely disagreed (>100 on one year)', worstDrift > 100, true)
-  near('both still summed to the same portfolio total',
-    dayBased.reduce((s, y) => s + y.total, 0), monthBased.reduce((s, y) => s + y.total, 0))
+  near('2026 fallback books exactly five whole months',
+    monthBased.find(y => y.year === 2026)!.total, GRAND.total * (5 / 36))
+  near('2029 fallback books exactly seven whole months',
+    monthBased.find(y => y.year === 2029)!.total, GRAND.total * (7 / 36))
 }
 
 section('13. Portfolio rollup: exact, estimated, and unplaceable')
