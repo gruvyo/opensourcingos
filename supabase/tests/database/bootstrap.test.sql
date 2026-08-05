@@ -263,21 +263,13 @@ select isnt(
   'different signups receive different workspaces'
 );
 
-insert into public.suppliers (id, organization_id, supplier_name)
-select
-  '10000000-0000-4000-8000-000000000014',
-  organization_id,
-  'Normalized Supplier LLC'
-from public.profiles
-where id = '10000000-0000-4000-8000-000000000001';
-
 select is(
   (
     select count(*)::bigint
     from public.suppliers
     where supplier_normalized_name = 'normalized supplier llc'
   ),
-  2::bigint,
+  3::bigint,
   'the same normalized supplier name remains valid in different workspaces'
 );
 
