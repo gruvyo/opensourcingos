@@ -17,7 +17,7 @@ export default async function NewEventPage() {
     supabase.from('business_units').select('id, business_unit_name').order('business_unit_name'),
     supabase.from('cost_centers').select('id, cost_center_name, business_unit_id').order('cost_center_name'),
     supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
-    supabase.from('organization_settings').select('currency_code').maybeSingle(),
+    supabase.from('organization_settings').select('currency_code, support_projects_enabled').maybeSingle(),
   ])
 
   // A failed query here would render as an empty dropdown, which is indistinguishable
@@ -33,7 +33,9 @@ export default async function NewEventPage() {
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">New Project</h1>
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-        Create a new sourcing event or support project
+        {settings?.support_projects_enabled ?? true
+          ? 'Create a new sourcing event or support project'
+          : 'Create a new sourcing project'}
       </p>
 
       {loadError && (
@@ -49,6 +51,7 @@ export default async function NewEventPage() {
         costCenters={costCenters || []}
         suppliers={suppliers || []}
         defaultCurrency={settings?.currency_code || 'USD'}
+        supportProjectsEnabled={settings?.support_projects_enabled ?? true}
       />
     </div>
   )

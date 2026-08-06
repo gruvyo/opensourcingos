@@ -15,6 +15,7 @@ const settingsSchema = z.object({
   fiscalYearStartMonth: z.coerce.number().int().min(1).max(12),
   dateFormat: z.enum(['MMM D, YYYY', 'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']),
   defaultRecognitionMethod: z.enum(['monthly', 'annual', 'one_time']),
+  supportProjectsEnabled: z.boolean(),
   requireBaseline: z.boolean(),
   hardReductionApprovalThreshold: z.union([z.literal(''), z.coerce.number().min(0)]),
 })
@@ -34,6 +35,7 @@ export async function updateSettings(
       fiscalYearStartMonth: formData.get('fiscalYearStartMonth'),
       dateFormat: formData.get('dateFormat'),
       defaultRecognitionMethod: formData.get('defaultRecognitionMethod'),
+      supportProjectsEnabled: formData.get('supportProjectsEnabled') === 'on',
       requireBaseline: formData.get('requireBaseline') === 'on',
       hardReductionApprovalThreshold: formData.get('hardReductionApprovalThreshold') || '',
     })
@@ -52,6 +54,7 @@ export async function updateSettings(
       p_fiscal_year_start_month: values.fiscalYearStartMonth,
       p_date_format: values.dateFormat,
       p_default_recognition_method: values.defaultRecognitionMethod,
+      p_support_projects_enabled: values.supportProjectsEnabled,
       p_require_baseline: values.requireBaseline,
       p_hard_reduction_approval_threshold: values.hardReductionApprovalThreshold === ''
         ? null
