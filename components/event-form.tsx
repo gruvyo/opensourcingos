@@ -41,12 +41,14 @@ export function EventForm({
   costCenters,
   suppliers: initialSuppliers,
   defaultCurrency,
+  supportProjectsEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
   costCenters: Option[]
   suppliers: Option[]
   defaultCurrency: string
+  supportProjectsEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -264,25 +266,30 @@ export function EventForm({
               </div>
             </div>
           </button>
-          <button
-            type="button"
-            aria-pressed={projectType === 'Support'}
-            onClick={() => handleProjectTypeChange('Support')}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
-              projectType === 'Support'
-                ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand-ink)]'
-                : 'border-[var(--border)] text-[var(--text-2)] hover:border-[var(--border-strong)]'
-            }`}
-          >
-            <LifeBuoy className="h-5 w-5" />
-            <div className="text-left">
-              <div>Support / Non-Commercial</div>
-              <div className={`text-xs font-normal ${projectType === 'Support' ? 'text-[var(--brand-ink)]' : 'text-[var(--text-3)]'}`}>
-                Vendor issues, tickets, $0 savings
+          {supportProjectsEnabled ? (
+            <button
+              type="button"
+              aria-pressed={projectType === 'Support'}
+              onClick={() => handleProjectTypeChange('Support')}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
+                projectType === 'Support'
+                  ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand-ink)]'
+                  : 'border-[var(--border)] text-[var(--text-2)] hover:border-[var(--border-strong)]'
+              }`}
+            >
+              <LifeBuoy className="h-5 w-5" />
+              <div className="text-left">
+                <div>Support / Non-Commercial</div>
+                <div className={`text-xs font-normal ${projectType === 'Support' ? 'text-[var(--brand-ink)]' : 'text-[var(--text-3)]'}`}>
+                  Vendor issues, tickets, $0 savings
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+          ) : null}
         </div>
+        {!supportProjectsEnabled ? (
+          <p className="mt-3 text-xs text-[var(--text-3)]">Support / Non-Commercial project creation is turned off by a workspace administrator.</p>
+        ) : null}
       </Card>
 
       {/* Basic Info */}

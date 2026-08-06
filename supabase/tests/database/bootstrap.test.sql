@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(32);
+select plan(50);
 
 select is(
   (
@@ -173,6 +173,230 @@ select throws_ok(
   '23505',
   'duplicate key value violates unique constraint "uq_suppliers_org_normalized_name"',
   'normalized supplier names cannot be duplicated within one workspace'
+);
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_settings'
+      and column_name = 'support_projects_enabled'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'Support project creation defaults to enabled and cannot be null'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_support_project_setting()'::regprocedure
+  ),
+  'Support project enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_support_project_setting()'::regprocedure
+  ),
+  'Support project enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'sourcing_events'
+      and t.tgname = 'sourcing_events_enforce_support_project_setting'
+      and not t.tgisinternal
+  ),
+  'sourcing_events has the Support project setting trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_support_project_setting()', 'EXECUTE'),
+  'anonymous users cannot execute Support project enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_support_project_setting()', 'EXECUTE'),
+  'signed-in users cannot execute Support project enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_support_project_setting()', 'EXECUTE'),
+  'service role can execute Support project enforcement'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric,boolean)'
+  ) is not null,
+  'workspace settings RPC accepts the Support project control'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric,boolean)',
+    'EXECUTE'
+  ),
+  'signed-in users can invoke the workspace settings RPC'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric)'
+  ) is not null,
+  'the deployed workspace settings RPC signature remains available'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric)'::regprocedure
+  ),
+  'the workspace settings compatibility RPC runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric)'::regprocedure
+  ),
+  'the workspace settings compatibility RPC has a fixed search path'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric)',
+    'EXECUTE'
+  ),
+  'signed-in deployed clients can invoke the compatibility RPC'
+);
+
+insert into public.sourcing_events (
+  id,
+  organization_id,
+  event_name,
+  event_type,
+  event_status,
+  project_type
+) values (
+  '00000000-0000-4000-8000-000000000016',
+  '00000000-0000-4000-8000-000000000001',
+  'Existing Support project',
+  'Other',
+  'Not Started',
+  'Support'
+);
+
+insert into public.organization_settings (
+  organization_id,
+  support_projects_enabled
+) values (
+  '00000000-0000-4000-8000-000000000001',
+  false
+)
+on conflict (organization_id) do update
+set support_projects_enabled = excluded.support_projects_enabled;
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set event_name = 'Existing Support project updated'
+    where id = '00000000-0000-4000-8000-000000000016'
+  $$,
+  'existing Support projects remain editable when new Support creation is off'
+);
+
+select throws_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type
+    ) values (
+      '00000000-0000-4000-8000-000000000017',
+      '00000000-0000-4000-8000-000000000001',
+      'Blocked Support project',
+      'Other',
+      'Not Started',
+      'Support'
+    )
+  $$,
+  '23514',
+  'Support / Non-Commercial projects are disabled for this workspace',
+  'new Support projects are blocked when the setting is off'
+);
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type
+    ) values (
+      '00000000-0000-4000-8000-000000000018',
+      '00000000-0000-4000-8000-000000000001',
+      'Allowed Sourcing project',
+      'Renewal',
+      'Pipeline',
+      'Sourcing'
+    )
+  $$,
+  'new Sourcing projects remain allowed when Support project creation is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set project_type = 'Support'
+    where id = '00000000-0000-4000-8000-000000000018'
+  $$,
+  '23514',
+  'Support / Non-Commercial projects are disabled for this workspace',
+  'direct conversion to Support is blocked when the setting is off'
+);
+
+insert into public.organizations (id, name)
+values ('00000000-0000-4000-8000-000000000019', 'No settings workspace');
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type
+    ) values (
+      '00000000-0000-4000-8000-000000000020',
+      '00000000-0000-4000-8000-000000000019',
+      'Default-enabled Support project',
+      'Other',
+      'Not Started',
+      'Support'
+    )
+  $$,
+  'workspaces without a settings row retain the default enabled behavior'
 );
 
 select ok(

@@ -721,6 +721,7 @@ export type Database = {
           locale: string
           organization_id: string
           require_baseline_for_hard_reduction: boolean
+          support_projects_enabled: boolean
           timezone: string
           updated_at: string
           updated_by: string | null
@@ -735,6 +736,7 @@ export type Database = {
           locale?: string
           organization_id: string
           require_baseline_for_hard_reduction?: boolean
+          support_projects_enabled?: boolean
           timezone?: string
           updated_at?: string
           updated_by?: string | null
@@ -749,6 +751,7 @@ export type Database = {
           locale?: string
           organization_id?: string
           require_baseline_for_hard_reduction?: boolean
+          support_projects_enabled?: boolean
           timezone?: string
           updated_at?: string
           updated_by?: string | null
@@ -1767,21 +1770,38 @@ export type Database = {
         Returns: number
       }
       current_org_id: { Args: never; Returns: string }
-      update_workspace_settings: {
-        Args: {
-          p_currency_code: string
-          p_date_format: string
-          p_default_recognition_method: string
-          p_fiscal_year_start_month: number
-          p_full_name: string
-          p_hard_reduction_approval_threshold: number
-          p_locale: string
-          p_organization_name: string
-          p_require_baseline: boolean
-          p_timezone: string
-        }
-        Returns: undefined
-      }
+      update_workspace_settings:
+        | {
+            Args: {
+              p_currency_code: string
+              p_date_format: string
+              p_default_recognition_method: string
+              p_fiscal_year_start_month: number
+              p_full_name: string
+              p_hard_reduction_approval_threshold: number
+              p_locale: string
+              p_organization_name: string
+              p_require_baseline: boolean
+              p_timezone: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_currency_code: string
+              p_date_format: string
+              p_default_recognition_method: string
+              p_fiscal_year_start_month: number
+              p_full_name: string
+              p_hard_reduction_approval_threshold: number
+              p_locale: string
+              p_organization_name: string
+              p_require_baseline: boolean
+              p_support_projects_enabled: boolean
+              p_timezone: string
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       [_ in never]: never

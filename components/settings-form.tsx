@@ -15,6 +15,7 @@ type SettingsValues = {
   fiscalYearStartMonth: number
   dateFormat: string
   defaultRecognitionMethod: string
+  supportProjectsEnabled: boolean
   requireBaseline: boolean
   hardReductionApprovalThreshold: number | null
 }
@@ -45,6 +46,18 @@ export function SettingsForm({ values, canEdit }: { values: SettingsValues; canE
             <Field label="Organization name *"><Input name="organizationName" defaultValue={values.organizationName} required /></Field>
             <Field label="Your display name *"><Input name="fullName" defaultValue={values.fullName} required /></Field>
           </div>
+        </section>
+
+        <section className="border-t border-[var(--border)] pt-6">
+          <h2 className="text-sm font-semibold text-[var(--text)]">System setup</h2>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Choose which project types workspace members can create.</p>
+          <label className="mt-4 flex items-start gap-3 rounded-lg border border-[var(--border)] p-4">
+            <input name="supportProjectsEnabled" type="checkbox" defaultChecked={values.supportProjectsEnabled} className="mt-1 h-4 w-4 accent-[var(--brand)]" />
+            <span>
+              <span className="block text-sm font-medium text-[var(--text)]">Allow Support / Non-Commercial projects</span>
+              <span className="mt-1 block text-xs text-[var(--text-3)]">When off, members cannot create or convert projects to Support. Existing Support projects remain available.</span>
+            </span>
+          </label>
         </section>
 
         <section className="border-t border-[var(--border)] pt-6">
