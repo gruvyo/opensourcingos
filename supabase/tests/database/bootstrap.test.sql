@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(111);
+select plan(132);
 
 select is(
   (
@@ -1230,6 +1230,295 @@ where id in (
 
 delete from public.organizations
 where id = 'b1000000-0000-4000-8000-000000000025';
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_settings'
+      and column_name = 'project_categories_enabled'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'project Categories default to enabled and cannot be null'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings_v5(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean)'
+  ) is not null,
+  'workspace settings v5 RPC accepts the project Category control'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v5(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v5 RPC runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v5(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v5 RPC has a fixed search path'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings_v5(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'signed-in users can invoke the workspace settings v5 RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.update_workspace_settings_v5(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'anonymous users cannot invoke the workspace settings v5 RPC'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_category_setting()'::regprocedure
+  ),
+  'project Category enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_category_setting()'::regprocedure
+  ),
+  'project Category enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'sourcing_events'
+      and t.tgname = 'sourcing_events_enforce_project_category_setting'
+      and not t.tgisinternal
+  ),
+  'sourcing_events has the project Category setting trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_project_category_setting()', 'EXECUTE'),
+  'anonymous users cannot execute project Category enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_project_category_setting()', 'EXECUTE'),
+  'signed-in users cannot execute project Category enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_project_category_setting()', 'EXECUTE'),
+  'service role can execute project Category enforcement'
+);
+
+insert into public.categories (id, organization_id, category_name)
+values
+  ('c1000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000001', 'Existing Project Category'),
+  ('c1000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000001', 'Replacement Project Category');
+
+insert into public.sourcing_events (
+  id,
+  organization_id,
+  event_name,
+  event_type,
+  event_status,
+  project_type,
+  category_id
+) values (
+  'c1000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000001',
+  'Existing categorized project',
+  'Renewal',
+  'Pipeline',
+  'Sourcing',
+  'c1000000-0000-4000-8000-000000000011'
+);
+
+update public.organization_settings
+set project_categories_enabled = false
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set event_name = 'Existing categorized project updated'
+    where id = 'c1000000-0000-4000-8000-000000000021'
+  $$,
+  'projects remain otherwise editable when project Categories are off'
+);
+
+select is(
+  (
+    select category_id
+    from public.sourcing_events
+    where id = 'c1000000-0000-4000-8000-000000000021'
+  ),
+  'c1000000-0000-4000-8000-000000000011'::uuid,
+  'unrelated project edits preserve the existing Category value'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set category_id = 'c1000000-0000-4000-8000-000000000012'
+    where id = 'c1000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Categories are disabled for this workspace',
+  'existing project Categories cannot be replaced when the setting is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set category_id = null
+    where id = 'c1000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Categories are disabled for this workspace',
+  'existing project Categories cannot be cleared when the setting is off'
+);
+
+select throws_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      category_id
+    ) values (
+      'c1000000-0000-4000-8000-000000000022',
+      '00000000-0000-4000-8000-000000000001',
+      'Blocked categorized project',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      'c1000000-0000-4000-8000-000000000011'
+    )
+  $$,
+  '23514',
+  'Project Categories are disabled for this workspace',
+  'new nonnull project Categories are blocked when the setting is off'
+);
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      category_id
+    ) values (
+      'c1000000-0000-4000-8000-000000000023',
+      '00000000-0000-4000-8000-000000000001',
+      'Allowed project without Category',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      null
+    )
+  $$,
+  'new projects without Categories remain allowed when the setting is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set category_id = 'c1000000-0000-4000-8000-000000000012'
+    where id = 'c1000000-0000-4000-8000-000000000023'
+  $$,
+  '23514',
+  'Project Categories are disabled for this workspace',
+  'project Categories cannot be added later when the setting is off'
+);
+
+insert into public.organizations (id, name)
+values ('c1000000-0000-4000-8000-000000000025', 'No project Category settings workspace');
+
+insert into public.categories (id, organization_id, category_name)
+values ('c1000000-0000-4000-8000-000000000026', 'c1000000-0000-4000-8000-000000000025', 'Default-enabled Project Category');
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      category_id
+    ) values (
+      'c1000000-0000-4000-8000-000000000024',
+      'c1000000-0000-4000-8000-000000000025',
+      'Default-enabled categorized project',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      'c1000000-0000-4000-8000-000000000026'
+    )
+  $$,
+  'workspaces without a settings row retain default-enabled project Categories'
+);
+
+update public.organization_settings
+set project_categories_enabled = true
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set category_id = 'c1000000-0000-4000-8000-000000000012'
+    where id = 'c1000000-0000-4000-8000-000000000021'
+  $$,
+  'project Categories can be changed again after the setting is re-enabled'
+);
+
+delete from public.sourcing_events
+where id in (
+  'c1000000-0000-4000-8000-000000000021',
+  'c1000000-0000-4000-8000-000000000023',
+  'c1000000-0000-4000-8000-000000000024'
+);
+
+delete from public.categories
+where id in (
+  'c1000000-0000-4000-8000-000000000011',
+  'c1000000-0000-4000-8000-000000000012',
+  'c1000000-0000-4000-8000-000000000026'
+);
+
+delete from public.organizations
+where id = 'c1000000-0000-4000-8000-000000000025';
 
 select ok(
   (

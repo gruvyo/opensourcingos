@@ -45,6 +45,7 @@ export function EventForm({
   projectDescriptionsEnabled,
   projectOwnersEnabled,
   projectCostCentersEnabled,
+  projectCategoriesEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -55,6 +56,7 @@ export function EventForm({
   projectDescriptionsEnabled: boolean
   projectOwnersEnabled: boolean
   projectCostCentersEnabled: boolean
+  projectCategoriesEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -193,7 +195,7 @@ export function EventForm({
       event_status: form.event_status,
       event_start_date: form.event_start_date || null,
       project_due_date: form.project_due_date || null,
-      category_id: form.category_id || null,
+      category_id: projectCategoriesEnabled ? form.category_id || null : null,
       business_unit_id: form.business_unit_id || null,
       cost_center_id: projectCostCentersEnabled ? form.cost_center_id || null : null,
       incumbent_supplier_id: form.incumbent_supplier_id || null,
@@ -375,20 +377,22 @@ export function EventForm({
       <Card className="p-6">
         <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">Classification</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label className={labelClass}>Category</label>
-            <Select
-              aria-label="Category"
-              value={form.category_id}
-              onChange={(e) => handleChange('category_id', e.target.value)}
-              className="mt-1"
-            >
-              <option value="">Select category...</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.category_name}</option>
-              ))}
-            </Select>
-          </div>
+          {projectCategoriesEnabled ? (
+            <div>
+              <label className={labelClass}>Category</label>
+              <Select
+                aria-label="Category"
+                value={form.category_id}
+                onChange={(e) => handleChange('category_id', e.target.value)}
+                className="mt-1"
+              >
+                <option value="">Select category...</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.category_name}</option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
           <div>
             <label className={labelClass}>Business Unit</label>
             <Select

@@ -50,6 +50,7 @@ export function EditProjectModal({
   projectDescriptionsEnabled,
   projectOwnersEnabled,
   projectCostCentersEnabled,
+  projectCategoriesEnabled,
   onClose,
   onSaved,
 }: {
@@ -61,6 +62,7 @@ export function EditProjectModal({
   projectDescriptionsEnabled: boolean
   projectOwnersEnabled: boolean
   projectCostCentersEnabled: boolean
+  projectCategoriesEnabled: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -154,7 +156,6 @@ export function EditProjectModal({
       event_close_date: form.event_close_date || null,
       contract_start_date: form.contract_start_date || null,
       contract_end_date: form.contract_end_date || null,
-      category_id: form.category_id || null,
       business_unit_id: form.business_unit_id || null,
       incumbent_supplier_id: form.incumbent_supplier_id || null,
       notes: form.notes || null,
@@ -171,6 +172,10 @@ export function EditProjectModal({
 
     if (projectCostCentersEnabled) {
       updates.cost_center_id = form.cost_center_id || null
+    }
+
+    if (projectCategoriesEnabled) {
+      updates.category_id = form.category_id || null
     }
 
     const { error: updateError } = await supabase
@@ -270,13 +275,15 @@ export function EditProjectModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="ep-category" className={labelClass}>Category</label>
-              <Select id="ep-category" value={form.category_id} onChange={(e) => handleChange('category_id', e.target.value)}>
-                <option value="">Select category...</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.category_name}</option>)}
-              </Select>
-            </div>
+            {projectCategoriesEnabled ? (
+              <div>
+                <label htmlFor="ep-category" className={labelClass}>Category</label>
+                <Select id="ep-category" value={form.category_id} onChange={(e) => handleChange('category_id', e.target.value)}>
+                  <option value="">Select category...</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.category_name}</option>)}
+                </Select>
+              </div>
+            ) : null}
             <div>
               <label htmlFor="ep-bu" className={labelClass}>Business Unit</label>
               <Select id="ep-bu" value={form.business_unit_id} onChange={(e) => handleChange('business_unit_id', e.target.value)}>
