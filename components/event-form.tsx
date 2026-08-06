@@ -42,6 +42,7 @@ export function EventForm({
   suppliers: initialSuppliers,
   defaultCurrency,
   supportProjectsEnabled,
+  projectDescriptionsEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -49,6 +50,7 @@ export function EventForm({
   suppliers: Option[]
   defaultCurrency: string
   supportProjectsEnabled: boolean
+  projectDescriptionsEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -308,17 +310,19 @@ export function EventForm({
               placeholder={projectType === 'Sourcing' ? "e.g. CRM Software Renewal" : "e.g. Vendor billing dispute — Salesforce"}
             />
           </div>
-          <div className="md:col-span-2">
-            <label className={labelClass}>Description</label>
-            <textarea
-              aria-label="Description"
-              value={form.event_description}
-              onChange={(e) => handleChange('event_description', e.target.value)}
-              className={textareaClass}
-              rows={3}
-              placeholder="Brief description"
-            />
-          </div>
+          {projectDescriptionsEnabled ? (
+            <div className="md:col-span-2">
+              <label className={labelClass}>Description</label>
+              <textarea
+                aria-label="Description"
+                value={form.event_description}
+                onChange={(e) => handleChange('event_description', e.target.value)}
+                className={textareaClass}
+                rows={3}
+                placeholder="Brief description"
+              />
+            </div>
+          ) : null}
           <div>
             <label className={labelClass}>{projectType === 'Sourcing' ? 'Event Type' : 'Support Type'} *</label>
             <Select

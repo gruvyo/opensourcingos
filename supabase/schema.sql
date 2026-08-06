@@ -193,6 +193,45 @@ $$;
 
 
 --
+-- Name: enforce_project_description_setting(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_project_description_setting() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+begin
+  if coalesce(
+    (
+      select settings.project_descriptions_enabled
+      from public.organization_settings as settings
+      where settings.organization_id = new.organization_id
+    ),
+    true
+  ) then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if nullif(btrim(new.event_description), '') is not null then
+      raise exception 'Project descriptions are disabled for this workspace'
+        using errcode = '23514';
+    end if;
+
+    return new;
+  end if;
+
+  if new.event_description is distinct from old.event_description then
+    raise exception 'Project descriptions are disabled for this workspace'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end
+$$;
+
+
+--
 -- Name: enforce_support_project_setting(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -430,6 +469,82 @@ begin
     require_baseline_for_hard_reduction = excluded.require_baseline_for_hard_reduction,
     hard_reduction_approval_threshold = excluded.hard_reduction_approval_threshold,
     support_projects_enabled = excluded.support_projects_enabled,
+    updated_by = excluded.updated_by;
+end
+$$;
+
+
+--
+-- Name: update_workspace_settings_v2(text, text, text, text, text, integer, text, text, boolean, numeric, boolean, boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_workspace_settings_v2(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean) RETURNS void
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v_user uuid := auth.uid();
+  v_org uuid := public.current_org_id();
+  v_role text;
+begin
+  if v_user is null or v_org is null then
+    raise exception 'authentication required';
+  end if;
+
+  select role into v_role
+  from public.profiles
+  where id = v_user and organization_id = v_org;
+
+  if v_role is distinct from 'admin' then
+    raise exception 'administrator role required';
+  end if;
+
+  update public.organizations
+  set name = p_organization_name
+  where id = v_org;
+
+  update public.profiles
+  set full_name = p_full_name
+  where id = v_user and organization_id = v_org;
+
+  insert into public.organization_settings (
+    organization_id,
+    currency_code,
+    locale,
+    timezone,
+    fiscal_year_start_month,
+    date_format,
+    default_recognition_method,
+    require_baseline_for_hard_reduction,
+    hard_reduction_approval_threshold,
+    support_projects_enabled,
+    project_descriptions_enabled,
+    updated_by
+  ) values (
+    v_org,
+    p_currency_code,
+    p_locale,
+    p_timezone,
+    p_fiscal_year_start_month,
+    p_date_format,
+    p_default_recognition_method,
+    p_require_baseline,
+    p_hard_reduction_approval_threshold,
+    p_support_projects_enabled,
+    p_project_descriptions_enabled,
+    v_user
+  )
+  on conflict (organization_id) do update set
+    currency_code = excluded.currency_code,
+    locale = excluded.locale,
+    timezone = excluded.timezone,
+    fiscal_year_start_month = excluded.fiscal_year_start_month,
+    date_format = excluded.date_format,
+    default_recognition_method = excluded.default_recognition_method,
+    require_baseline_for_hard_reduction = excluded.require_baseline_for_hard_reduction,
+    hard_reduction_approval_threshold = excluded.hard_reduction_approval_threshold,
+    support_projects_enabled = excluded.support_projects_enabled,
+    project_descriptions_enabled = excluded.project_descriptions_enabled,
     updated_by = excluded.updated_by;
 end
 $$;
@@ -705,6 +820,7 @@ CREATE TABLE public.organization_settings (
     require_baseline_for_hard_reduction boolean DEFAULT true NOT NULL,
     hard_reduction_approval_threshold numeric(15,2),
     support_projects_enabled boolean DEFAULT true NOT NULL,
+    project_descriptions_enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_by uuid,
@@ -723,6 +839,13 @@ ALTER TABLE ONLY public.organization_settings FORCE ROW LEVEL SECURITY;
 --
 
 COMMENT ON COLUMN public.organization_settings.support_projects_enabled IS 'Controls whether new Support / Non-Commercial projects may be created. Existing Support projects remain available.';
+
+
+--
+-- Name: COLUMN organization_settings.project_descriptions_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organization_settings.project_descriptions_enabled IS 'Controls whether project descriptions may be added or changed. Existing descriptions remain visible.';
 
 
 --
@@ -1825,6 +1948,13 @@ CREATE TRIGGER savings_calculation_lines_updated_at BEFORE UPDATE ON public.savi
 --
 
 CREATE TRIGGER savings_calculations_updated_at BEFORE UPDATE ON public.savings_calculations FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+
+--
+-- Name: sourcing_events sourcing_events_enforce_project_description_setting; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER sourcing_events_enforce_project_description_setting BEFORE INSERT OR UPDATE ON public.sourcing_events FOR EACH ROW EXECUTE FUNCTION public.enforce_project_description_setting();
 
 
 --
@@ -3216,6 +3346,14 @@ GRANT ALL ON FUNCTION public.handle_new_user() TO service_role;
 
 
 --
+-- Name: FUNCTION enforce_project_description_setting(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.enforce_project_description_setting() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.enforce_project_description_setting() TO service_role;
+
+
+--
 -- Name: FUNCTION enforce_support_project_setting(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -3265,6 +3403,15 @@ GRANT ALL ON FUNCTION public.update_workspace_settings(p_organization_name text,
 REVOKE ALL ON FUNCTION public.update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean) TO authenticated;
 GRANT ALL ON FUNCTION public.update_workspace_settings(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean) TO service_role;
+
+
+--
+-- Name: FUNCTION update_workspace_settings_v2(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.update_workspace_settings_v2(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.update_workspace_settings_v2(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.update_workspace_settings_v2(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean) TO service_role;
 
 
 --

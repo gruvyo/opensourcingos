@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(50);
+select plan(69);
 
 select is(
   (
@@ -411,6 +411,261 @@ where id = '00000000-0000-4000-8000-000000000019';
 
 update public.organization_settings
 set support_projects_enabled = true
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_settings'
+      and column_name = 'project_descriptions_enabled'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'project descriptions default to enabled and cannot be null'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings_v2(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean)'
+  ) is not null,
+  'workspace settings v2 RPC accepts the project description control'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v2(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v2 RPC runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v2(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v2 RPC has a fixed search path'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings_v2(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'signed-in users can invoke the workspace settings v2 RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.update_workspace_settings_v2(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'anonymous users cannot invoke the workspace settings v2 RPC'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_description_setting()'::regprocedure
+  ),
+  'project description enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_description_setting()'::regprocedure
+  ),
+  'project description enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'sourcing_events'
+      and t.tgname = 'sourcing_events_enforce_project_description_setting'
+      and not t.tgisinternal
+  ),
+  'sourcing_events has the project description setting trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_project_description_setting()', 'EXECUTE'),
+  'anonymous users cannot execute project description enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_project_description_setting()', 'EXECUTE'),
+  'signed-in users cannot execute project description enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_project_description_setting()', 'EXECUTE'),
+  'service role can execute project description enforcement'
+);
+
+insert into public.sourcing_events (
+  id,
+  organization_id,
+  event_name,
+  event_description,
+  event_type,
+  event_status,
+  project_type
+) values (
+  '90000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000001',
+  'Existing described project',
+  'Description to preserve',
+  'Renewal',
+  'Pipeline',
+  'Sourcing'
+);
+
+update public.organization_settings
+set project_descriptions_enabled = false
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set event_name = 'Existing described project updated'
+    where id = '90000000-0000-4000-8000-000000000021'
+  $$,
+  'described projects remain otherwise editable when descriptions are off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set event_description = 'Replacement description'
+    where id = '90000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project descriptions are disabled for this workspace',
+  'existing descriptions cannot be replaced when descriptions are off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set event_description = null
+    where id = '90000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project descriptions are disabled for this workspace',
+  'existing descriptions cannot be cleared when descriptions are off'
+);
+
+select throws_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_description,
+      event_type,
+      event_status,
+      project_type
+    ) values (
+      '90000000-0000-4000-8000-000000000022',
+      '00000000-0000-4000-8000-000000000001',
+      'Blocked described project',
+      'Blocked description',
+      'Renewal',
+      'Pipeline',
+      'Sourcing'
+    )
+  $$,
+  '23514',
+  'Project descriptions are disabled for this workspace',
+  'new nonblank descriptions are blocked when descriptions are off'
+);
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_description,
+      event_type,
+      event_status,
+      project_type
+    ) values (
+      '90000000-0000-4000-8000-000000000023',
+      '00000000-0000-4000-8000-000000000001',
+      'Allowed project without description',
+      null,
+      'Renewal',
+      'Pipeline',
+      'Sourcing'
+    )
+  $$,
+  'new projects without descriptions remain allowed when descriptions are off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set event_description = 'Late description'
+    where id = '90000000-0000-4000-8000-000000000023'
+  $$,
+  '23514',
+  'Project descriptions are disabled for this workspace',
+  'descriptions cannot be added later when descriptions are off'
+);
+
+insert into public.organizations (id, name)
+values ('90000000-0000-4000-8000-000000000025', 'No description settings workspace');
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_description,
+      event_type,
+      event_status,
+      project_type
+    ) values (
+      '90000000-0000-4000-8000-000000000024',
+      '90000000-0000-4000-8000-000000000025',
+      'Default-enabled described project',
+      'Allowed by the default',
+      'Renewal',
+      'Pipeline',
+      'Sourcing'
+    )
+  $$,
+  'workspaces without a settings row retain default-enabled descriptions'
+);
+
+delete from public.sourcing_events
+where id in (
+  '90000000-0000-4000-8000-000000000021',
+  '90000000-0000-4000-8000-000000000023',
+  '90000000-0000-4000-8000-000000000024'
+);
+
+delete from public.organizations
+where id = '90000000-0000-4000-8000-000000000025';
+
+update public.organization_settings
+set project_descriptions_enabled = true
 where organization_id = '00000000-0000-4000-8000-000000000001';
 
 select ok(

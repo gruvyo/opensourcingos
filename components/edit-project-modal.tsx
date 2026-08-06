@@ -47,6 +47,7 @@ export function EditProjectModal({
   businessUnits,
   costCenters,
   suppliers,
+  projectDescriptionsEnabled,
   onClose,
   onSaved,
 }: {
@@ -55,6 +56,7 @@ export function EditProjectModal({
   businessUnits: Option[]
   costCenters: Option[]
   suppliers: Option[]
+  projectDescriptionsEnabled: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -141,7 +143,6 @@ export function EditProjectModal({
 
     const updates: Record<string, string | null> = {
       event_name: form.event_name,
-      event_description: form.event_description || null,
       event_type: form.event_type || null,
       event_status: form.event_status,
       buyer_name: form.buyer_name || null,
@@ -158,6 +159,9 @@ export function EditProjectModal({
       updated_at: new Date().toISOString(),
     }
 
+    if (projectDescriptionsEnabled) {
+      updates.event_description = form.event_description || null
+    }
 
     const { error: updateError } = await supabase
       .from('sourcing_events')
@@ -229,10 +233,12 @@ export function EditProjectModal({
             <Input id="ep-name" type="text" required value={form.event_name} onChange={(e) => handleChange('event_name', e.target.value)} />
           </div>
 
-          <div>
-            <label htmlFor="ep-desc" className={labelClass}>Description</label>
-            <textarea id="ep-desc" value={form.event_description} onChange={(e) => handleChange('event_description', e.target.value)} className={textareaClass} rows={2} />
-          </div>
+          {projectDescriptionsEnabled ? (
+            <div>
+              <label htmlFor="ep-desc" className={labelClass}>Description</label>
+              <textarea id="ep-desc" value={form.event_description} onChange={(e) => handleChange('event_description', e.target.value)} className={textareaClass} rows={2} />
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

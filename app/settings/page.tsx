@@ -37,6 +37,7 @@ export default async function SettingsPage() {
     dateFormat: settings?.date_format || 'MMM D, YYYY',
     defaultRecognitionMethod: settings?.default_recognition_method || 'monthly',
     supportProjectsEnabled: settings?.support_projects_enabled ?? true,
+    projectDescriptionsEnabled: settings?.project_descriptions_enabled ?? true,
     requireBaseline: settings?.require_baseline_for_hard_reduction ?? true,
     hardReductionApprovalThreshold: settings?.hard_reduction_approval_threshold ?? null,
   }
