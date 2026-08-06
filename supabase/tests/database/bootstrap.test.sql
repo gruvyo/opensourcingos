@@ -525,7 +525,7 @@ insert into public.sourcing_events (
   event_status,
   project_type
 ) values (
-  '00000000-0000-4000-8000-000000000021',
+  '90000000-0000-4000-8000-000000000021',
   '00000000-0000-4000-8000-000000000001',
   'Existing described project',
   'Description to preserve',
@@ -542,7 +542,7 @@ select lives_ok(
   $$
     update public.sourcing_events
     set event_name = 'Existing described project updated'
-    where id = '00000000-0000-4000-8000-000000000021'
+    where id = '90000000-0000-4000-8000-000000000021'
   $$,
   'described projects remain otherwise editable when descriptions are off'
 );
@@ -551,7 +551,7 @@ select throws_ok(
   $$
     update public.sourcing_events
     set event_description = 'Replacement description'
-    where id = '00000000-0000-4000-8000-000000000021'
+    where id = '90000000-0000-4000-8000-000000000021'
   $$,
   '23514',
   'Project descriptions are disabled for this workspace',
@@ -562,7 +562,7 @@ select throws_ok(
   $$
     update public.sourcing_events
     set event_description = null
-    where id = '00000000-0000-4000-8000-000000000021'
+    where id = '90000000-0000-4000-8000-000000000021'
   $$,
   '23514',
   'Project descriptions are disabled for this workspace',
@@ -580,7 +580,7 @@ select throws_ok(
       event_status,
       project_type
     ) values (
-      '00000000-0000-4000-8000-000000000022',
+      '90000000-0000-4000-8000-000000000022',
       '00000000-0000-4000-8000-000000000001',
       'Blocked described project',
       'Blocked description',
@@ -605,7 +605,7 @@ select lives_ok(
       event_status,
       project_type
     ) values (
-      '00000000-0000-4000-8000-000000000023',
+      '90000000-0000-4000-8000-000000000023',
       '00000000-0000-4000-8000-000000000001',
       'Allowed project without description',
       null,
@@ -621,7 +621,7 @@ select throws_ok(
   $$
     update public.sourcing_events
     set event_description = 'Late description'
-    where id = '00000000-0000-4000-8000-000000000023'
+    where id = '90000000-0000-4000-8000-000000000023'
   $$,
   '23514',
   'Project descriptions are disabled for this workspace',
@@ -629,7 +629,7 @@ select throws_ok(
 );
 
 insert into public.organizations (id, name)
-values ('00000000-0000-4000-8000-000000000025', 'No description settings workspace');
+values ('90000000-0000-4000-8000-000000000025', 'No description settings workspace');
 
 select lives_ok(
   $$
@@ -642,8 +642,8 @@ select lives_ok(
       event_status,
       project_type
     ) values (
-      '00000000-0000-4000-8000-000000000024',
-      '00000000-0000-4000-8000-000000000025',
+      '90000000-0000-4000-8000-000000000024',
+      '90000000-0000-4000-8000-000000000025',
       'Default-enabled described project',
       'Allowed by the default',
       'Renewal',
@@ -656,13 +656,13 @@ select lives_ok(
 
 delete from public.sourcing_events
 where id in (
-  '00000000-0000-4000-8000-000000000021',
-  '00000000-0000-4000-8000-000000000023',
-  '00000000-0000-4000-8000-000000000024'
+  '90000000-0000-4000-8000-000000000021',
+  '90000000-0000-4000-8000-000000000023',
+  '90000000-0000-4000-8000-000000000024'
 );
 
 delete from public.organizations
-where id = '00000000-0000-4000-8000-000000000025';
+where id = '90000000-0000-4000-8000-000000000025';
 
 update public.organization_settings
 set project_descriptions_enabled = true
