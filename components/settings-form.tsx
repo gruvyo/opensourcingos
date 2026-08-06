@@ -19,6 +19,7 @@ type SettingsValues = {
   projectDescriptionsEnabled: boolean
   projectOwnersEnabled: boolean
   projectCostCentersEnabled: boolean
+  projectCategoriesEnabled: boolean
   requireBaseline: boolean
   hardReductionApprovalThreshold: number | null
 }
@@ -81,6 +82,13 @@ export function SettingsForm({ values, canEdit }: { values: SettingsValues; canE
               <span>
                 <span className="block text-sm font-medium text-[var(--text)]">Allow Project Cost Center</span>
                 <span className="mt-1 block text-xs text-[var(--text-3)]">When off, members cannot add or change Cost Centers. Existing values remain visible in project details.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border border-[var(--border)] p-4">
+              <input name="projectCategoriesEnabled" type="checkbox" defaultChecked={values.projectCategoriesEnabled} className="mt-1 h-4 w-4 accent-[var(--brand)]" />
+              <span>
+                <span className="block text-sm font-medium text-[var(--text)]">Allow Project Category</span>
+                <span className="mt-1 block text-xs text-[var(--text-3)]">When off, members cannot add or change project Categories. Existing values remain visible in project details, lists, and dashboards.</span>
               </span>
             </label>
           </div>
