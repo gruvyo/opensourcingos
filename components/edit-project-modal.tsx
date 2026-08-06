@@ -48,6 +48,7 @@ export function EditProjectModal({
   costCenters,
   suppliers,
   projectDescriptionsEnabled,
+  projectOwnersEnabled,
   onClose,
   onSaved,
 }: {
@@ -57,6 +58,7 @@ export function EditProjectModal({
   costCenters: Option[]
   suppliers: Option[]
   projectDescriptionsEnabled: boolean
+  projectOwnersEnabled: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -145,7 +147,6 @@ export function EditProjectModal({
       event_name: form.event_name,
       event_type: form.event_type || null,
       event_status: form.event_status,
-      buyer_name: form.buyer_name || null,
       event_start_date: form.event_start_date || null,
       project_due_date: form.project_due_date || null,
       event_close_date: form.event_close_date || null,
@@ -161,6 +162,10 @@ export function EditProjectModal({
 
     if (projectDescriptionsEnabled) {
       updates.event_description = form.event_description || null
+    }
+
+    if (projectOwnersEnabled) {
+      updates.buyer_name = form.buyer_name || null
     }
 
     const { error: updateError } = await supabase
@@ -251,10 +256,12 @@ export function EditProjectModal({
               <label htmlFor="ep-type" className={labelClass}>Event Type</label>
               <Input id="ep-type" type="text" value={form.event_type} onChange={(e) => handleChange('event_type', e.target.value)} />
             </div>
-            <div>
-              <label htmlFor="ep-buyer" className={labelClass}>Owner / Buyer</label>
-              <Input id="ep-buyer" type="text" value={form.buyer_name} onChange={(e) => handleChange('buyer_name', e.target.value)} placeholder="e.g. Jane Smith" />
-            </div>
+            {projectOwnersEnabled ? (
+              <div>
+                <label htmlFor="ep-buyer" className={labelClass}>Owner / Buyer</label>
+                <Input id="ep-buyer" type="text" value={form.buyer_name} onChange={(e) => handleChange('buyer_name', e.target.value)} placeholder="e.g. Jane Smith" />
+              </div>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

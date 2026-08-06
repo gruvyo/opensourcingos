@@ -17,6 +17,7 @@ type SettingsValues = {
   defaultRecognitionMethod: string
   supportProjectsEnabled: boolean
   projectDescriptionsEnabled: boolean
+  projectOwnersEnabled: boolean
   requireBaseline: boolean
   hardReductionApprovalThreshold: number | null
 }
@@ -65,6 +66,13 @@ export function SettingsForm({ values, canEdit }: { values: SettingsValues; canE
               <span>
                 <span className="block text-sm font-medium text-[var(--text)]">Allow Project Descriptions</span>
                 <span className="mt-1 block text-xs text-[var(--text-3)]">When off, members cannot add or change descriptions. Existing descriptions remain visible.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border border-[var(--border)] p-4">
+              <input name="projectOwnersEnabled" type="checkbox" defaultChecked={values.projectOwnersEnabled} className="mt-1 h-4 w-4 accent-[var(--brand)]" />
+              <span>
+                <span className="block text-sm font-medium text-[var(--text)]">Allow Project Owner / Buyer</span>
+                <span className="mt-1 block text-xs text-[var(--text-3)]">When off, members cannot add or change owners. Existing owner values remain visible in projects and reports.</span>
               </span>
             </label>
           </div>

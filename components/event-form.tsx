@@ -43,6 +43,7 @@ export function EventForm({
   defaultCurrency,
   supportProjectsEnabled,
   projectDescriptionsEnabled,
+  projectOwnersEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -51,6 +52,7 @@ export function EventForm({
   defaultCurrency: string
   supportProjectsEnabled: boolean
   projectDescriptionsEnabled: boolean
+  projectOwnersEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -176,7 +178,7 @@ export function EventForm({
       event_description: form.event_description || null,
       event_type: form.event_type || null,
       project_type: projectType,
-      buyer_name: form.buyer_name || null,
+      buyer_name: projectOwnersEnabled ? form.buyer_name || null : null,
       // Keep the legacy field populated for rollback compatibility. The same
       // content is written to the append-only timeline immediately below.
       notes: form.notes || null,
@@ -351,17 +353,19 @@ export function EventForm({
               ))}
             </Select>
           </div>
-          <div>
-            <label className={labelClass}>Owner / Buyer</label>
-            <Input
-              aria-label="Owner or Buyer"
-              type="text"
-              value={form.buyer_name}
-              onChange={(e) => handleChange('buyer_name', e.target.value)}
-              className="mt-1"
-              placeholder="e.g. Jane Smith"
-            />
-          </div>
+          {projectOwnersEnabled ? (
+            <div>
+              <label className={labelClass}>Owner / Buyer</label>
+              <Input
+                aria-label="Owner or Buyer"
+                type="text"
+                value={form.buyer_name}
+                onChange={(e) => handleChange('buyer_name', e.target.value)}
+                className="mt-1"
+                placeholder="e.g. Jane Smith"
+              />
+            </div>
+          ) : null}
         </div>
       </Card>
 
