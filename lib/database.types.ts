@@ -720,8 +720,8 @@ export type Database = {
           hard_reduction_approval_threshold: number | null
           locale: string
           organization_id: string
-          project_cost_centers_enabled: boolean
           project_categories_enabled: boolean
+          project_cost_centers_enabled: boolean
           project_descriptions_enabled: boolean
           project_owners_enabled: boolean
           require_baseline_for_hard_reduction: boolean
@@ -739,8 +739,8 @@ export type Database = {
           hard_reduction_approval_threshold?: number | null
           locale?: string
           organization_id: string
-          project_cost_centers_enabled?: boolean
           project_categories_enabled?: boolean
+          project_cost_centers_enabled?: boolean
           project_descriptions_enabled?: boolean
           project_owners_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
@@ -758,8 +758,8 @@ export type Database = {
           hard_reduction_approval_threshold?: number | null
           locale?: string
           organization_id?: string
-          project_cost_centers_enabled?: boolean
           project_categories_enabled?: boolean
+          project_cost_centers_enabled?: boolean
           project_descriptions_enabled?: boolean
           project_owners_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
