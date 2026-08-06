@@ -399,6 +399,20 @@ select lives_ok(
   'workspaces without a settings row retain the default enabled behavior'
 );
 
+delete from public.sourcing_events
+where id in (
+  '00000000-0000-4000-8000-000000000016',
+  '00000000-0000-4000-8000-000000000018',
+  '00000000-0000-4000-8000-000000000020'
+);
+
+delete from public.organizations
+where id = '00000000-0000-4000-8000-000000000019';
+
+update public.organization_settings
+set support_projects_enabled = true
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
 select ok(
   (
     select bool_and(has_table_privilege('authenticated', format('public.%I', c.relname), 'SELECT'))
