@@ -24,6 +24,7 @@ export default async function EventDetailPage({
     { data: costCenters, error: costCentersError },
     { data: updates, error: updatesError },
     { data: currentProfile },
+    { data: settings, error: settingsError },
   ] = await Promise.all([
     supabase.from('sourcing_events')
       .select(`
@@ -66,6 +67,9 @@ export default async function EventDetailPage({
       .select('id, full_name, email')
       .eq('id', user.id)
       .single(),
+    supabase.from('organization_settings')
+      .select('project_descriptions_enabled')
+      .maybeSingle(),
   ])
 
   if (!event || !currentProfile) notFound()
@@ -74,7 +78,8 @@ export default async function EventDetailPage({
   // that's not a load failure, it's handled by notFound() above.
   const loadError = (eventError && eventError.code !== 'PGRST116' ? eventError.message : null)
     || scopeLinesError?.message || suppliersError?.message || categoriesError?.message
-    || businessUnitsError?.message || costCentersError?.message || updatesError?.message || null
+    || businessUnitsError?.message || costCentersError?.message || updatesError?.message
+    || settingsError?.message || null
 
   return (
     <div className="min-w-0 p-4 sm:p-8">
@@ -99,6 +104,7 @@ export default async function EventDetailPage({
         costCenters={costCenters || []}
         updates={updates || []}
         currentProfile={currentProfile}
+        projectDescriptionsEnabled={settings?.project_descriptions_enabled ?? true}
       />
     </div>
   )
