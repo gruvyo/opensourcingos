@@ -668,13 +668,6 @@ export function classifyRealization(
 
 // ---- Portfolio rollup (dashboard / savings / reports all use this) -----
 
-export interface YearBucket {
-  year: string
-  costReduction: number
-  costAvoidance: number
-  total: number
-}
-
 export interface PortfolioRollup {
   totalSavings: number
   totalCostReduction: number
@@ -694,11 +687,7 @@ export interface PortfolioRollup {
   byCategory: { name: string; value: number }[]
   /** Gross savings + project count grouped by the event's business unit. */
   byBusinessUnit: { name: string; value: number; count: number }[]
-  /** Savings prorated across calendar years (dynamic range, no rounding drift). */
-  byYear: YearBucket[]
-  /** Gross savings of calcs with no dates — surfaced, not silently dropped. */
-  unscheduled: number
-  /** True when byType sums back to totalSavings (a self-consistency check). */
+  /** True when Reduction + Avoidance reconciles to Total across the portfolio. */
   reconciles: boolean
 }
 
@@ -790,8 +779,6 @@ export function portfolioRollup(
     .map(([name, { value, count }]) => ({ name, value, count }))
     .sort((a, b) => b.value - a.value)
 
-  const { byYear, unscheduled } = prorateByYear(calcs)
-
   // Self-consistency. This used to compare byType's sum against totalSavings --
   // but both accumulate the same `gross` variable, so it was TRUE BY
   // CONSTRUCTION and could never fire. It now checks the thing that can
@@ -816,67 +803,8 @@ export function portfolioRollup(
     byType,
     byCategory,
     byBusinessUnit,
-    byYear,
-    unscheduled,
     reconciles,
   }
-}
-
-const DAY_MS = 1000 * 60 * 60 * 24
-
-/**
- * Prorate each calc's savings across the calendar years its savings period
- * spans, weighted by the number of days that fall in each year. Fixes the old
- * version's three flaws: (1) hardcoded 2026–2030 window → dynamic range;
- * (2) rounding each year independently → keep full precision, round only at
- * display; (3) silently dropping undated calcs → returned as `unscheduled`.
- */
-export function prorateByYear(calcs: SavingsCalcRow[]): { byYear: YearBucket[]; unscheduled: number } {
-  const buckets = new Map<number, YearBucket>()
-  let unscheduled = 0
-
-  const ensure = (y: number): YearBucket => {
-    let b = buckets.get(y)
-    if (!b) {
-      b = { year: String(y), costReduction: 0, costAvoidance: 0, total: 0 }
-      buckets.set(y, b)
-    }
-    return b
-  }
-
-  for (const c of calcs) {
-    const total = num(c.gross_savings_amount)
-    if (!c.savings_start_date || !c.savings_end_date) {
-      unscheduled += total
-      continue
-    }
-    const start = new Date(c.savings_start_date)
-    const end = new Date(c.savings_end_date)
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
-      unscheduled += total
-      continue
-    }
-    const cr = num(c.cost_reduction_amount)
-    const ca = num(c.cost_avoidance_amount)
-    const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1)
-
-    for (let y = start.getFullYear(); y <= end.getFullYear(); y++) {
-      const yearStart = new Date(y, 0, 1)
-      const yearEnd = new Date(y, 11, 31)
-      const overlapStart = start > yearStart ? start : yearStart
-      const overlapEnd = end < yearEnd ? end : yearEnd
-      if (overlapStart > overlapEnd) continue
-      const overlapDays = Math.max(0, Math.round((overlapEnd.getTime() - overlapStart.getTime()) / DAY_MS) + 1)
-      const fraction = overlapDays / totalDays
-      const b = ensure(y)
-      b.costReduction += cr * fraction
-      b.costAvoidance += ca * fraction
-      b.total += total * fraction
-    }
-  }
-
-  const byYear = Array.from(buckets.values()).sort((a, b) => Number(a.year) - Number(b.year))
-  return { byYear, unscheduled }
 }
 
 // ---- THE PORTFOLIO FISCAL YEAR (Step 4) -------------------------------
@@ -885,9 +813,9 @@ export function prorateByYear(calcs: SavingsCalcRow[]): { byYear: YearBucket[]; 
 // been scheduled. The rest carry nothing but a savings_calculation with a start
 // and an end date.
 //
-// The old answer was prorateByYear(), which weights each calendar year by the
-// number of DAYS it holds. That disagrees with the schedule, which books whole
-// months — on the reference deal (900,000 over 36 months from August 2026) the
+// The retired answer weighted each calendar year by the number of DAYS it
+// holds. That disagrees with the schedule, which books whole months — on the
+// reference deal (900,000 over 36 months from August 2026) the
 // two differ by up to 912 in a single year while both summing to 900,000. Two
 // screens, same deal, different fiscal-year numbers. That is exactly the drift
 // this module exists to prevent.
