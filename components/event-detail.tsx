@@ -130,6 +130,7 @@ export function EventDetail({
   updates,
   currentProfile,
   projectDescriptionsEnabled,
+  projectOwnersEnabled,
 }: {
   event: Event
   scopeLines: ScopeLine[]
@@ -140,6 +141,7 @@ export function EventDetail({
   updates: ProjectUpdate[]
   currentProfile: CurrentProfile
   projectDescriptionsEnabled: boolean
+  projectOwnersEnabled: boolean
 }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEditModal, setShowEditModal] = useState(false)
@@ -239,6 +241,7 @@ export function EventDetail({
           costCenters={costCenters}
           suppliers={suppliers}
           projectDescriptionsEnabled={projectDescriptionsEnabled}
+          projectOwnersEnabled={projectOwnersEnabled}
           onClose={() => setShowEditModal(false)}
           onSaved={() => { setShowEditModal(false); window.location.reload(); }}
         />

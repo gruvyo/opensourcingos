@@ -17,6 +17,7 @@ const settingsSchema = z.object({
   defaultRecognitionMethod: z.enum(['monthly', 'annual', 'one_time']),
   supportProjectsEnabled: z.boolean(),
   projectDescriptionsEnabled: z.boolean(),
+  projectOwnersEnabled: z.boolean(),
   requireBaseline: z.boolean(),
   hardReductionApprovalThreshold: z.union([z.literal(''), z.coerce.number().min(0)]),
 })
@@ -38,6 +39,7 @@ export async function updateSettings(
       defaultRecognitionMethod: formData.get('defaultRecognitionMethod'),
       supportProjectsEnabled: formData.get('supportProjectsEnabled') === 'on',
       projectDescriptionsEnabled: formData.get('projectDescriptionsEnabled') === 'on',
+      projectOwnersEnabled: formData.get('projectOwnersEnabled') === 'on',
       requireBaseline: formData.get('requireBaseline') === 'on',
       hardReductionApprovalThreshold: formData.get('hardReductionApprovalThreshold') || '',
     })
@@ -47,7 +49,7 @@ export async function updateSettings(
     }
 
     const values = parsed.data
-    const { error } = await supabase.rpc('update_workspace_settings_v2', {
+    const { error } = await supabase.rpc('update_workspace_settings_v3', {
       p_organization_name: values.organizationName,
       p_full_name: values.fullName,
       p_currency_code: values.currencyCode,
@@ -58,6 +60,7 @@ export async function updateSettings(
       p_default_recognition_method: values.defaultRecognitionMethod,
       p_support_projects_enabled: values.supportProjectsEnabled,
       p_project_descriptions_enabled: values.projectDescriptionsEnabled,
+      p_project_owners_enabled: values.projectOwnersEnabled,
       p_require_baseline: values.requireBaseline,
       p_hard_reduction_approval_threshold: values.hardReductionApprovalThreshold === ''
         ? null

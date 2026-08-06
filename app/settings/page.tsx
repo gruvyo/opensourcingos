@@ -38,6 +38,7 @@ export default async function SettingsPage() {
     defaultRecognitionMethod: settings?.default_recognition_method || 'monthly',
     supportProjectsEnabled: settings?.support_projects_enabled ?? true,
     projectDescriptionsEnabled: settings?.project_descriptions_enabled ?? true,
+    projectOwnersEnabled: settings?.project_owners_enabled ?? true,
     requireBaseline: settings?.require_baseline_for_hard_reduction ?? true,
     hardReductionApprovalThreshold: settings?.hard_reduction_approval_threshold ?? null,
   }

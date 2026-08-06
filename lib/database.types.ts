@@ -721,6 +721,7 @@ export type Database = {
           locale: string
           organization_id: string
           project_descriptions_enabled: boolean
+          project_owners_enabled: boolean
           require_baseline_for_hard_reduction: boolean
           support_projects_enabled: boolean
           timezone: string
@@ -737,6 +738,7 @@ export type Database = {
           locale?: string
           organization_id: string
           project_descriptions_enabled?: boolean
+          project_owners_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
           support_projects_enabled?: boolean
           timezone?: string
@@ -753,6 +755,7 @@ export type Database = {
           locale?: string
           organization_id?: string
           project_descriptions_enabled?: boolean
+          project_owners_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
           support_projects_enabled?: boolean
           timezone?: string
@@ -1816,6 +1819,24 @@ export type Database = {
           p_locale: string
           p_organization_name: string
           p_project_descriptions_enabled: boolean
+          p_require_baseline: boolean
+          p_support_projects_enabled: boolean
+          p_timezone: string
+        }
+        Returns: undefined
+      }
+      update_workspace_settings_v3: {
+        Args: {
+          p_currency_code: string
+          p_date_format: string
+          p_default_recognition_method: string
+          p_fiscal_year_start_month: number
+          p_full_name: string
+          p_hard_reduction_approval_threshold: number
+          p_locale: string
+          p_organization_name: string
+          p_project_descriptions_enabled: boolean
+          p_project_owners_enabled: boolean
           p_require_baseline: boolean
           p_support_projects_enabled: boolean
           p_timezone: string
