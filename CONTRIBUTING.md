@@ -18,12 +18,16 @@ git clone https://github.com/gruvyo/opensourcingos.git
 cd opensourcingos
 npm ci
 cp .env.example .env.local
-npm run dev
+npm run db:start
+npm run db:reset
+npm run db:test
+npm run db:types
 ```
 
-Fill `.env.local` with a compatible Supabase project URL and a modern
-publishable key. Never use a service-role or secret key in a `NEXT_PUBLIC_`
-variable.
+Run `supabase status`, then fill `.env.local` with the local API URL and modern
+publishable key before running `npm run dev`. Never use a service-role or secret
+key in a `NEXT_PUBLIC_` variable. Google sign-in requires separate local OAuth
+configuration; see [`supabase/README.md`](supabase/README.md#google-sign-in).
 
 ## Framework guidance
 
@@ -38,12 +42,14 @@ Before submitting a pull request, run:
 
 ```bash
 npm run verify
+npm run lint
 npx tsc --noEmit
+npm run test:env
+npm run test:portfolio-queries
 ```
 
-Also run `npm run lint` and avoid adding new lint errors. The existing lint
-baseline is not yet clean, so unrelated cleanup should be kept in a separate
-change.
+All five checks currently pass on `main`. Keep unrelated cleanup in a separate
+change so the user-facing behavior and its verification remain easy to review.
 
 ## Savings methodology changes
 

@@ -33,9 +33,9 @@ npm run db:types
 ```
 
 `db:types` regenerates `lib/database.types.ts` from the local `public` schema.
-The generated file describes the database but is not connected to the
-application clients yet. CI rebuilds the database and verifies that the file
-stays current whenever the schema or database workflow changes.
+The application imports these generated types for its database-backed records
+and mutations. CI rebuilds the database and verifies that the file stays current
+whenever the schema or database workflow changes.
 
 `db:reset` destroys only the local database, replays every migration, and then
 loads the fictional seed. Never add `--linked` when working with production.
