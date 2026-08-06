@@ -49,6 +49,7 @@ export function EditProjectModal({
   suppliers,
   projectDescriptionsEnabled,
   projectOwnersEnabled,
+  projectCostCentersEnabled,
   onClose,
   onSaved,
 }: {
@@ -59,6 +60,7 @@ export function EditProjectModal({
   suppliers: Option[]
   projectDescriptionsEnabled: boolean
   projectOwnersEnabled: boolean
+  projectCostCentersEnabled: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -154,7 +156,6 @@ export function EditProjectModal({
       contract_end_date: form.contract_end_date || null,
       category_id: form.category_id || null,
       business_unit_id: form.business_unit_id || null,
-      cost_center_id: form.cost_center_id || null,
       incumbent_supplier_id: form.incumbent_supplier_id || null,
       notes: form.notes || null,
       updated_at: new Date().toISOString(),
@@ -166,6 +167,10 @@ export function EditProjectModal({
 
     if (projectOwnersEnabled) {
       updates.buyer_name = form.buyer_name || null
+    }
+
+    if (projectCostCentersEnabled) {
+      updates.cost_center_id = form.cost_center_id || null
     }
 
     const { error: updateError } = await supabase
@@ -279,13 +284,15 @@ export function EditProjectModal({
                 {businessUnits.map(b => <option key={b.id} value={b.id}>{b.business_unit_name}</option>)}
               </Select>
             </div>
-            <div>
-              <label htmlFor="ep-cc" className={labelClass}>Cost Center</label>
-              <Select id="ep-cc" value={form.cost_center_id} onChange={(e) => handleChange('cost_center_id', e.target.value)}>
-                <option value="">Select cost center...</option>
-                {costCenters.map(c => <option key={c.id} value={c.id}>{c.cost_center_name}</option>)}
-              </Select>
-            </div>
+            {projectCostCentersEnabled ? (
+              <div>
+                <label htmlFor="ep-cc" className={labelClass}>Cost Center</label>
+                <Select id="ep-cc" value={form.cost_center_id} onChange={(e) => handleChange('cost_center_id', e.target.value)}>
+                  <option value="">Select cost center...</option>
+                  {costCenters.map(c => <option key={c.id} value={c.id}>{c.cost_center_name}</option>)}
+                </Select>
+              </div>
+            ) : null}
             <div>
               <label htmlFor="ep-supplier" className={labelClass}>Incumbent Supplier</label>
               <Select id="ep-supplier" value={form.incumbent_supplier_id} onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)}>

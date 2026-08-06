@@ -44,6 +44,7 @@ export function EventForm({
   supportProjectsEnabled,
   projectDescriptionsEnabled,
   projectOwnersEnabled,
+  projectCostCentersEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -53,6 +54,7 @@ export function EventForm({
   supportProjectsEnabled: boolean
   projectDescriptionsEnabled: boolean
   projectOwnersEnabled: boolean
+  projectCostCentersEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -193,7 +195,7 @@ export function EventForm({
       project_due_date: form.project_due_date || null,
       category_id: form.category_id || null,
       business_unit_id: form.business_unit_id || null,
-      cost_center_id: form.cost_center_id || null,
+      cost_center_id: projectCostCentersEnabled ? form.cost_center_id || null : null,
       incumbent_supplier_id: form.incumbent_supplier_id || null,
     }
 
@@ -401,20 +403,22 @@ export function EventForm({
               ))}
             </Select>
           </div>
-          <div>
-            <label className={labelClass}>Cost Center</label>
-            <Select
-              aria-label="Cost Center"
-              value={form.cost_center_id}
-              onChange={(e) => handleChange('cost_center_id', e.target.value)}
-              className="mt-1"
-            >
-              <option value="">Select cost center...</option>
-              {costCenters.map((c) => (
-                <option key={c.id} value={c.id}>{c.cost_center_name}</option>
-              ))}
-            </Select>
-          </div>
+          {projectCostCentersEnabled ? (
+            <div>
+              <label className={labelClass}>Cost Center</label>
+              <Select
+                aria-label="Cost Center"
+                value={form.cost_center_id}
+                onChange={(e) => handleChange('cost_center_id', e.target.value)}
+                className="mt-1"
+              >
+                <option value="">Select cost center...</option>
+                {costCenters.map((c) => (
+                  <option key={c.id} value={c.id}>{c.cost_center_name}</option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
           <div>
             <label className={labelClass}>Incumbent Supplier</label>
             <div className="mt-1 flex gap-2">

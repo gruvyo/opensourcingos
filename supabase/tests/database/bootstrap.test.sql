@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(90);
+select plan(111);
 
 select is(
   (
@@ -941,6 +941,295 @@ where id in (
 
 delete from public.organizations
 where id = 'a1000000-0000-4000-8000-000000000025';
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_settings'
+      and column_name = 'project_cost_centers_enabled'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'project Cost Centers default to enabled and cannot be null'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings_v4(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean)'
+  ) is not null,
+  'workspace settings v4 RPC accepts the project Cost Center control'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v4(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v4 RPC runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v4(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v4 RPC has a fixed search path'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings_v4(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'signed-in users can invoke the workspace settings v4 RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.update_workspace_settings_v4(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'anonymous users cannot invoke the workspace settings v4 RPC'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_cost_center_setting()'::regprocedure
+  ),
+  'project Cost Center enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_cost_center_setting()'::regprocedure
+  ),
+  'project Cost Center enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'sourcing_events'
+      and t.tgname = 'sourcing_events_enforce_project_cost_center_setting'
+      and not t.tgisinternal
+  ),
+  'sourcing_events has the project Cost Center setting trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_project_cost_center_setting()', 'EXECUTE'),
+  'anonymous users cannot execute project Cost Center enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_project_cost_center_setting()', 'EXECUTE'),
+  'signed-in users cannot execute project Cost Center enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_project_cost_center_setting()', 'EXECUTE'),
+  'service role can execute project Cost Center enforcement'
+);
+
+insert into public.cost_centers (id, organization_id, cost_center_name)
+values
+  ('b1000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000001', 'Existing Cost Center'),
+  ('b1000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000001', 'Replacement Cost Center');
+
+insert into public.sourcing_events (
+  id,
+  organization_id,
+  event_name,
+  event_type,
+  event_status,
+  project_type,
+  cost_center_id
+) values (
+  'b1000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000001',
+  'Existing classified project',
+  'Renewal',
+  'Pipeline',
+  'Sourcing',
+  'b1000000-0000-4000-8000-000000000011'
+);
+
+update public.organization_settings
+set project_cost_centers_enabled = false
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set event_name = 'Existing classified project updated'
+    where id = 'b1000000-0000-4000-8000-000000000021'
+  $$,
+  'projects remain otherwise editable when project Cost Centers are off'
+);
+
+select is(
+  (
+    select cost_center_id
+    from public.sourcing_events
+    where id = 'b1000000-0000-4000-8000-000000000021'
+  ),
+  'b1000000-0000-4000-8000-000000000011'::uuid,
+  'unrelated project edits preserve the existing Cost Center value'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set cost_center_id = 'b1000000-0000-4000-8000-000000000012'
+    where id = 'b1000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Cost Centers are disabled for this workspace',
+  'existing project Cost Centers cannot be replaced when the setting is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set cost_center_id = null
+    where id = 'b1000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Cost Centers are disabled for this workspace',
+  'existing project Cost Centers cannot be cleared when the setting is off'
+);
+
+select throws_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      cost_center_id
+    ) values (
+      'b1000000-0000-4000-8000-000000000022',
+      '00000000-0000-4000-8000-000000000001',
+      'Blocked classified project',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      'b1000000-0000-4000-8000-000000000011'
+    )
+  $$,
+  '23514',
+  'Project Cost Centers are disabled for this workspace',
+  'new nonnull project Cost Centers are blocked when the setting is off'
+);
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      cost_center_id
+    ) values (
+      'b1000000-0000-4000-8000-000000000023',
+      '00000000-0000-4000-8000-000000000001',
+      'Allowed project without Cost Center',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      null
+    )
+  $$,
+  'new projects without Cost Centers remain allowed when the setting is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set cost_center_id = 'b1000000-0000-4000-8000-000000000012'
+    where id = 'b1000000-0000-4000-8000-000000000023'
+  $$,
+  '23514',
+  'Project Cost Centers are disabled for this workspace',
+  'project Cost Centers cannot be added later when the setting is off'
+);
+
+insert into public.organizations (id, name)
+values ('b1000000-0000-4000-8000-000000000025', 'No project Cost Center settings workspace');
+
+insert into public.cost_centers (id, organization_id, cost_center_name)
+values ('b1000000-0000-4000-8000-000000000026', 'b1000000-0000-4000-8000-000000000025', 'Default-enabled Cost Center');
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      cost_center_id
+    ) values (
+      'b1000000-0000-4000-8000-000000000024',
+      'b1000000-0000-4000-8000-000000000025',
+      'Default-enabled classified project',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      'b1000000-0000-4000-8000-000000000026'
+    )
+  $$,
+  'workspaces without a settings row retain default-enabled project Cost Centers'
+);
+
+update public.organization_settings
+set project_cost_centers_enabled = true
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set cost_center_id = 'b1000000-0000-4000-8000-000000000012'
+    where id = 'b1000000-0000-4000-8000-000000000021'
+  $$,
+  'project Cost Centers can be changed again after the setting is re-enabled'
+);
+
+delete from public.sourcing_events
+where id in (
+  'b1000000-0000-4000-8000-000000000021',
+  'b1000000-0000-4000-8000-000000000023',
+  'b1000000-0000-4000-8000-000000000024'
+);
+
+delete from public.cost_centers
+where id in (
+  'b1000000-0000-4000-8000-000000000011',
+  'b1000000-0000-4000-8000-000000000012',
+  'b1000000-0000-4000-8000-000000000026'
+);
+
+delete from public.organizations
+where id = 'b1000000-0000-4000-8000-000000000025';
 
 select ok(
   (
