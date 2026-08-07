@@ -2,14 +2,17 @@
 
 ## Implementation status
 
-Release 2 is implemented in `feat/settings-suppliers-v2`: workspace settings
-are editable and atomic, supplier records can be created independently, and
-supplier profiles reconcile projects, awards, negotiated savings, realized
-savings, and audit history. Database policies make viewers read-only while
-administrators and procurement users receive the intended editing rights.
+Release 2 is live on `main`: workspace settings are editable and atomic,
+administrators can govern Support projects and the optional project description,
+owner, Cost Center, and Category fields, supplier records can be created
+independently, and supplier profiles reconcile projects, awards, negotiated
+savings, realized savings, and audit history. Database policies make viewers
+read-only while administrators and procurement users receive the intended
+editing rights.
 
-Membership invitations, performance reviews, certifications, duplicate merge,
-and portfolio concentration remain Release 3 work.
+Normalized supplier names are unique within each workspace. Membership
+invitations, performance reviews, certifications, duplicate merge, and portfolio
+concentration remain Release 3 work.
 
 ## Product intent
 
@@ -87,12 +90,13 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
   structured risk metadata.
 - Add `supplier_contacts`, `supplier_categories`, `supplier_certifications`,
   `supplier_performance_reviews`, and `supplier_notes`.
-- Add normalized-name uniqueness within each organization, supporting indexes,
-  and an audited supplier-merge database function unavailable to browser users.
+- Normalized-name uniqueness within each organization and its supporting indexes
+  are implemented. An audited supplier-merge database function unavailable to
+  browser users remains planned.
 
 ## Delivery sequence
 
-### Release 1 — useful with today's schema
+### Release 1 — shipped foundation
 
 - Concept B application shell and shared page hierarchy.
 - Supplier portfolio summary, search, filters, status, risk, preference,
@@ -100,14 +104,14 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - Settings overview with correct identity, organization, reporting conventions,
   methodology controls, and platform connections.
 
-### Release 2 — editable operating controls
+### Release 2 — shipped operating controls
 
 - Database migration for organization settings and supplier master details.
 - Authenticated, validated server actions for settings and supplier edits.
 - Supplier profile route with sourcing, award, savings, and realization history.
 - Role-aware controls and complete loading, success, and failure feedback.
 
-### Release 3 — governance and intelligence
+### Release 3 — planned governance and intelligence
 
 - Membership administration and audit log.
 - Supplier performance reviews, certifications, risk evidence, and reminders.

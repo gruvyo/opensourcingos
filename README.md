@@ -8,9 +8,10 @@ _Product direction concept; the screens illustrate the experience this public
 beta is working toward._
 
 OpenSourcingOS is a public-beta procurement value tracker for sourcing projects,
-baselines, supplier offers, savings schedules, fiscal-year reporting, and
-portfolio analysis. It is designed around one question: can every reported
-savings figure be traced back to the commercial anchors that produced it?
+workspace controls, supplier management, savings schedules, fiscal-year
+reporting, and portfolio analysis. It is designed around one question: can every
+reported savings figure be traced back to the commercial anchors that produced
+it?
 
 [Try the hosted demo](https://opensourcingos.com/login) ·
 [Report a security issue](SECURITY.md) ·
@@ -19,7 +20,16 @@ savings figure be traced back to the commercial anchors that produced it?
 ## What it does
 
 - Tracks sourcing and non-commercial support projects in one portfolio.
+- Lets administrators govern Support projects and the optional project
+  description, owner, Cost Center, and Category fields without removing
+  historical data.
+- Tracks project due dates and dated updates alongside each project's commercial
+  record.
 - Records scope lines, baselines, supplier offers, and final awards.
+- Maintains editable supplier records and profiles covering sourcing history,
+  awards, savings, realization, status, risk, preference, and diversity.
+- Configures workspace identity, reporting defaults, and savings-methodology
+  controls through settings reserved for workspace administrators.
 - Separates Cost Reduction from Cost Avoidance without losing the total deal
   movement.
 - Normalizes offers with different terms onto a comparable monthly basis.
@@ -178,10 +188,11 @@ Current priorities are:
 
 1. Preserve methodology traceability, workspace isolation, accessibility, and
    cross-browser confidence as the product evolves.
-2. Add administrator controls for modules, optional project fields, and
+2. Complete workspace governance with broader module and optional-field
+   controls, membership administration, audit visibility, and
    workspace-managed selection lists.
-3. Expand dashboards, collaboration workflows, and supplier administration,
-   risk, performance, and reporting capabilities.
+3. Expand dashboards, collaboration workflows, and supplier performance, risk,
+   certification, duplicate-management, and reporting capabilities.
 
 ## Contributing
 
