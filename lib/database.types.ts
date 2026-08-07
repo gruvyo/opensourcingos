@@ -720,6 +720,7 @@ export type Database = {
           hard_reduction_approval_threshold: number | null
           locale: string
           organization_id: string
+          project_business_units_enabled: boolean
           project_categories_enabled: boolean
           project_cost_centers_enabled: boolean
           project_descriptions_enabled: boolean
@@ -739,6 +740,7 @@ export type Database = {
           hard_reduction_approval_threshold?: number | null
           locale?: string
           organization_id: string
+          project_business_units_enabled?: boolean
           project_categories_enabled?: boolean
           project_cost_centers_enabled?: boolean
           project_descriptions_enabled?: boolean
@@ -758,6 +760,7 @@ export type Database = {
           hard_reduction_approval_threshold?: number | null
           locale?: string
           organization_id?: string
+          project_business_units_enabled?: boolean
           project_categories_enabled?: boolean
           project_cost_centers_enabled?: boolean
           project_descriptions_enabled?: boolean
@@ -1878,6 +1881,27 @@ export type Database = {
           p_hard_reduction_approval_threshold: number
           p_locale: string
           p_organization_name: string
+          p_project_categories_enabled: boolean
+          p_project_cost_centers_enabled: boolean
+          p_project_descriptions_enabled: boolean
+          p_project_owners_enabled: boolean
+          p_require_baseline: boolean
+          p_support_projects_enabled: boolean
+          p_timezone: string
+        }
+        Returns: undefined
+      }
+      update_workspace_settings_v6: {
+        Args: {
+          p_currency_code: string
+          p_date_format: string
+          p_default_recognition_method: string
+          p_fiscal_year_start_month: number
+          p_full_name: string
+          p_hard_reduction_approval_threshold: number
+          p_locale: string
+          p_organization_name: string
+          p_project_business_units_enabled: boolean
           p_project_categories_enabled: boolean
           p_project_cost_centers_enabled: boolean
           p_project_descriptions_enabled: boolean

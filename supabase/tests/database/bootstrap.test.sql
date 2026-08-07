@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(132);
+select plan(153);
 
 select is(
   (
@@ -1519,6 +1519,295 @@ where id in (
 
 delete from public.organizations
 where id = 'c1000000-0000-4000-8000-000000000025';
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_settings'
+      and column_name = 'project_business_units_enabled'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'project Business Units default to enabled and cannot be null'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings_v6(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean)'
+  ) is not null,
+  'workspace settings v6 RPC accepts the project Business Unit control'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v6(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v6 RPC runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v6(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v6 RPC has a fixed search path'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings_v6(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'signed-in users can invoke the workspace settings v6 RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.update_workspace_settings_v6(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'anonymous users cannot invoke the workspace settings v6 RPC'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_business_unit_setting()'::regprocedure
+  ),
+  'project Business Unit enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_business_unit_setting()'::regprocedure
+  ),
+  'project Business Unit enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'sourcing_events'
+      and t.tgname = 'sourcing_events_enforce_project_business_unit_setting'
+      and not t.tgisinternal
+  ),
+  'sourcing_events has the project Business Unit setting trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_project_business_unit_setting()', 'EXECUTE'),
+  'anonymous users cannot execute project Business Unit enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_project_business_unit_setting()', 'EXECUTE'),
+  'signed-in users cannot execute project Business Unit enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_project_business_unit_setting()', 'EXECUTE'),
+  'service role can execute project Business Unit enforcement'
+);
+
+insert into public.business_units (id, organization_id, business_unit_name)
+values
+  ('d1000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000001', 'Existing Project Business Unit'),
+  ('d1000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000001', 'Replacement Project Business Unit');
+
+insert into public.sourcing_events (
+  id,
+  organization_id,
+  event_name,
+  event_type,
+  event_status,
+  project_type,
+  business_unit_id
+) values (
+  'd1000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000001',
+  'Existing Business Unit project',
+  'Renewal',
+  'Pipeline',
+  'Sourcing',
+  'd1000000-0000-4000-8000-000000000011'
+);
+
+update public.organization_settings
+set project_business_units_enabled = false
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set event_name = 'Existing Business Unit project updated'
+    where id = 'd1000000-0000-4000-8000-000000000021'
+  $$,
+  'projects remain otherwise editable when project Business Units are off'
+);
+
+select is(
+  (
+    select business_unit_id
+    from public.sourcing_events
+    where id = 'd1000000-0000-4000-8000-000000000021'
+  ),
+  'd1000000-0000-4000-8000-000000000011'::uuid,
+  'unrelated project edits preserve the existing Business Unit value'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set business_unit_id = 'd1000000-0000-4000-8000-000000000012'
+    where id = 'd1000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Business Units are disabled for this workspace',
+  'existing project Business Units cannot be replaced when the setting is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set business_unit_id = null
+    where id = 'd1000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Business Units are disabled for this workspace',
+  'existing project Business Units cannot be cleared when the setting is off'
+);
+
+select throws_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      business_unit_id
+    ) values (
+      'd1000000-0000-4000-8000-000000000022',
+      '00000000-0000-4000-8000-000000000001',
+      'Blocked Business Unit project',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      'd1000000-0000-4000-8000-000000000011'
+    )
+  $$,
+  '23514',
+  'Project Business Units are disabled for this workspace',
+  'new nonnull project Business Units are blocked when the setting is off'
+);
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      business_unit_id
+    ) values (
+      'd1000000-0000-4000-8000-000000000023',
+      '00000000-0000-4000-8000-000000000001',
+      'Allowed project without Business Unit',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      null
+    )
+  $$,
+  'new projects without Business Units remain allowed when the setting is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set business_unit_id = 'd1000000-0000-4000-8000-000000000012'
+    where id = 'd1000000-0000-4000-8000-000000000023'
+  $$,
+  '23514',
+  'Project Business Units are disabled for this workspace',
+  'project Business Units cannot be added later when the setting is off'
+);
+
+insert into public.organizations (id, name)
+values ('d1000000-0000-4000-8000-000000000025', 'No project Business Unit settings workspace');
+
+insert into public.business_units (id, organization_id, business_unit_name)
+values ('d1000000-0000-4000-8000-000000000026', 'd1000000-0000-4000-8000-000000000025', 'Default-enabled Project Business Unit');
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id,
+      organization_id,
+      event_name,
+      event_type,
+      event_status,
+      project_type,
+      business_unit_id
+    ) values (
+      'd1000000-0000-4000-8000-000000000024',
+      'd1000000-0000-4000-8000-000000000025',
+      'Default-enabled Business Unit project',
+      'Renewal',
+      'Pipeline',
+      'Sourcing',
+      'd1000000-0000-4000-8000-000000000026'
+    )
+  $$,
+  'workspaces without a settings row retain default-enabled project Business Units'
+);
+
+update public.organization_settings
+set project_business_units_enabled = true
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set business_unit_id = 'd1000000-0000-4000-8000-000000000012'
+    where id = 'd1000000-0000-4000-8000-000000000021'
+  $$,
+  'project Business Units can be changed again after the setting is re-enabled'
+);
+
+delete from public.sourcing_events
+where id in (
+  'd1000000-0000-4000-8000-000000000021',
+  'd1000000-0000-4000-8000-000000000023',
+  'd1000000-0000-4000-8000-000000000024'
+);
+
+delete from public.business_units
+where id in (
+  'd1000000-0000-4000-8000-000000000011',
+  'd1000000-0000-4000-8000-000000000012',
+  'd1000000-0000-4000-8000-000000000026'
+);
+
+delete from public.organizations
+where id = 'd1000000-0000-4000-8000-000000000025';
 
 select ok(
   (

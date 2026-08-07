@@ -17,7 +17,7 @@ export default async function NewEventPage() {
     supabase.from('business_units').select('id, business_unit_name').order('business_unit_name'),
     supabase.from('cost_centers').select('id, cost_center_name, business_unit_id').order('cost_center_name'),
     supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
-    supabase.from('organization_settings').select('currency_code, support_projects_enabled, project_descriptions_enabled, project_owners_enabled, project_cost_centers_enabled, project_categories_enabled').maybeSingle(),
+    supabase.from('organization_settings').select('currency_code, support_projects_enabled, project_descriptions_enabled, project_owners_enabled, project_cost_centers_enabled, project_categories_enabled, project_business_units_enabled').maybeSingle(),
   ])
 
   // A failed query here would render as an empty dropdown, which is indistinguishable
@@ -56,6 +56,7 @@ export default async function NewEventPage() {
         projectOwnersEnabled={settings?.project_owners_enabled ?? true}
         projectCostCentersEnabled={settings?.project_cost_centers_enabled ?? true}
         projectCategoriesEnabled={settings?.project_categories_enabled ?? true}
+        projectBusinessUnitsEnabled={settings?.project_business_units_enabled ?? true}
       />
     </div>
   )

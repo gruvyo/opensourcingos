@@ -68,7 +68,7 @@ export default async function EventDetailPage({
       .eq('id', user.id)
       .single(),
     supabase.from('organization_settings')
-      .select('project_descriptions_enabled, project_owners_enabled, project_cost_centers_enabled, project_categories_enabled')
+      .select('project_descriptions_enabled, project_owners_enabled, project_cost_centers_enabled, project_categories_enabled, project_business_units_enabled')
       .maybeSingle(),
   ])
 
@@ -108,6 +108,7 @@ export default async function EventDetailPage({
         projectOwnersEnabled={settings?.project_owners_enabled ?? true}
         projectCostCentersEnabled={settings?.project_cost_centers_enabled ?? true}
         projectCategoriesEnabled={settings?.project_categories_enabled ?? true}
+        projectBusinessUnitsEnabled={settings?.project_business_units_enabled ?? true}
       />
     </div>
   )
