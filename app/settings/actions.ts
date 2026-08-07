@@ -20,6 +20,7 @@ const settingsSchema = z.object({
   projectOwnersEnabled: z.boolean(),
   projectCostCentersEnabled: z.boolean(),
   projectCategoriesEnabled: z.boolean(),
+  projectBusinessUnitsEnabled: z.boolean(),
   requireBaseline: z.boolean(),
   hardReductionApprovalThreshold: z.union([z.literal(''), z.coerce.number().min(0)]),
 })
@@ -44,6 +45,7 @@ export async function updateSettings(
       projectOwnersEnabled: formData.get('projectOwnersEnabled') === 'on',
       projectCostCentersEnabled: formData.get('projectCostCentersEnabled') === 'on',
       projectCategoriesEnabled: formData.get('projectCategoriesEnabled') === 'on',
+      projectBusinessUnitsEnabled: formData.get('projectBusinessUnitsEnabled') === 'on',
       requireBaseline: formData.get('requireBaseline') === 'on',
       hardReductionApprovalThreshold: formData.get('hardReductionApprovalThreshold') || '',
     })
@@ -53,7 +55,7 @@ export async function updateSettings(
     }
 
     const values = parsed.data
-    const { error } = await supabase.rpc('update_workspace_settings_v5', {
+    const { error } = await supabase.rpc('update_workspace_settings_v6', {
       p_organization_name: values.organizationName,
       p_full_name: values.fullName,
       p_currency_code: values.currencyCode,
@@ -67,6 +69,7 @@ export async function updateSettings(
       p_project_owners_enabled: values.projectOwnersEnabled,
       p_project_cost_centers_enabled: values.projectCostCentersEnabled,
       p_project_categories_enabled: values.projectCategoriesEnabled,
+      p_project_business_units_enabled: values.projectBusinessUnitsEnabled,
       p_require_baseline: values.requireBaseline,
       p_hard_reduction_approval_threshold: values.hardReductionApprovalThreshold === ''
         ? null

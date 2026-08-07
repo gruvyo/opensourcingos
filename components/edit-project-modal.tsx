@@ -51,6 +51,7 @@ export function EditProjectModal({
   projectOwnersEnabled,
   projectCostCentersEnabled,
   projectCategoriesEnabled,
+  projectBusinessUnitsEnabled,
   onClose,
   onSaved,
 }: {
@@ -63,6 +64,7 @@ export function EditProjectModal({
   projectOwnersEnabled: boolean
   projectCostCentersEnabled: boolean
   projectCategoriesEnabled: boolean
+  projectBusinessUnitsEnabled: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -156,7 +158,6 @@ export function EditProjectModal({
       event_close_date: form.event_close_date || null,
       contract_start_date: form.contract_start_date || null,
       contract_end_date: form.contract_end_date || null,
-      business_unit_id: form.business_unit_id || null,
       incumbent_supplier_id: form.incumbent_supplier_id || null,
       notes: form.notes || null,
       updated_at: new Date().toISOString(),
@@ -176,6 +177,10 @@ export function EditProjectModal({
 
     if (projectCategoriesEnabled) {
       updates.category_id = form.category_id || null
+    }
+
+    if (projectBusinessUnitsEnabled) {
+      updates.business_unit_id = form.business_unit_id || null
     }
 
     const { error: updateError } = await supabase
@@ -284,13 +289,15 @@ export function EditProjectModal({
                 </Select>
               </div>
             ) : null}
-            <div>
-              <label htmlFor="ep-bu" className={labelClass}>Business Unit</label>
-              <Select id="ep-bu" value={form.business_unit_id} onChange={(e) => handleChange('business_unit_id', e.target.value)}>
-                <option value="">Select business unit...</option>
-                {businessUnits.map(b => <option key={b.id} value={b.id}>{b.business_unit_name}</option>)}
-              </Select>
-            </div>
+            {projectBusinessUnitsEnabled ? (
+              <div>
+                <label htmlFor="ep-bu" className={labelClass}>Business Unit</label>
+                <Select id="ep-bu" value={form.business_unit_id} onChange={(e) => handleChange('business_unit_id', e.target.value)}>
+                  <option value="">Select business unit...</option>
+                  {businessUnits.map(b => <option key={b.id} value={b.id}>{b.business_unit_name}</option>)}
+                </Select>
+              </div>
+            ) : null}
             {projectCostCentersEnabled ? (
               <div>
                 <label htmlFor="ep-cc" className={labelClass}>Cost Center</label>

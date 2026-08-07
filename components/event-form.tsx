@@ -46,6 +46,7 @@ export function EventForm({
   projectOwnersEnabled,
   projectCostCentersEnabled,
   projectCategoriesEnabled,
+  projectBusinessUnitsEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -57,6 +58,7 @@ export function EventForm({
   projectOwnersEnabled: boolean
   projectCostCentersEnabled: boolean
   projectCategoriesEnabled: boolean
+  projectBusinessUnitsEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -196,7 +198,7 @@ export function EventForm({
       event_start_date: form.event_start_date || null,
       project_due_date: form.project_due_date || null,
       category_id: projectCategoriesEnabled ? form.category_id || null : null,
-      business_unit_id: form.business_unit_id || null,
+      business_unit_id: projectBusinessUnitsEnabled ? form.business_unit_id || null : null,
       cost_center_id: projectCostCentersEnabled ? form.cost_center_id || null : null,
       incumbent_supplier_id: form.incumbent_supplier_id || null,
     }
@@ -393,20 +395,22 @@ export function EventForm({
               </Select>
             </div>
           ) : null}
-          <div>
-            <label className={labelClass}>Business Unit</label>
-            <Select
-              aria-label="Business Unit"
-              value={form.business_unit_id}
-              onChange={(e) => handleChange('business_unit_id', e.target.value)}
-              className="mt-1"
-            >
-              <option value="">Select business unit...</option>
-              {businessUnits.map((b) => (
-                <option key={b.id} value={b.id}>{b.business_unit_name}</option>
-              ))}
-            </Select>
-          </div>
+          {projectBusinessUnitsEnabled ? (
+            <div>
+              <label className={labelClass}>Business Unit</label>
+              <Select
+                aria-label="Business Unit"
+                value={form.business_unit_id}
+                onChange={(e) => handleChange('business_unit_id', e.target.value)}
+                className="mt-1"
+              >
+                <option value="">Select business unit...</option>
+                {businessUnits.map((b) => (
+                  <option key={b.id} value={b.id}>{b.business_unit_name}</option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
           {projectCostCentersEnabled ? (
             <div>
               <label className={labelClass}>Cost Center</label>
