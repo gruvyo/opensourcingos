@@ -296,7 +296,7 @@ insert into public.sourcing_events (
   '00000000-0000-4000-8000-000000000016',
   '00000000-0000-4000-8000-000000000001',
   'Existing Support project',
-  'Other',
+  'General Inquiry',
   'Not Started',
   'Support'
 );
@@ -333,7 +333,7 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000017',
       '00000000-0000-4000-8000-000000000001',
       'Blocked Support project',
-      'Other',
+      'General Inquiry',
       'Not Started',
       'Support'
     )
@@ -380,7 +380,7 @@ values ('00000000-0000-4000-8000-000000000019', 'No settings workspace');
 
 insert into public.project_choice_options (organization_id, choice_type, project_type, label)
 values
-  ('00000000-0000-4000-8000-000000000019', 'event_type', 'Support', 'Other'),
+  ('00000000-0000-4000-8000-000000000019', 'event_type', 'Support', 'General Inquiry'),
   ('00000000-0000-4000-8000-000000000019', 'event_status', 'Support', 'Not Started');
 
 select lives_ok(
@@ -396,7 +396,7 @@ select lives_ok(
       '00000000-0000-4000-8000-000000000020',
       '00000000-0000-4000-8000-000000000019',
       'Default-enabled Support project',
-      'Other',
+      'General Inquiry',
       'Not Started',
       'Support'
     )
