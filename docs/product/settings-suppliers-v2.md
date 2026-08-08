@@ -84,6 +84,10 @@ workspace-scoped, and auditable.
 - Only workspace administrators can add, rename, archive, or restore choices.
   Database policies and project-write triggers enforce these rules even when a
   client bypasses the application form.
+- The built-in Type and Status taxonomy is defined in
+  [`project-classification-defaults.md`](./project-classification-defaults.md).
+  Sourcing Type explains why the project exists; commercial value levers remain
+  in the savings evidence chain rather than being duplicated as project types.
 
 All new tables require forced Row Level Security, organization-scoped policies,
 indexes on `organization_id`, and tests proving cross-workspace isolation.

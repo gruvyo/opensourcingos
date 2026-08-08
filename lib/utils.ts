@@ -73,23 +73,17 @@ export function statusColor(status: string): string {
 
   const colors: Record<string, string> = {
     'Pipeline': blue,
-    'Scoped': blue,
-    'Baseline Pending': amber,
-    'Baseline Approved': green,
+    'Scoping & Strategy': blue,
     'In Market': purple,
     'Negotiation': purple,
-    'Award Recommended': indigo,
-    'Award Approved': indigo,
-    'Contracted': emerald,
-    'Implemented': emerald,
-    'Realized': green,
-    'Finance Validated': green,
-    'Closed': gray,
+    'Award & Contracting': indigo,
+    'Implementation': emerald,
     'Cancelled': red,
     'Rejected': red,
     'Not Started': gray,
     'In Progress': blue,
-    'Hold': amber,
+    'Pending': amber,
+    'On Hold': amber,
     'Complete': green,
   }
   return colors[status] || gray

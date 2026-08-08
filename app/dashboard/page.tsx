@@ -31,24 +31,20 @@ import { formatCurrency, statusColor } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { clsx } from 'clsx'
 
-const INACTIVE_STATUSES = new Set(['Closed', 'Cancelled', 'Rejected', 'Complete'])
+const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
 
 const STATUS_PROGRESS: Record<string, number> = {
   Pipeline: 10,
   'Not Started': 10,
-  Scoped: 20,
-  'Baseline Pending': 30,
-  'Baseline Approved': 40,
-  'In Market': 55,
-  'In Progress': 55,
-  Negotiation: 70,
-  'Award Recommended': 80,
-  'Award Approved': 88,
-  Contracted: 94,
-  Implemented: 97,
-  Realized: 100,
-  'Finance Validated': 100,
-  Hold: 50,
+  'Scoping & Strategy': 25,
+  'In Market': 45,
+  'In Progress': 50,
+  Pending: 50,
+  Negotiation: 60,
+  'Award & Contracting': 75,
+  Implementation: 90,
+  'On Hold': 50,
+  Complete: 100,
 }
 
 type EventRow = EventLiteRow & {

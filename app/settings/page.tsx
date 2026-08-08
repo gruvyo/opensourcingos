@@ -44,6 +44,7 @@ export default async function SettingsPage() {
       label: choice.label,
       active: choice.active_flag,
       projectType: choice.project_type as ManagedClassificationOption['projectType'],
+      sortOrder: choice.sort_order,
     })),
     ...(categoriesResult.data || []).map(category => ({
       id: category.id, kind: 'category' as const, label: category.category_name, active: category.active_flag,

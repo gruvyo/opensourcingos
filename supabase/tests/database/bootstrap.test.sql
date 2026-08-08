@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(204);
+select plan(211);
 
 select is(
   (
@@ -296,7 +296,7 @@ insert into public.sourcing_events (
   '00000000-0000-4000-8000-000000000016',
   '00000000-0000-4000-8000-000000000001',
   'Existing Support project',
-  'Other',
+  'General Inquiry',
   'Not Started',
   'Support'
 );
@@ -333,7 +333,7 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000017',
       '00000000-0000-4000-8000-000000000001',
       'Blocked Support project',
-      'Other',
+      'General Inquiry',
       'Not Started',
       'Support'
     )
@@ -356,7 +356,7 @@ select lives_ok(
       '00000000-0000-4000-8000-000000000018',
       '00000000-0000-4000-8000-000000000001',
       'Allowed Sourcing project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing'
     )
@@ -380,7 +380,7 @@ values ('00000000-0000-4000-8000-000000000019', 'No settings workspace');
 
 insert into public.project_choice_options (organization_id, choice_type, project_type, label)
 values
-  ('00000000-0000-4000-8000-000000000019', 'event_type', 'Support', 'Other'),
+  ('00000000-0000-4000-8000-000000000019', 'event_type', 'Support', 'General Inquiry'),
   ('00000000-0000-4000-8000-000000000019', 'event_status', 'Support', 'Not Started');
 
 select lives_ok(
@@ -396,7 +396,7 @@ select lives_ok(
       '00000000-0000-4000-8000-000000000020',
       '00000000-0000-4000-8000-000000000019',
       'Default-enabled Support project',
-      'Other',
+      'General Inquiry',
       'Not Started',
       'Support'
     )
@@ -537,7 +537,7 @@ insert into public.sourcing_events (
   '00000000-0000-4000-8000-000000000001',
   'Existing described project',
   'Description to preserve',
-  'Renewal',
+  'Contract Renewal',
   'Pipeline',
   'Sourcing'
 );
@@ -592,7 +592,7 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000001',
       'Blocked described project',
       'Blocked description',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing'
     )
@@ -617,7 +617,7 @@ select lives_ok(
       '00000000-0000-4000-8000-000000000001',
       'Allowed project without description',
       null,
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing'
     )
@@ -641,7 +641,7 @@ values ('90000000-0000-4000-8000-000000000025', 'No description settings workspa
 
 insert into public.project_choice_options (organization_id, choice_type, project_type, label)
 values
-  ('90000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('90000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Contract Renewal'),
   ('90000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
 
 select lives_ok(
@@ -659,7 +659,7 @@ select lives_ok(
       '90000000-0000-4000-8000-000000000025',
       'Default-enabled described project',
       'Allowed by the default',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing'
     )
@@ -808,7 +808,7 @@ insert into public.sourcing_events (
   'a1000000-0000-4000-8000-000000000021',
   '00000000-0000-4000-8000-000000000001',
   'Existing owned project',
-  'Renewal',
+  'Contract Renewal',
   'Pipeline',
   'Sourcing',
   'Owner to preserve'
@@ -873,7 +873,7 @@ select throws_ok(
       'a1000000-0000-4000-8000-000000000022',
       '00000000-0000-4000-8000-000000000001',
       'Blocked owned project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'Blocked owner'
@@ -898,7 +898,7 @@ select lives_ok(
       'a1000000-0000-4000-8000-000000000023',
       '00000000-0000-4000-8000-000000000001',
       'Allowed project without owner',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       null
@@ -923,7 +923,7 @@ values ('a1000000-0000-4000-8000-000000000025', 'No project owner settings works
 
 insert into public.project_choice_options (organization_id, choice_type, project_type, label)
 values
-  ('a1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('a1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Contract Renewal'),
   ('a1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline'),
   ('a1000000-0000-4000-8000-000000000025', 'owner', null, 'Allowed by the default');
 
@@ -941,7 +941,7 @@ select lives_ok(
       'a1000000-0000-4000-8000-000000000024',
       'a1000000-0000-4000-8000-000000000025',
       'Default-enabled owned project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'Allowed by the default'
@@ -1096,7 +1096,7 @@ insert into public.sourcing_events (
   'b1000000-0000-4000-8000-000000000021',
   '00000000-0000-4000-8000-000000000001',
   'Existing classified project',
-  'Renewal',
+  'Contract Renewal',
   'Pipeline',
   'Sourcing',
   'b1000000-0000-4000-8000-000000000011'
@@ -1161,7 +1161,7 @@ select throws_ok(
       'b1000000-0000-4000-8000-000000000022',
       '00000000-0000-4000-8000-000000000001',
       'Blocked classified project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'b1000000-0000-4000-8000-000000000011'
@@ -1186,7 +1186,7 @@ select lives_ok(
       'b1000000-0000-4000-8000-000000000023',
       '00000000-0000-4000-8000-000000000001',
       'Allowed project without Cost Center',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       null
@@ -1211,7 +1211,7 @@ values ('b1000000-0000-4000-8000-000000000025', 'No project Cost Center settings
 
 insert into public.project_choice_options (organization_id, choice_type, project_type, label)
 values
-  ('b1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('b1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Contract Renewal'),
   ('b1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
 
 insert into public.cost_centers (id, organization_id, cost_center_name)
@@ -1231,7 +1231,7 @@ select lives_ok(
       'b1000000-0000-4000-8000-000000000024',
       'b1000000-0000-4000-8000-000000000025',
       'Default-enabled classified project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'b1000000-0000-4000-8000-000000000026'
@@ -1393,7 +1393,7 @@ insert into public.sourcing_events (
   'c1000000-0000-4000-8000-000000000021',
   '00000000-0000-4000-8000-000000000001',
   'Existing categorized project',
-  'Renewal',
+  'Contract Renewal',
   'Pipeline',
   'Sourcing',
   'c1000000-0000-4000-8000-000000000011'
@@ -1458,7 +1458,7 @@ select throws_ok(
       'c1000000-0000-4000-8000-000000000022',
       '00000000-0000-4000-8000-000000000001',
       'Blocked categorized project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'c1000000-0000-4000-8000-000000000011'
@@ -1483,7 +1483,7 @@ select lives_ok(
       'c1000000-0000-4000-8000-000000000023',
       '00000000-0000-4000-8000-000000000001',
       'Allowed project without Category',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       null
@@ -1508,7 +1508,7 @@ values ('c1000000-0000-4000-8000-000000000025', 'No project Category settings wo
 
 insert into public.project_choice_options (organization_id, choice_type, project_type, label)
 values
-  ('c1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('c1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Contract Renewal'),
   ('c1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
 
 insert into public.categories (id, organization_id, category_name)
@@ -1528,7 +1528,7 @@ select lives_ok(
       'c1000000-0000-4000-8000-000000000024',
       'c1000000-0000-4000-8000-000000000025',
       'Default-enabled categorized project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'c1000000-0000-4000-8000-000000000026'
@@ -1690,7 +1690,7 @@ insert into public.sourcing_events (
   'd1000000-0000-4000-8000-000000000021',
   '00000000-0000-4000-8000-000000000001',
   'Existing Business Unit project',
-  'Renewal',
+  'Contract Renewal',
   'Pipeline',
   'Sourcing',
   'd1000000-0000-4000-8000-000000000011'
@@ -1755,7 +1755,7 @@ select throws_ok(
       'd1000000-0000-4000-8000-000000000022',
       '00000000-0000-4000-8000-000000000001',
       'Blocked Business Unit project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'd1000000-0000-4000-8000-000000000011'
@@ -1780,7 +1780,7 @@ select lives_ok(
       'd1000000-0000-4000-8000-000000000023',
       '00000000-0000-4000-8000-000000000001',
       'Allowed project without Business Unit',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       null
@@ -1805,7 +1805,7 @@ values ('d1000000-0000-4000-8000-000000000025', 'No project Business Unit settin
 
 insert into public.project_choice_options (organization_id, choice_type, project_type, label)
 values
-  ('d1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('d1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Contract Renewal'),
   ('d1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
 
 insert into public.business_units (id, organization_id, business_unit_name)
@@ -1825,7 +1825,7 @@ select lives_ok(
       'd1000000-0000-4000-8000-000000000024',
       'd1000000-0000-4000-8000-000000000025',
       'Default-enabled Business Unit project',
-      'Renewal',
+      'Contract Renewal',
       'Pipeline',
       'Sourcing',
       'd1000000-0000-4000-8000-000000000026'
@@ -2186,7 +2186,7 @@ select throws_ok(
     ) values (
       'e3000000-0000-4000-8000-000000000002',
       '00000000-0000-4000-8000-000000000001',
-      'Blocked incumbent test project', 'Renewal', 'Sourcing',
+      'Blocked incumbent test project', 'Contract Renewal', 'Sourcing',
       'Pipeline', 'USD', 'e3000000-0000-4000-8000-000000000001'
     )
   $$,
@@ -2203,7 +2203,7 @@ select lives_ok(
     ) values (
       'e3000000-0000-4000-8000-000000000003',
       '00000000-0000-4000-8000-000000000001',
-      'Allowed project without incumbent', 'Renewal', 'Sourcing',
+      'Allowed project without incumbent', 'Contract Renewal', 'Sourcing',
       'Pipeline', 'USD', null
     )
   $$,
@@ -2250,8 +2250,94 @@ select is(
     where organization_id = '00000000-0000-4000-8000-000000000001'
       and choice_type in ('event_type', 'event_status')
   ),
-  41::bigint,
+  26::bigint,
   'the demo workspace receives all built-in project types and statuses'
+);
+
+select is(
+  (
+    select array_agg(label order by sort_order)
+    from public.project_choice_options
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and choice_type = 'event_type'
+      and project_type = 'Sourcing'
+  ),
+  array[
+    'Contract Renewal', 'New Purchase', 'Mid-Contract Commercial Review',
+    'Demand or Specification Change', 'Supplier or Market Change',
+    'Other Sourcing Initiative'
+  ]::text[],
+  'Sourcing Type defaults describe why the project exists'
+);
+
+select is(
+  (
+    select array_agg(label order by sort_order)
+    from public.project_choice_options
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and choice_type = 'event_type'
+      and project_type = 'Support'
+  ),
+  array[
+    'Vendor Performance or Service Issue', 'Billing or Payment Issue',
+    'Contract Inquiry', 'Operational Request', 'Risk or Compliance Review',
+    'General Inquiry'
+  ]::text[],
+  'Support Type defaults describe why the request exists'
+);
+
+select is(
+  (
+    select array_agg(label order by sort_order)
+    from public.project_choice_options
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and choice_type = 'event_status'
+      and project_type = 'Sourcing'
+  ),
+  array[
+    'Pipeline', 'Scoping & Strategy', 'In Market', 'Negotiation',
+    'Award & Contracting', 'Implementation', 'Complete', 'On Hold', 'Cancelled'
+  ]::text[],
+  'Sourcing Status defaults use the streamlined workflow'
+);
+
+select is(
+  (
+    select array_agg(label order by sort_order)
+    from public.project_choice_options
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and choice_type = 'event_status'
+      and project_type = 'Support'
+  ),
+  array['Not Started', 'In Progress', 'Pending', 'Complete', 'Cancelled']::text[],
+  'Support Status defaults use the streamlined workflow'
+);
+
+select is(
+  (
+    select event_type || '|' || event_status
+    from public.sourcing_events
+    where id = '00000000-0000-4000-8000-000000000021'
+  ),
+  'Contract Renewal|Award & Contracting',
+  'the fictional reference project uses the refreshed beta taxonomy'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.audit_log
+    where entity_type = 'project_choice_option'
+      and after_data ->> 'label' = 'Contract Renewal'
+  ),
+  'managed project choices use their own audit entity type'
+);
+
+select ok(
+  exists (select 1 from public.audit_log where entity_type = 'category')
+  and exists (select 1 from public.audit_log where entity_type = 'business_unit')
+  and exists (select 1 from public.audit_log where entity_type = 'cost_center'),
+  'relational workspace choices use accurate audit entity types'
 );
 
 select ok(
@@ -2355,7 +2441,7 @@ insert into public.sourcing_events (
   'e1000000-0000-4000-8000-000000000012',
   '00000000-0000-4000-8000-000000000001',
   'Active choice project',
-  'Renewal',
+  'Contract Renewal',
   'Pipeline',
   'Sourcing'
 );
@@ -2525,7 +2611,7 @@ select is(
     where profile.id = '10000000-0000-4000-8000-000000000001'
       and choice.choice_type in ('event_type', 'event_status')
   ),
-  41::bigint,
+  26::bigint,
   'first signup receives an isolated copy of the managed project choices'
 );
 
@@ -2586,7 +2672,7 @@ select
   '10000000-0000-4000-8000-000000000099',
   organization_id,
   'Alex private project',
-  'Renewal',
+  'Contract Renewal',
   'Pipeline',
   'Sourcing'
 from public.profiles
