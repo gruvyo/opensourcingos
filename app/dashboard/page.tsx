@@ -283,23 +283,19 @@ export default async function DashboardPage({
     : realizationList.filter(period => realizationYear(period) === selectedYear)
   const realization = realizationRollup(scopedRealizationPeriods)
 
-  const realizedByYear = new Map<number, number>()
-  for (const period of realizationList) {
-    const year = realizationYear(period)
-    if (year === null) continue
-    realizedByYear.set(year, (realizedByYear.get(year) || 0) + num(period.realized_savings))
-  }
-  const trendYears = new Set([
-    ...byYear.years.map(year => year.year),
-    ...realizedByYear.keys(),
-  ])
-  const trendData: DashboardTrendPoint[] = Array.from(trendYears)
-    .sort((a, b) => a - b)
-    .map(year => ({
+  const trendData: DashboardTrendPoint[] = byYear.years.map(({ year }) => {
+    const yearLifecycle = scheduleLifecycleRollup(
+      calcList,
+      (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+      new Date(),
       year,
-      total: byYear.years.find(bucket => bucket.year === year)?.total ?? 0,
-      realized: realizedByYear.get(year) ?? 0,
-    }))
+    )
+    return {
+      year,
+      estimated: yearLifecycle.estimatedPipeline,
+      executed: yearLifecycle.executed,
+    }
+  })
 
   const typeSplit = [
     {
@@ -387,7 +383,7 @@ export default async function DashboardPage({
           <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-[var(--text)]">Savings over fiscal year</h2>
-              <p className="mt-1 text-xs text-[var(--text-3)]">Reported total compared with recorded realization</p>
+              <p className="mt-1 text-xs text-[var(--text-3)]">Estimated pipeline compared with executed savings</p>
             </div>
             <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-xs font-medium text-[var(--brand-ink)]">
               {scopeLabel}
