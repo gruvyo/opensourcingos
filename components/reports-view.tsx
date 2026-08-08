@@ -45,7 +45,7 @@ type ReportId =
 
 type ReportValue = string | number | null
 type ReportRow = Record<string, ReportValue>
-type ColumnFormat = 'text' | 'number' | 'currency' | 'date' | 'status'
+type ColumnFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status'
 
 type ReportColumn = {
   key: string
@@ -65,6 +65,8 @@ type SavingsTotals = {
   reduction: number
   avoidance: number
   total: number
+  estimated: number
+  executed: number
 }
 
 const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
@@ -110,6 +112,10 @@ function sortRows(rows: ReportRow[], key: string): ReportRow[] {
 
 function formatValue(value: ReportValue, format: ColumnFormat = 'text'): string {
   if (format === 'currency') return formatCurrency(num(value))
+  if (format === 'reduction') {
+    const amount = num(value)
+    return amount < 0 ? `(${formatCurrency(Math.abs(amount))})` : formatCurrency(amount)
+  }
   if (format === 'date') return formatDate(typeof value === 'string' ? value : null)
   if (format === 'number') return num(value).toLocaleString('en-US')
   if (value === null || value === '') return '—'
@@ -127,17 +133,21 @@ function aggregateBy(
     reduction: number
     avoidance: number
     savings: number
+    estimated: number
+    executed: number
   }>()
 
   for (const event of events) {
     const label = getLabel(event)
-    const current = groups.get(label) ?? { projects: 0, active: 0, reduction: 0, avoidance: 0, savings: 0 }
-    const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0 }
+    const current = groups.get(label) ?? { projects: 0, active: 0, reduction: 0, avoidance: 0, savings: 0, estimated: 0, executed: 0 }
+    const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0, estimated: 0, executed: 0 }
     current.projects += 1
     current.active += INACTIVE_STATUSES.has(event.event_status) ? 0 : 1
     current.reduction += savings.reduction
     current.avoidance += savings.avoidance
     current.savings += savings.total
+    current.estimated += savings.estimated
+    current.executed += savings.executed
     groups.set(label, current)
   }
 
@@ -186,15 +196,17 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
     const totalsByEvent = new Map<string, SavingsTotals>()
     for (const calculation of savingsCalcs) {
       if (!calculation.event_id || !filteredIds.has(calculation.event_id)) continue
-      const current = totalsByEvent.get(calculation.event_id) ?? { reduction: 0, avoidance: 0, total: 0 }
+      const current = totalsByEvent.get(calculation.event_id) ?? { reduction: 0, avoidance: 0, total: 0, estimated: 0, executed: 0 }
       current.reduction += num(calculation.cost_reduction_amount)
       current.avoidance += num(calculation.cost_avoidance_amount)
       current.total += reportedSavings(calculation)
+      if (calculation.calculation_status === 'executed') current.executed += reportedSavings(calculation)
+      else current.estimated += reportedSavings(calculation)
       totalsByEvent.set(calculation.event_id, current)
     }
 
     const projectRows = filteredEvents.map(event => {
-      const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0 }
+      const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0, estimated: 0, executed: 0 }
       return {
         project: event.event_name,
         type: event.event_type,
@@ -210,6 +222,8 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
         reduction: savings.reduction,
         avoidance: savings.avoidance,
         savings: savings.total,
+        estimated: savings.estimated,
+        executed: savings.executed,
       }
     })
 
@@ -230,9 +244,11 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
     const savingsColumns: ReportColumn[] = [
       { key: 'name', label: 'Group' },
       { key: 'projects', label: 'Projects', format: 'number' },
-      { key: 'reduction', label: 'Cost Reduction', format: 'currency' },
+      { key: 'reduction', label: 'Cost Reduction', format: 'reduction' },
       { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
       { key: 'savings', label: 'Total Savings', format: 'currency' },
+      { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
+      { key: 'executed', label: 'Executed Savings', format: 'currency' },
     ]
 
     if (reportId === 'pipeline') {
@@ -263,9 +279,11 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
           { key: 'owner', label: 'Owner' },
           { key: 'businessUnit', label: 'Business Unit' },
           { key: 'status', label: 'Status', format: 'status' },
-          { key: 'reduction', label: 'Cost Reduction', format: 'currency' },
+          { key: 'reduction', label: 'Cost Reduction', format: 'reduction' },
           { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
           { key: 'savings', label: 'Total Savings', format: 'currency' },
+          { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
+          { key: 'executed', label: 'Executed Savings', format: 'currency' },
         ],
         rows: sortRows(projectRows, 'savings'),
       }
@@ -279,6 +297,8 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
         reduction: values.reduction,
         avoidance: values.avoidance,
         savings: values.savings,
+        estimated: values.estimated,
+        executed: values.executed,
       }))
 
     if (reportId === 'savings-business-unit' || reportId === 'savings-buyer') {
@@ -428,7 +448,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
                 <tr key={`${reportId}-${rowIndex}`} className="transition-colors hover:bg-[var(--surface-2)]">
                   {report.columns.map(column => {
                     const formatted = formatValue(row[column.key], column.format)
-                    const numeric = column.format === 'currency' || column.format === 'number'
+                    const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number'
                     return (
                       <td key={column.key} className={`px-4 py-3 text-sm ${numeric ? 'text-right font-medium tabular-nums text-[var(--text)]' : 'text-left text-[var(--text-2)]'}`}>
                         {column.format === 'status' ? (

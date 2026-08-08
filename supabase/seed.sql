@@ -119,7 +119,10 @@ insert into public.sourcing_events (
   project_due_date,
   contract_start_date,
   contract_end_date,
-  project_type
+  project_type,
+  savings_disposition,
+  savings_disposition_reason,
+  savings_disposition_at
 )
 values (
   '00000000-0000-4000-8000-000000000021',
@@ -137,7 +140,10 @@ values (
   '2026-07-31',
   '2026-08-01',
   '2029-07-31',
-  'Sourcing'
+  'Sourcing',
+  'executed',
+  'Fictional demo schedule is an executed commercial result.',
+  '2026-07-01T00:00:00Z'
 );
 
 insert into public.project_updates (
@@ -234,6 +240,8 @@ insert into public.savings_calculations (
   savings_percentage,
   net_savings_amount,
   calculation_status,
+  executed_at,
+  execution_note,
   savings_start_date,
   savings_end_date,
   cost_reduction_amount,
@@ -256,7 +264,9 @@ values (
   900000,
   30,
   900000,
-  'contracted',
+  'executed',
+  '2026-07-01T00:00:00Z',
+  'Fictional demo schedule is an executed commercial result.',
   '2026-08-01',
   '2029-07-31',
   300000,
@@ -283,6 +293,12 @@ insert into public.savings_periods (
   cost_reduction_amount,
   cost_avoidance_amount,
   total_savings_amount
+  ,executed_baseline_amount
+  ,executed_opening_amount
+  ,executed_final_amount
+  ,executed_cost_reduction_amount
+  ,executed_cost_avoidance_amount
+  ,executed_total_savings_amount
 )
 values
   (
@@ -290,19 +306,22 @@ values
     '00000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000021',
     '00000000-0000-4000-8000-000000000051',
-    1, 8, 2026, 12, 1000000, 1200000, 900000, 100000, 200000, 300000
+    1, 8, 2026, 12, 1000000, 1200000, 900000, 100000, 200000, 300000,
+    1000000, 1200000, 900000, 100000, 200000, 300000
   ),
   (
     '00000000-0000-4000-8000-000000000062',
     '00000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000021',
     '00000000-0000-4000-8000-000000000051',
-    2, 8, 2027, 12, 1000000, 1200000, 900000, 100000, 200000, 300000
+    2, 8, 2027, 12, 1000000, 1200000, 900000, 100000, 200000, 300000,
+    1000000, 1200000, 900000, 100000, 200000, 300000
   ),
   (
     '00000000-0000-4000-8000-000000000063',
     '00000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000021',
     '00000000-0000-4000-8000-000000000051',
-    3, 8, 2028, 12, 1000000, 1200000, 900000, 100000, 200000, 300000
+    3, 8, 2028, 12, 1000000, 1200000, 900000, 100000, 200000, 300000,
+    1000000, 1200000, 900000, 100000, 200000, 300000
   );

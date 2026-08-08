@@ -38,6 +38,24 @@ const STATUS_PILL: Record<string, string> = {
 
 export default async function RealizationPage() {
   const supabase = await createClient()
+  const { data: settings, error: settingsError } = await supabase
+    .from('organization_settings')
+    .select('savings_realization_enabled')
+    .maybeSingle()
+
+  if (!settings?.savings_realization_enabled) {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold text-[var(--text)]">Savings Realization</h1>
+        <Card className="mt-6 max-w-2xl p-6">
+          <h2 className="text-sm font-semibold text-[var(--text)]">This capability is not enabled</h2>
+          <p className="mt-2 text-sm text-[var(--text-2)]">Your workspace still reports scheduled estimated, executed, and accrued executed savings. An administrator can enable actual savings and finance validation in Settings.</p>
+          <Link href="/settings" className="mt-4 inline-flex text-sm font-medium text-[var(--brand-ink)] hover:underline">Open Settings</Link>
+          {settingsError ? <p className="mt-3 text-xs text-red-600">Settings could not be loaded: {settingsError.message}</p> : null}
+        </Card>
+      </div>
+    )
+  }
 
   const { data: periods, error: periodsError } = await fetchPortfolioRows(
     'Realization periods',
@@ -63,9 +81,9 @@ export default async function RealizationPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text)]">Realization</h1>
+        <h1 className="text-2xl font-bold text-[var(--text)]">Savings Realization</h1>
         <p className="mt-1 text-sm text-[var(--text-2)]">
-          Actual savings landing vs. projected — across all sourcing projects
+          Actual savings compared with executed schedules across all sourcing projects
         </p>
       </div>
 
@@ -79,7 +97,7 @@ export default async function RealizationPage() {
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card className="p-6">
-          <p className="text-sm font-medium text-[var(--text-3)]">Projected Savings</p>
+          <p className="text-sm font-medium text-[var(--text-3)]">Executed Savings</p>
           <p className="mt-2 text-2xl font-bold text-[var(--text)]">{formatCurrency(rollup.totalProjected)}</p>
         </Card>
         <Card className="p-6">
@@ -93,7 +111,7 @@ export default async function RealizationPage() {
         <Card className="p-6">
           <p className="text-sm font-medium text-[var(--text-3)]">Realization Rate</p>
           <p className="mt-2 text-2xl font-bold text-indigo-600 dark:text-indigo-400">{rollup.realizationRate.toFixed(1)}%</p>
-          <p className="mt-1 text-xs text-[var(--text-3)]">Realized ÷ projected</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Realized ÷ executed</p>
         </Card>
       </div>
 
@@ -107,8 +125,7 @@ export default async function RealizationPage() {
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">
               <th scope="col" className="px-4 py-3">Project</th>
-              <th scope="col" className="px-4 py-3">Period</th>
-              <th scope="col" className="px-4 py-3 text-right">Projected</th>
+              <th scope="col" className="px-4 py-3 text-right">Executed</th>
               <th scope="col" className="px-4 py-3 text-right">Actual</th>
               <th scope="col" className="px-4 py-3 text-right">Realized</th>
               <th scope="col" className="px-4 py-3 text-right">Leakage</th>
@@ -122,7 +139,7 @@ export default async function RealizationPage() {
                   <TrendingUp className="mx-auto mb-2 h-8 w-8 text-[var(--text-3)]" />
                   <p className="text-sm text-[var(--text-3)]">No realization periods yet</p>
                   <p className="mt-1 text-xs text-[var(--text-3)]">
-                    Add periods inside a project&apos;s Realization tab to track actual vs. projected savings.
+                    Create periods from an executed project schedule to track actual and realized savings.
                   </p>
                 </td>
               </tr>

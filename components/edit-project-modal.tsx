@@ -35,6 +35,8 @@ type Project = Pick<
   | 'contract_start_date'
   | 'contract_end_date'
   | 'notes'
+  | 'savings_disposition'
+  | 'savings_disposition_reason'
 >
 
 export function EditProjectModal({
@@ -72,6 +74,9 @@ export function EditProjectModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showSavingsDecision, setShowSavingsDecision] = useState(false)
+  const [completionCalculation, setCompletionCalculation] = useState<{ id: string; hasSchedule: boolean } | null>(null)
+  const [noExecutionReason, setNoExecutionReason] = useState('')
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = 'edit-project-title'
 
@@ -145,7 +150,7 @@ export function EditProjectModal({
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleSave = async () => {
+  const persistUpdates = async (extra: Record<string, string | null> = {}) => {
     setLoading(true)
     setError(null)
 
@@ -160,6 +165,7 @@ export function EditProjectModal({
       contract_end_date: form.contract_end_date || null,
       notes: form.notes || null,
       updated_at: new Date().toISOString(),
+      ...extra,
     }
 
     if (projectDescriptionsEnabled) {
@@ -199,6 +205,99 @@ export function EditProjectModal({
 
     setLoading(false)
     onSaved()
+  }
+
+  const savingsDecisionMetadata = async () => {
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      setError(userError?.message ?? 'Your session could not be verified. Please sign in again.')
+      setLoading(false)
+      return null
+    }
+
+    return {
+      savings_disposition_at: new Date().toISOString(),
+      savings_disposition_by: user.id,
+    }
+  }
+
+  const handleSave = async () => {
+    const completingSourcingProject = !isSupport
+      && form.event_status === 'Complete'
+      && project.event_status !== 'Complete'
+
+    if (completingSourcingProject && !project.savings_disposition) {
+      setLoading(true); setError(null)
+      const { data: calculation, error: calculationError } = await supabase
+        .from('savings_calculations')
+        .select('id, calculation_status')
+        .eq('event_id', project.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (calculationError) { setError(calculationError.message); setLoading(false); return }
+
+      if (calculation?.calculation_status === 'executed') {
+        const decisionMetadata = await savingsDecisionMetadata()
+        if (!decisionMetadata) return
+        await persistUpdates({
+          savings_disposition: 'executed',
+          savings_disposition_reason: 'Savings schedule was already marked executed.',
+          ...decisionMetadata,
+        })
+        return
+      }
+
+      let hasSchedule = false
+      if (calculation) {
+        const { count, error: periodError } = await supabase
+          .from('savings_periods')
+          .select('id', { count: 'exact', head: true })
+          .eq('savings_calculation_id', calculation.id)
+        if (periodError) { setError(periodError.message); setLoading(false); return }
+        hasSchedule = (count ?? 0) > 0
+      }
+
+      setCompletionCalculation(calculation ? { id: calculation.id, hasSchedule } : null)
+      setLoading(false)
+      setShowSavingsDecision(true)
+      return
+    }
+
+    await persistUpdates()
+  }
+
+  const executeAndComplete = async () => {
+    if (!completionCalculation?.hasSchedule) return
+    setLoading(true); setError(null)
+    const { error: executeError } = await supabase.rpc('mark_savings_schedule_executed', {
+      p_savings_calculation_id: completionCalculation.id,
+      p_execution_note: 'Confirmed while completing the sourcing project.',
+    })
+    if (executeError) { setError(executeError.message); setLoading(false); return }
+    setShowSavingsDecision(false)
+    await persistUpdates({
+      savings_disposition: 'executed',
+      savings_disposition_reason: 'Savings schedule marked executed while completing the project.',
+    })
+  }
+
+  const completeWithoutExecution = async () => {
+    const reason = noExecutionReason.trim()
+    if (reason.length < 10) {
+      setError('Explain why this project completed without executed savings (at least 10 characters).')
+      return
+    }
+    setLoading(true)
+    const decisionMetadata = await savingsDecisionMetadata()
+    if (!decisionMetadata) return
+    setShowSavingsDecision(false)
+    await persistUpdates({
+      savings_disposition: 'no_executed_savings',
+      savings_disposition_reason: reason,
+      ...decisionMetadata,
+    })
   }
 
   const handleDelete = async () => {
@@ -387,6 +486,49 @@ export function EditProjectModal({
         </div>
         </div>
       </div>
+      {showSavingsDecision && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="savings-completion-title" className="w-full max-w-lg rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl">
+            <h2 id="savings-completion-title" className="text-lg font-bold text-[var(--text)]">Resolve savings before completing</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-2)]">
+              Completing a sourcing project requires a decision about its savings. Estimates are never silently converted into executed results.
+            </p>
+
+            {completionCalculation?.hasSchedule ? (
+              <button type="button" onClick={executeAndComplete} disabled={loading} className="mt-5 w-full rounded-lg border border-green-300 bg-green-50 p-4 text-left dark:border-green-800 dark:bg-green-900/20">
+                <span className="block text-sm font-semibold text-green-800 dark:text-green-200">Mark the schedule executed and complete</span>
+                <span className="mt-1 block text-xs text-green-700 dark:text-green-300">Preserves the estimate, creates the executed snapshot, and records this decision.</span>
+              </button>
+            ) : (
+              <div className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                There is no generated savings schedule to execute. Create one first, or explain why this project has no executed savings.
+              </div>
+            )}
+
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
+              <label htmlFor="no-execution-reason" className="text-sm font-semibold text-[var(--text)]">Complete without executed savings</label>
+              <textarea
+                id="no-execution-reason"
+                value={noExecutionReason}
+                onChange={event => setNoExecutionReason(event.target.value)}
+                rows={3}
+                placeholder="Explain why no savings were executed..."
+                className={textareaClass}
+              />
+              <p className="mt-1 text-xs text-[var(--text-3)]">Required and retained with the project history.</p>
+            </div>
+
+            {error && <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <Button variant="secondary" onClick={() => { setShowSavingsDecision(false); setError(null) }} disabled={loading}>Go back</Button>
+              <Button onClick={completeWithoutExecution} disabled={loading || noExecutionReason.trim().length < 10}>
+                Complete with no executed savings
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete this project?"

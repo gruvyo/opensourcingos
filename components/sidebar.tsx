@@ -46,11 +46,19 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [signOutError, setSignOutError] = useState<string | null>(null)
+  const [savingsRealizationEnabled, setSavingsRealizationEnabled] = useState(false)
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) setUserEmail(user.email ?? null)
+      if (user) {
+        setUserEmail(user.email ?? null)
+        const { data: settings } = await supabase
+          .from('organization_settings')
+          .select('savings_realization_enabled')
+          .maybeSingle()
+        setSavingsRealizationEnabled(settings?.savings_realization_enabled ?? false)
+      }
     }
     getUser()
   }, [supabase])
@@ -98,7 +106,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 {group.label}
               </h2>
               <ul className="space-y-1">
-                {group.items.map((item) => {
+                {group.items.filter(item => item.href !== '/realization' || savingsRealizationEnabled).map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
