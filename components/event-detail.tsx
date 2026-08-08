@@ -136,6 +136,7 @@ export function EventDetail({
   projectCostCentersEnabled,
   projectCategoriesEnabled,
   projectBusinessUnitsEnabled,
+  projectUpdatesEnabled,
 }: {
   event: Event
   scopeLines: ScopeLine[]
@@ -151,6 +152,7 @@ export function EventDetail({
   projectCostCentersEnabled: boolean
   projectCategoriesEnabled: boolean
   projectBusinessUnitsEnabled: boolean
+  projectUpdatesEnabled: boolean
 }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEditModal, setShowEditModal] = useState(false)
@@ -227,6 +229,7 @@ export function EventDetail({
             organizationId={event.organization_id}
             initialUpdates={updates}
             currentProfile={currentProfile}
+            projectUpdatesEnabled={projectUpdatesEnabled}
           />
         )}
         {/* The hidden Scope tab needs a wider query before its navigation entry is restored. */}
@@ -324,11 +327,13 @@ function ProjectUpdatesTab({
   organizationId,
   initialUpdates,
   currentProfile,
+  projectUpdatesEnabled,
 }: {
   eventId: string
   organizationId: string
   initialUpdates: ProjectUpdate[]
   currentProfile: CurrentProfile
+  projectUpdatesEnabled: boolean
 }) {
   const supabase = createClient()
   const [updates, setUpdates] = useState(initialUpdates)
@@ -374,42 +379,53 @@ function ProjectUpdatesTab({
 
   return (
     <div className="space-y-4">
-      <Card className="p-6">
-        <form onSubmit={addUpdate}>
-          <label htmlFor="project-update" className="text-sm font-semibold text-[var(--text)]">
-            Add a project update
-          </label>
-          <p className="mt-1 text-xs text-[var(--text-3)]">
-            Build a dated record of decisions, milestones, and next steps.
-          </p>
-          <textarea
-            id="project-update"
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            maxLength={10000}
-            rows={4}
-            placeholder="What changed? Include the outcome and next step..."
-            className="mt-4 block w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
-          />
-          {error && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>
-          )}
-          <div className="mt-3 flex items-center justify-between gap-4">
-            <span className="text-xs text-[var(--text-3)]">{body.length.toLocaleString()} / 10,000</span>
-            <Button type="submit" size="sm" disabled={saving || !body.trim()}>
-              <Send className="h-3.5 w-3.5" />
-              {saving ? 'Adding...' : 'Add Update'}
-            </Button>
-          </div>
-        </form>
-      </Card>
+      {projectUpdatesEnabled ? (
+        <Card className="p-6">
+          <form onSubmit={addUpdate}>
+            <label htmlFor="project-update" className="text-sm font-semibold text-[var(--text)]">
+              Add a project update
+            </label>
+            <p className="mt-1 text-xs text-[var(--text-3)]">
+              Build a dated record of decisions, milestones, and next steps.
+            </p>
+            <textarea
+              id="project-update"
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              maxLength={10000}
+              rows={4}
+              placeholder="What changed? Include the outcome and next step..."
+              className="mt-4 block w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+            />
+            {error && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>
+            )}
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-xs text-[var(--text-3)]">{body.length.toLocaleString()} / 10,000</span>
+              <Button type="submit" size="sm" disabled={saving || !body.trim()}>
+                <Send className="h-3.5 w-3.5" />
+                {saving ? 'Adding...' : 'Add Update'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      ) : (
+        <Card className="p-5">
+          <p className="text-sm font-medium text-[var(--text)]">New project updates are disabled for this workspace.</p>
+          <p className="mt-1 text-sm text-[var(--text-3)]">Existing update history remains available below.</p>
+        </Card>
+      )}
 
       <div className="space-y-3">
         {updates.length === 0 ? (
           <Card className="p-8 text-center">
             <MessageSquareText className="mx-auto mb-3 h-8 w-8 text-[var(--text-3)]" />
             <p className="text-sm font-medium text-[var(--text)]">No updates yet</p>
-            <p className="mt-1 text-sm text-[var(--text-3)]">Add the first update to start this project&apos;s history.</p>
+            <p className="mt-1 text-sm text-[var(--text-3)]">
+              {projectUpdatesEnabled
+                ? 'Add the first update to start this project\'s history.'
+                : 'This project has no update history.'}
+            </p>
           </Card>
         ) : updates.map(update => {
           const author = getFirst(update.author)

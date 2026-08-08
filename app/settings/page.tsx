@@ -71,6 +71,7 @@ export default async function SettingsPage() {
     projectCostCentersEnabled: settings?.project_cost_centers_enabled ?? true,
     projectCategoriesEnabled: settings?.project_categories_enabled ?? true,
     projectBusinessUnitsEnabled: settings?.project_business_units_enabled ?? true,
+    projectUpdatesEnabled: settings?.project_updates_enabled ?? true,
     requireBaseline: settings?.require_baseline_for_hard_reduction ?? true,
     hardReductionApprovalThreshold: settings?.hard_reduction_approval_threshold ?? null,
   }

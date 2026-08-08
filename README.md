@@ -21,8 +21,8 @@ it?
 
 - Tracks sourcing and non-commercial support projects in one portfolio.
 - Lets administrators govern Support projects and the optional project
-  description, owner, Cost Center, Category, and Business Unit fields without removing
-  historical data.
+  description, owner, Cost Center, Category, Business Unit, and Project Updates
+  features without removing historical data.
 - Lets administrators manage the Event Type, Status, Owner, Category,
   Business Unit, and Cost Center choices used by project forms.
 - Tracks project due dates and dated updates alongside each project's commercial

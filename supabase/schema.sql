@@ -232,6 +232,32 @@ $$;
 
 
 --
+-- Name: enforce_project_updates_setting(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_project_updates_setting() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+begin
+  if coalesce(
+    (
+      select settings.project_updates_enabled
+      from public.organization_settings as settings
+      where settings.organization_id = new.organization_id
+    ),
+    true
+  ) then
+    return new;
+  end if;
+
+  raise exception 'Project Updates are disabled for this workspace'
+    using errcode = '23514';
+end
+$$;
+
+
+--
 -- Name: enforce_project_category_setting(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1040,6 +1066,97 @@ end
 $$;
 
 
+--
+-- Name: update_workspace_settings_v7(text, text, text, text, text, integer, text, text, boolean, numeric, boolean, boolean, boolean, boolean, boolean, boolean, boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_workspace_settings_v7(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean) RETURNS void
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v_user uuid := auth.uid();
+  v_org uuid := public.current_org_id();
+  v_role text;
+begin
+  if v_user is null or v_org is null then
+    raise exception 'authentication required';
+  end if;
+
+  select role into v_role
+  from public.profiles
+  where id = v_user and organization_id = v_org;
+
+  if v_role is distinct from 'admin' then
+    raise exception 'administrator role required';
+  end if;
+
+  update public.organizations
+  set name = p_organization_name
+  where id = v_org;
+
+  update public.profiles
+  set full_name = p_full_name
+  where id = v_user and organization_id = v_org;
+
+  insert into public.organization_settings (
+    organization_id,
+    currency_code,
+    locale,
+    timezone,
+    fiscal_year_start_month,
+    date_format,
+    default_recognition_method,
+    require_baseline_for_hard_reduction,
+    hard_reduction_approval_threshold,
+    support_projects_enabled,
+    project_descriptions_enabled,
+    project_owners_enabled,
+    project_cost_centers_enabled,
+    project_categories_enabled,
+    project_business_units_enabled,
+    project_updates_enabled,
+    updated_by
+  ) values (
+    v_org,
+    p_currency_code,
+    p_locale,
+    p_timezone,
+    p_fiscal_year_start_month,
+    p_date_format,
+    p_default_recognition_method,
+    p_require_baseline,
+    p_hard_reduction_approval_threshold,
+    p_support_projects_enabled,
+    p_project_descriptions_enabled,
+    p_project_owners_enabled,
+    p_project_cost_centers_enabled,
+    p_project_categories_enabled,
+    p_project_business_units_enabled,
+    p_project_updates_enabled,
+    v_user
+  )
+  on conflict (organization_id) do update set
+    currency_code = excluded.currency_code,
+    locale = excluded.locale,
+    timezone = excluded.timezone,
+    fiscal_year_start_month = excluded.fiscal_year_start_month,
+    date_format = excluded.date_format,
+    default_recognition_method = excluded.default_recognition_method,
+    require_baseline_for_hard_reduction = excluded.require_baseline_for_hard_reduction,
+    hard_reduction_approval_threshold = excluded.hard_reduction_approval_threshold,
+    support_projects_enabled = excluded.support_projects_enabled,
+    project_descriptions_enabled = excluded.project_descriptions_enabled,
+    project_owners_enabled = excluded.project_owners_enabled,
+    project_cost_centers_enabled = excluded.project_cost_centers_enabled,
+    project_categories_enabled = excluded.project_categories_enabled,
+    project_business_units_enabled = excluded.project_business_units_enabled,
+    project_updates_enabled = excluded.project_updates_enabled,
+    updated_by = excluded.updated_by;
+end
+$$;
+
+
 SET default_table_access_method = heap;
 
 --
@@ -1318,6 +1435,7 @@ CREATE TABLE public.organization_settings (
     project_cost_centers_enabled boolean DEFAULT true NOT NULL,
     project_categories_enabled boolean DEFAULT true NOT NULL,
     project_business_units_enabled boolean DEFAULT true NOT NULL,
+    project_updates_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT organization_settings_currency_code_check CHECK ((currency_code ~ '^[A-Z]{3}$'::text)),
     CONSTRAINT organization_settings_date_format_check CHECK ((date_format = ANY (ARRAY['MMM D, YYYY'::text, 'MM/DD/YYYY'::text, 'DD/MM/YYYY'::text, 'YYYY-MM-DD'::text]))),
     CONSTRAINT organization_settings_default_recognition_method_check CHECK ((default_recognition_method = ANY (ARRAY['monthly'::text, 'annual'::text, 'one_time'::text]))),
@@ -1368,6 +1486,13 @@ COMMENT ON COLUMN public.organization_settings.project_categories_enabled IS 'Co
 --
 
 COMMENT ON COLUMN public.organization_settings.project_business_units_enabled IS 'Controls whether project Business Unit values may be added or changed. Existing values remain visible.';
+
+
+--
+-- Name: COLUMN organization_settings.project_updates_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organization_settings.project_updates_enabled IS 'Controls whether new project updates may be added. Existing update history remains visible.';
 
 
 --
@@ -2442,6 +2567,13 @@ CREATE TRIGGER organization_settings_audit AFTER INSERT OR DELETE OR UPDATE ON p
 --
 
 CREATE TRIGGER organization_settings_updated_at BEFORE UPDATE ON public.organization_settings FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+
+--
+-- Name: project_updates project_updates_enforce_workspace_setting; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER project_updates_enforce_workspace_setting BEFORE INSERT ON public.project_updates FOR EACH ROW EXECUTE FUNCTION public.enforce_project_updates_setting();
 
 
 --
@@ -3904,6 +4036,14 @@ GRANT ALL ON FUNCTION public.enforce_project_business_unit_setting() TO service_
 
 
 --
+-- Name: FUNCTION enforce_project_updates_setting(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.enforce_project_updates_setting() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.enforce_project_updates_setting() TO service_role;
+
+
+--
 -- Name: FUNCTION enforce_project_category_setting(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -4030,6 +4170,15 @@ GRANT ALL ON FUNCTION public.update_workspace_settings_v5(p_organization_name te
 REVOKE ALL ON FUNCTION public.update_workspace_settings_v6(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.update_workspace_settings_v6(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean) TO authenticated;
 GRANT ALL ON FUNCTION public.update_workspace_settings_v6(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean) TO service_role;
+
+
+--
+-- Name: FUNCTION update_workspace_settings_v7(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.update_workspace_settings_v7(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.update_workspace_settings_v7(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.update_workspace_settings_v7(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean) TO service_role;
 
 
 --
