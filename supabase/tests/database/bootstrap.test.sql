@@ -674,6 +674,9 @@ where id in (
   '90000000-0000-4000-8000-000000000024'
 );
 
+delete from public.project_choice_options
+where organization_id = '90000000-0000-4000-8000-000000000025';
+
 delete from public.organizations
 where id = '90000000-0000-4000-8000-000000000025';
 
@@ -966,6 +969,9 @@ where id in (
   'a1000000-0000-4000-8000-000000000023',
   'a1000000-0000-4000-8000-000000000024'
 );
+
+delete from public.project_choice_options
+where organization_id = 'a1000000-0000-4000-8000-000000000025';
 
 delete from public.organizations
 where id = 'a1000000-0000-4000-8000-000000000025';
@@ -1261,6 +1267,9 @@ where id in (
   'b1000000-0000-4000-8000-000000000026'
 );
 
+delete from public.project_choice_options
+where organization_id = 'b1000000-0000-4000-8000-000000000025';
+
 delete from public.organizations
 where id = 'b1000000-0000-4000-8000-000000000025';
 
@@ -1554,6 +1563,9 @@ where id in (
   'c1000000-0000-4000-8000-000000000012',
   'c1000000-0000-4000-8000-000000000026'
 );
+
+delete from public.project_choice_options
+where organization_id = 'c1000000-0000-4000-8000-000000000025';
 
 delete from public.organizations
 where id = 'c1000000-0000-4000-8000-000000000025';
@@ -1849,6 +1861,9 @@ where id in (
   'd1000000-0000-4000-8000-000000000026'
 );
 
+delete from public.project_choice_options
+where organization_id = 'd1000000-0000-4000-8000-000000000025';
+
 delete from public.organizations
 where id = 'd1000000-0000-4000-8000-000000000025';
 
@@ -2068,6 +2083,9 @@ select throws_ok(
   'At least one active project choice is required for this project type',
   'the last active type or status cannot be archived'
 );
+
+delete from public.project_choice_options
+where organization_id = 'e1000000-0000-4000-8000-000000000031';
 
 delete from public.organizations
 where id = 'e1000000-0000-4000-8000-000000000031';
