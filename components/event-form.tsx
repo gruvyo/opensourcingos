@@ -29,6 +29,7 @@ export function EventForm({
   projectCostCentersEnabled,
   projectCategoriesEnabled,
   projectBusinessUnitsEnabled,
+  projectUpdatesEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -42,6 +43,7 @@ export function EventForm({
   projectCostCentersEnabled: boolean
   projectCategoriesEnabled: boolean
   projectBusinessUnitsEnabled: boolean
+  projectUpdatesEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -205,7 +207,7 @@ export function EventForm({
       return
     }
 
-    if (form.notes.trim()) {
+    if (projectUpdatesEnabled && form.notes.trim()) {
       const { error: updateError } = await supabase
         .from('project_updates')
         .insert({
@@ -506,21 +508,23 @@ export function EventForm({
       </Card>
 
       {/* Initial Project Update */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold text-[var(--text)]">Initial Project Update</h2>
-        <p className="mt-1 text-xs text-[var(--text-3)]">
-          Optional. This becomes the first dated entry in the project&apos;s update history.
-        </p>
-        <textarea
-          aria-label="Initial Project Update"
-          value={form.notes}
-          onChange={(e) => handleChange('notes', e.target.value)}
-          className={textareaClass}
-          rows={4}
-          maxLength={10000}
-          placeholder="Add the starting context, latest decision, or next step..."
-        />
-      </Card>
+      {projectUpdatesEnabled ? (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold text-[var(--text)]">Initial Project Update</h2>
+          <p className="mt-1 text-xs text-[var(--text-3)]">
+            Optional. This becomes the first dated entry in the project&apos;s update history.
+          </p>
+          <textarea
+            aria-label="Initial Project Update"
+            value={form.notes}
+            onChange={(e) => handleChange('notes', e.target.value)}
+            className={textareaClass}
+            rows={4}
+            maxLength={10000}
+            placeholder="Add the starting context, latest decision, or next step..."
+          />
+        </Card>
+      ) : null}
 
       {/* Submit */}
       <div className="flex justify-end gap-3">

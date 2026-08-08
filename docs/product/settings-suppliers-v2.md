@@ -4,11 +4,11 @@
 
 Release 2 is live on `main`: workspace settings are editable and atomic,
 administrators can govern Support projects and the optional project description,
-owner, Cost Center, Category, and Business Unit fields, supplier records can be created
-independently, and supplier profiles reconcile projects, awards, negotiated
-savings, realized savings, and audit history. Database policies make viewers
-read-only while administrators and procurement users receive the intended
-editing rights.
+owner, Cost Center, Category, Business Unit, and Project Updates features,
+supplier records can be created independently, and supplier profiles reconcile
+projects, awards, negotiated savings, realized savings, and audit history.
+Database policies make viewers read-only while administrators and procurement
+users receive the intended editing rights.
 
 Workspace Classification Management extends Settings with administrator-managed
 Event Type, Status, Owner, Category, Business Unit, and Cost Center choices.
@@ -86,6 +86,15 @@ workspace-scoped, and auditable.
 
 All new tables require forced Row Level Security, organization-scoped policies,
 indexes on `organization_id`, and tests proving cross-workspace isolation.
+
+### Project Updates behavior
+
+- The Project Updates setting defaults on for existing and new workspaces.
+- Turning it off removes the initial-update field from project creation and the
+  update composer from project details.
+- The Updates tab and all existing dated history remain readable.
+- Database enforcement rejects direct inserts while the setting is off, and
+  re-enabling the setting restores new updates without changing history.
 
 ## Suppliers v2
 

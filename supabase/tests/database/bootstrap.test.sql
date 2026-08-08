@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(170);
+select plan(185);
 
 select is(
   (
@@ -1866,6 +1866,160 @@ where organization_id = 'd1000000-0000-4000-8000-000000000025';
 
 delete from public.organizations
 where id = 'd1000000-0000-4000-8000-000000000025';
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_settings'
+      and column_name = 'project_updates_enabled'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'Project Updates default to enabled and cannot be null'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings_v7(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'
+  ) is not null,
+  'workspace settings v7 RPC accepts the Project Updates control'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v7(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v7 RPC runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v7(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v7 RPC has a fixed search path'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings_v7(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'signed-in users can invoke the workspace settings v7 RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.update_workspace_settings_v7(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'anonymous users cannot invoke the workspace settings v7 RPC'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_updates_setting()'::regprocedure
+  ),
+  'Project Updates enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_updates_setting()'::regprocedure
+  ),
+  'Project Updates enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'project_updates'
+      and t.tgname = 'project_updates_enforce_workspace_setting'
+      and not t.tgisinternal
+  ),
+  'project_updates has the workspace setting trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_project_updates_setting()', 'EXECUTE'),
+  'anonymous users cannot execute Project Updates enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_project_updates_setting()', 'EXECUTE'),
+  'signed-in users cannot execute Project Updates enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_project_updates_setting()', 'EXECUTE'),
+  'service role can execute Project Updates enforcement'
+);
+
+update public.organization_settings
+set project_updates_enabled = false
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select is(
+  (
+    select body
+    from public.project_updates
+    where id = '00000000-0000-4000-8000-000000000022'
+  ),
+  'Fictional agreement completed and ready for savings tracking.',
+  'existing Project Updates remain readable when new updates are disabled'
+);
+
+select throws_ok(
+  $$
+    insert into public.project_updates (
+      id, organization_id, event_id, body
+    ) values (
+      'e2000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000021',
+      'Blocked test update'
+    )
+  $$,
+  '23514',
+  'Project Updates are disabled for this workspace',
+  'new Project Updates are blocked when the setting is off'
+);
+
+update public.organization_settings
+set project_updates_enabled = true
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    insert into public.project_updates (
+      id, organization_id, event_id, body
+    ) values (
+      'e2000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000021',
+      'Allowed test update'
+    )
+  $$,
+  'new Project Updates can be added again after the setting is re-enabled'
+);
+
+delete from public.project_updates
+where id = 'e2000000-0000-4000-8000-000000000001';
 
 select ok(
   (
