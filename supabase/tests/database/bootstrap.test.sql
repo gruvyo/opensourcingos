@@ -411,6 +411,9 @@ where id in (
   '00000000-0000-4000-8000-000000000020'
 );
 
+delete from public.project_choice_options
+where organization_id = '00000000-0000-4000-8000-000000000019';
+
 delete from public.organizations
 where id = '00000000-0000-4000-8000-000000000019';
 
