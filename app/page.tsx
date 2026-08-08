@@ -21,8 +21,8 @@ const features = [
     icon: BarChart3,
   },
   {
-    title: 'Realization, not promises',
-    description: 'Separate forecast, booked, and realized value so pipeline never quietly becomes reported savings.',
+    title: 'Evidence across the lifecycle',
+    description: 'Keep estimated, executed, accrued, and optionally realized savings distinct on one period-based ledger.',
     icon: TrendingUp,
   },
 ]

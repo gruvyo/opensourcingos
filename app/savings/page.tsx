@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import Link from 'next/link'
 import { formatCurrency, formatReduction, formatDate } from '@/lib/utils'
-import { portfolioRollup, reportedSavings, classifyRealization, getFirst } from '@/lib/savings'
+import { portfolioRollup, reportedSavings, scheduleLifecycleRollup, getFirst, type SchedulePeriodRow } from '@/lib/savings'
 import { Calculator, ArrowRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +13,7 @@ export default async function SavingsPage() {
   const [
     { data: savingsCalcs, error: savingsCalcsError },
     { data: events, error: eventsError },
+    { data: periodRows, error: periodsError },
   ] = await Promise.all([
     fetchPortfolioRows('Savings calculations', (from, to) => (
       supabase.from('savings_calculations').select(`
@@ -35,11 +36,21 @@ export default async function SavingsPage() {
         .order('id', { ascending: true })
         .range(from, to)
     )),
+    fetchPortfolioRows('Savings periods', (from, to) => (
+      supabase.from('savings_periods').select(`
+        savings_calculation_id, period_number, period_month, period_year, period_months,
+        baseline_amount, total_savings_amount,
+        executed_baseline_amount, executed_total_savings_amount
+      `, { count: 'exact' })
+        .order('savings_calculation_id')
+        .order('period_number')
+        .range(from, to)
+    )),
   ])
 
   // A failed query here would render as "$0 savings", which is indistinguishable
   // from a genuinely empty portfolio. Say which one it is.
-  const loadError = savingsCalcsError?.message || eventsError?.message || null
+  const loadError = savingsCalcsError?.message || eventsError?.message || periodsError?.message || null
 
   const calcs = savingsCalcs || []
   const eventList = events || []
@@ -47,6 +58,11 @@ export default async function SavingsPage() {
 
   // Single source of truth for every headline/breakdown number.
   const rollup = portfolioRollup(calcs, eventList, { now })
+  const lifecycle = scheduleLifecycleRollup(
+    calcs,
+    (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+    now,
+  )
 
   // The savings TYPE split comes from the two amount columns, never from the
   // derived savings_type label — a negotiation produces both legs, and the
@@ -56,10 +72,6 @@ export default async function SavingsPage() {
     { name: 'Cost Reduction', value: rollup.totalCostReduction },
     { name: 'Cost Avoidance', value: rollup.totalCostAvoidance },
   ]
-
-  // For per-row realized/accrued badges, use the SAME canonical rule.
-  const contractStartByEventId = new Map<string, string | null>()
-  for (const e of eventList) contractStartByEventId.set(e.id, e.contract_start_date ?? null)
 
   return (
     <div className="p-8">
@@ -77,22 +89,26 @@ export default async function SavingsPage() {
         </div>
       )}
 
-      {/* Summary cards — 3 cards only */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="p-6">
-          <p className="text-sm font-medium text-[var(--text-3)]">Total Savings</p>
-          <p className="mt-2 text-2xl font-bold text-[var(--text)]">{formatCurrency(rollup.totalSavings)}</p>
-          <p className="mt-1 text-xs text-[var(--text-3)]">Gross savings across all calculations</p>
+          <p className="text-sm font-medium text-[var(--text-3)]">Spend Addressed</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--text)]">{formatCurrency(lifecycle.spendAddressed)}</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Scheduled baseline spend where a hard baseline exists</p>
         </Card>
         <Card className="p-6">
-          <p className="text-sm font-medium text-[var(--text-3)]">Cost Reduction</p>
-          <p className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{formatReduction(rollup.totalCostReduction)}</p>
-          <p className="mt-1 text-xs text-[var(--text-3)]">Actual bottom-line reduction — price went down from what we were paying</p>
+          <p className="text-sm font-medium text-[var(--text-3)]">Estimated Pipeline</p>
+          <p className="mt-2 text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(lifecycle.estimatedPipeline)}</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">{lifecycle.estimatedCount} scheduled estimate{lifecycle.estimatedCount === 1 ? '' : 's'} not yet executed</p>
         </Card>
         <Card className="p-6">
-          <p className="text-sm font-medium text-[var(--text-3)]">Cost Avoidance</p>
-          <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(rollup.totalCostAvoidance)}</p>
-          <p className="mt-1 text-xs text-[var(--text-3)]">Value not paid — negotiated below what supplier proposed</p>
+          <p className="text-sm font-medium text-[var(--text-3)]">Executed Savings</p>
+          <p className="mt-2 text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(lifecycle.executed)}</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Confirmed commercial results across {lifecycle.executedCount} schedule{lifecycle.executedCount === 1 ? '' : 's'}</p>
+        </Card>
+        <Card className="p-6">
+          <p className="text-sm font-medium text-[var(--text-3)]">Accrued Executed</p>
+          <p className="mt-2 text-2xl font-bold text-violet-600 dark:text-violet-400">{formatCurrency(lifecycle.accruedExecuted)}</p>
+          <p className="mt-1 text-xs text-[var(--text-3)]">Executed savings scheduled through this month</p>
         </Card>
       </div>
 
@@ -133,13 +149,12 @@ export default async function SavingsPage() {
               <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Total Savings</th>
               <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Savings Period</th>
               <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Status</th>
-              <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Classification</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
             {calcs.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center">
+                <td colSpan={8} className="px-4 py-12 text-center">
                   <Calculator className="mx-auto mb-2 h-8 w-8 text-[var(--text-3)]" />
                   <p className="text-sm text-[var(--text-3)]">No savings calculations yet</p>
                   <p className="mt-1 text-xs text-[var(--text-3)]">
@@ -151,7 +166,6 @@ export default async function SavingsPage() {
               calcs.map((calc) => {
                 const event = getFirst<{ event_name: string; contract_start_date: string | null }>(calc.event)
                 const totalForCalc = reportedSavings(calc)
-                const isRealized = classifyRealization(calc, contractStartByEventId, now) === 'Realized'
                 return (
                   <tr key={calc.id} className="hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3">
@@ -180,12 +194,7 @@ export default async function SavingsPage() {
                     <td className="px-4 py-3 text-sm text-[var(--text-2)]">
                       {calc.savings_start_date ? `${formatDate(calc.savings_start_date)} → ${formatDate(calc.savings_end_date)}` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-2)]">{calc.calculation_status}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={isRealized ? 'success' : 'info'}>
-                        {isRealized ? 'Realized' : 'Accrued'}
-                      </Badge>
-                    </td>
+                    <td className="px-4 py-3"><Badge tone={calc.calculation_status === 'executed' ? 'success' : 'info'} className="capitalize">{calc.calculation_status}</Badge></td>
                   </tr>
                 )
               })

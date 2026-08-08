@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Tables } from '@/lib/database.types'
-import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X } from 'lucide-react'
+import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X, BadgeCheck } from 'lucide-react'
 import { formatCurrency, formatReduction as money } from '@/lib/utils'
 import {
   chainSavings, baselineQuality,
@@ -57,6 +57,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
+  const [showExecuteConfirm, setShowExecuteConfirm] = useState(false)
 
   const [baseline, setBaseline] = useState<ScheduleBaseline | null>(null)
   const [opening, setOpening] = useState<ScheduleOffer | null>(null)
@@ -220,6 +221,8 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
 
   const saved = useMemo(() => toSchedulePeriods(rows), [rows])
   const savedTotals = scheduleTotals(saved)
+  const executedTotal = rows.reduce((sum, row) => sum + Number(row.executed_total_savings_amount ?? 0), 0)
+  const isExecuted = calc?.calculation_status === 'executed'
   const savedByYear = useMemo(() => scheduleByYear(saved), [saved])
   const editedCount = rows.filter(r => r.is_edited).length
   const drift = saved.length ? savedTotals.total - dealChain.total : 0
@@ -243,6 +246,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   // -------------------------------------------------------------------
   const generate = async () => {
     if (!calc) return
+    if (isExecuted) { setError('Executed schedules are preserved and cannot be regenerated.'); return }
 
     setBusy(true); setError(null)
     const { data: { user } } = await supabase.auth.getUser()
@@ -291,6 +295,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   // Per-row editing. Only the three anchors; the split is always derived.
   // -------------------------------------------------------------------
   const startEdit = (r: SavedScheduleRow) => {
+    if (isExecuted) return
     setEditingId(r.id)
     setDraft({
       baseline: r.baseline_amount === null || r.baseline_amount === undefined ? '' : String(r.baseline_amount),
@@ -350,6 +355,18 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
     const res = await supabase.from('savings_calculations')
       .update(publishable(current, startMonth, startYear, dealMonths)).eq('id', calc.id)
     if (res.error) setError(res.error.message)
+  }
+
+  const executeSchedule = async () => {
+    if (!calc) return
+    setBusy(true); setError(null)
+    const { error: executeError } = await supabase.rpc('mark_savings_schedule_executed', {
+      p_savings_calculation_id: calc.id,
+      p_execution_note: 'Confirmed from the project Savings Schedule.',
+    })
+    setBusy(false)
+    if (executeError) { setError(executeError.message); return }
+    await load()
   }
 
   if (loading) {
@@ -417,24 +434,47 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
         </Card>
       ) : (
         <>
+          <Card className="mb-4 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <BadgeCheck className={clsx('mt-0.5 h-5 w-5', isExecuted ? 'text-green-600' : 'text-[var(--text-3)]')} aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text)]">
+                    {isExecuted ? 'Executed savings schedule' : 'Estimated savings schedule'}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-2)]">
+                    {isExecuted
+                      ? `${formatCurrency(executedTotal)} is preserved as the confirmed result; the original estimate remains available for comparison.`
+                      : 'Execution copies every estimated period into a durable snapshot and records who confirmed it.'}
+                  </p>
+                </div>
+              </div>
+              {!isExecuted && saved.length > 0 && (
+                <Button onClick={() => setShowExecuteConfirm(true)} disabled={busy}>
+                  Mark schedule executed
+                </Button>
+              )}
+            </div>
+          </Card>
+
           {/* ---- Settings ------------------------------------------------ */}
           <Card className="mb-4 p-4">
             <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">Schedule settings</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Start month</label>
-                <Select aria-label="Start month" value={startMonth} onChange={e => setStartMonth(Number(e.target.value))} className="mt-1">
+                <Select aria-label="Start month" value={startMonth} onChange={e => setStartMonth(Number(e.target.value))} disabled={isExecuted} className="mt-1">
                   {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </Select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Start year</label>
-                <Input aria-label="Start year" type="number" min={2000} max={2100} value={startYear}
+                <Input aria-label="Start year" type="number" min={2000} max={2100} value={startYear} disabled={isExecuted}
                   onChange={e => setStartYear(Number(e.target.value))} className="mt-1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Period type</label>
-                <Select aria-label="Period type" value={periodType} onChange={e => changeType(e.target.value as PeriodType)} className="mt-1">
+                <Select aria-label="Period type" value={periodType} onChange={e => changeType(e.target.value as PeriodType)} disabled={isExecuted} className="mt-1">
                   {PERIOD_TYPES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </Select>
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">
@@ -450,7 +490,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Period count</label>
-                <Input aria-label="Period count" type="number" min={1} max={600} value={periodCount}
+                <Input aria-label="Period count" type="number" min={1} max={600} value={periodCount} disabled={isExecuted}
                   onChange={e => setPeriodCount(Number(e.target.value))} className="mt-1" />
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">
                   {defaultPeriodCount(periodType, dealMonths)} covers the {dealMonths}-month deal.
@@ -485,7 +525,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
               </div>
               <Button
                 onClick={() => editedCount > 0 ? setShowRegenerateConfirm(true) : void generate()}
-                disabled={busy}
+                disabled={busy || isExecuted}
               >
                 {busy ? 'Working...' : saved.length ? 'Regenerate schedule' : 'Generate schedule'}
               </Button>
@@ -576,7 +616,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                   )}
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[860px] text-sm">
+                  <table className="w-full min-w-[980px] text-sm">
                     <caption className="sr-only">Savings schedule periods</caption>
                     <thead>
                       <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-3)]">
@@ -587,7 +627,8 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                         <th scope="col" className="py-2 pr-3 text-right font-medium">Final</th>
                         <th scope="col" className="py-2 pr-3 text-right font-medium">Cost Reduction</th>
                         <th scope="col" className="py-2 pr-3 text-right font-medium">Cost Avoidance</th>
-                        <th scope="col" className="py-2 pr-3 text-right font-medium">Total</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Estimated</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">Executed</th>
                         <th scope="col" aria-label="Actions" className="py-2 w-20" />
                       </tr>
                     </thead>
@@ -630,6 +671,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                                 <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{money(draftChain.reduction)}</td>
                                 <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(draftChain.avoidance)}</td>
                                 <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatCurrency(draftChain.total)}</td>
+                                <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-3)]">—</td>
                                 <td className="py-2">
                                   <div className="flex justify-end gap-1">
                                     <Button size="sm" variant="ghost" disabled={busy}
@@ -654,14 +696,17 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                                 </td>
                                 <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(p.avoidance)}</td>
                                 <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatCurrency(p.total)}</td>
+                                <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[var(--text)]">
+                                  {r.executed_total_savings_amount === null ? '—' : formatCurrency(r.executed_total_savings_amount)}
+                                </td>
                                 <td className="py-2">
                                   <div className="flex justify-end gap-1">
-                                    <Button size="sm" variant="ghost" onClick={() => startEdit(r)}
+                                    <Button size="sm" variant="ghost" onClick={() => startEdit(r)} disabled={isExecuted}
                                       title="Edit this period" aria-label="Edit this period">
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
                                     {r.is_edited && (
-                                      <Button size="sm" variant="ghost" disabled={busy}
+                                      <Button size="sm" variant="ghost" disabled={busy || isExecuted}
                                         onClick={() => resetRow(r)} title="Reset to the generated figures"
                                         aria-label="Reset to the generated figures">
                                         <RotateCcw className="h-3.5 w-3.5" />
@@ -687,6 +732,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                         </td>
                         <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">{formatCurrency(savedTotals.avoidance)}</td>
                         <td className="py-2 pr-3 text-right tabular-nums text-green-600 dark:text-green-400">{formatCurrency(savedTotals.total)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-[var(--text)]">{isExecuted ? formatCurrency(executedTotal) : '—'}</td>
                         <td className="py-2" />
                       </tr>
                     </tfoot>
@@ -710,6 +756,16 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
           pendingLabel="Regenerating..."
           onConfirm={generate}
           onCancel={() => setShowRegenerateConfirm(false)}
+        />
+      )}
+      {showExecuteConfirm && (
+        <ConfirmDialog
+          title="Mark this savings schedule executed?"
+          description="This preserves the estimate and copies every period into the executed column. Executed schedules become read-only so the confirmed result cannot be silently rewritten."
+          confirmLabel="Mark executed"
+          pendingLabel="Marking executed..."
+          onConfirm={executeSchedule}
+          onCancel={() => setShowExecuteConfirm(false)}
         />
       )}
     </div>

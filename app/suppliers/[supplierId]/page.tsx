@@ -33,7 +33,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
   const [{ data: supplier, error: supplierError }, { data: owners }, { data: currencySettings }] = await Promise.all([
     supabase.from('suppliers').select('*').eq('id', supplierId).maybeSingle(),
     profile?.organization_id ? supabase.from('profiles').select('id, full_name, email').eq('organization_id', profile.organization_id).order('full_name') : Promise.resolve({ data: [] }),
-    profile?.organization_id ? supabase.from('organization_settings').select('currency_code').eq('organization_id', profile.organization_id).maybeSingle() : Promise.resolve({ data: null }),
+    profile?.organization_id ? supabase.from('organization_settings').select('currency_code, savings_realization_enabled').eq('organization_id', profile.organization_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
 
   if (supplierError || !supplier) notFound()
@@ -48,7 +48,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
 
   const [{ data: calculations, error: calculationsError }, { data: periods, error: periodsError }, { data: audit, error: auditError }] = await Promise.all([
     eventIds.length ? supabase.from('savings_calculations').select('id, event_id, calculation_name, calculation_status, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount, created_at').in('event_id', eventIds).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
-    eventIds.length ? supabase.from('realization_periods').select('id, event_id, period_name, period_end_date, realized_savings, projected_savings, realization_status, finance_validated').in('event_id', eventIds).order('period_end_date', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+    eventIds.length && currencySettings?.savings_realization_enabled ? supabase.from('realization_periods').select('id, event_id, period_name, period_end_date, realized_savings, projected_savings, realization_status, finance_validated').in('event_id', eventIds).order('period_end_date', { ascending: false }) : Promise.resolve({ data: [], error: null }),
     supabase.from('audit_log').select('id, action, actor_id, before_data, after_data, created_at').eq('entity_type', 'supplier').eq('entity_id', supplierId).order('created_at', { ascending: false }).limit(20),
   ])
 
@@ -58,6 +58,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
   const eventMap = new Map(events.map(event => [event.id, event.event_name]))
   const ownerMap = new Map((owners || []).map(owner => [owner.id, owner.full_name || owner.email || 'Workspace member']))
   const currency = currencySettings?.currency_code || 'USD'
+  const savingsRealizationEnabled = currencySettings?.savings_realization_enabled ?? false
   const canEdit = profile?.role === 'admin' || profile?.role === 'procurement_user'
   const values: SupplierFormValues = {
     supplierName: supplier.supplier_name,
@@ -78,7 +79,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
       <PageHeader
         eyebrow="Supplier profile"
         title={supplier.supplier_name}
-        description="Relationship details, sourcing activity, award outcomes, savings, realization, and change history."
+        description={`Relationship details, sourcing activity, award outcomes, savings${savingsRealizationEnabled ? ', realization' : ''}, and change history.`}
         actions={<div className="flex flex-wrap gap-2"><Badge tone={supplier.preferred_flag ? 'brand' : 'neutral'}>{supplier.preferred_flag ? 'Preferred' : 'Standard'}</Badge><Badge tone={supplier.risk_rating === 'High' ? 'danger' : supplier.risk_rating === 'Medium' ? 'warning' : 'success'}>{supplier.risk_rating || 'Unrated'} risk</Badge></div>}
       />
 
@@ -89,16 +90,16 @@ export default async function SupplierProfilePage({ params }: PageProps) {
           { label: 'Linked projects', value: events.length, icon: Building2 },
           { label: 'Awards', value: events.filter(event => event.awarded_supplier_id === supplierId).length, icon: Landmark },
           { label: 'Negotiated savings', value: formatCurrency(sum(calculationRows, 'gross_savings_amount'), currency), icon: PiggyBank },
-          { label: 'Realized savings', value: formatCurrency(sum(periodRows, 'realized_savings'), currency), icon: TrendingUp },
+          ...(savingsRealizationEnabled ? [{ label: 'Realized savings', value: formatCurrency(sum(periodRows, 'realized_savings'), currency), icon: TrendingUp }] : []),
         ].map(item => <Card key={item.label} className="p-5"><item.icon className="h-5 w-5 text-[var(--brand-ink)]" aria-hidden="true" /><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">{item.label}</p><p className="mt-1 text-xl font-bold text-[var(--text)]">{item.value}</p></Card>)}
       </section>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-6">
-          <Card className="overflow-hidden">
+          {savingsRealizationEnabled ? <Card className="overflow-hidden">
             <div className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--text)]">Projects & awards</h2></div>
             {events.length ? <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-sm"><caption className="sr-only">Projects and award relationships for {supplier.supplier_name}</caption><thead><tr className="bg-[var(--surface-2)] text-left text-[11px] uppercase tracking-wider text-[var(--text-3)]"><th scope="col" className="px-5 py-3">Project</th><th scope="col" className="px-4 py-3">Status</th><th scope="col" className="px-4 py-3">Relationship</th><th scope="col" className="px-5 py-3">Started</th></tr></thead><tbody className="divide-y divide-[var(--border)]">{events.map(event => <tr key={event.id}><td className="px-5 py-3"><Link href={`/events/${event.id}`} className="font-medium text-[var(--brand-ink)] hover:underline">{event.event_name}</Link></td><td className="px-4 py-3"><Badge tone={statusTone(event.event_status)}>{event.event_status || 'Pipeline'}</Badge></td><td className="px-4 py-3">{event.awarded_supplier_id === supplierId ? <Badge tone="success">Awarded</Badge> : <span className="text-[var(--text-2)]">Incumbent</span>}</td><td className="px-5 py-3 text-[var(--text-3)]">{formatDate(event.event_start_date)}</td></tr>)}</tbody></table></div> : <p className="p-6 text-sm text-[var(--text-2)]">No sourcing projects are linked yet.</p>}
-          </Card>
+          </Card> : null}
 
           <Card className="overflow-hidden">
             <div className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--text)]">Savings history</h2></div>

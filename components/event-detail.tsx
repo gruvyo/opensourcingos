@@ -73,6 +73,8 @@ type Event = {
   project_type: string | null
   buyer_name: string | null
   notes: string | null
+  savings_disposition: string | null
+  savings_disposition_reason: string | null
   category_id: string | null
   business_unit_id: string | null
   cost_center_id: string | null
@@ -138,6 +140,7 @@ export function EventDetail({
   projectBusinessUnitsEnabled,
   projectUpdatesEnabled,
   projectIncumbentSuppliersEnabled,
+  savingsRealizationEnabled,
 }: {
   event: Event
   scopeLines: ScopeLine[]
@@ -155,12 +158,17 @@ export function EventDetail({
   projectBusinessUnitsEnabled: boolean
   projectUpdatesEnabled: boolean
   projectIncumbentSuppliersEnabled: boolean
+  savingsRealizationEnabled: boolean
 }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEditModal, setShowEditModal] = useState(false)
 
   const isSupport = event.project_type === 'Support'
-  const TABS = isSupport ? SUPPORT_TABS : SOURCING_TABS
+  const TABS = isSupport
+    ? SUPPORT_TABS
+    : savingsRealizationEnabled
+      ? [...SOURCING_TABS.slice(0, -1), { id: 'realization', label: 'Savings Realization', icon: Clock }, SOURCING_TABS[SOURCING_TABS.length - 1]]
+      : SOURCING_TABS
 
   return (
     <div className="min-w-0">

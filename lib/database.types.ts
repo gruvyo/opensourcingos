@@ -730,6 +730,7 @@ export type Database = {
           project_incumbent_suppliers_enabled: boolean
           project_owners_enabled: boolean
           project_updates_enabled: boolean
+          savings_realization_enabled: boolean
           require_baseline_for_hard_reduction: boolean
           support_projects_enabled: boolean
           timezone: string
@@ -752,6 +753,7 @@ export type Database = {
           project_incumbent_suppliers_enabled?: boolean
           project_owners_enabled?: boolean
           project_updates_enabled?: boolean
+          savings_realization_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
           support_projects_enabled?: boolean
           timezone?: string
@@ -774,6 +776,7 @@ export type Database = {
           project_incumbent_suppliers_enabled?: boolean
           project_owners_enabled?: boolean
           project_updates_enabled?: boolean
+          savings_realization_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
           support_projects_enabled?: boolean
           timezone?: string
@@ -995,6 +998,7 @@ export type Database = {
           realization_status: string | null
           realized_savings: number | null
           savings_calculation_id: string | null
+          savings_period_id: string | null
           updated_at: string | null
           updated_by: string | null
         }
@@ -1020,6 +1024,7 @@ export type Database = {
           realization_status?: string | null
           realized_savings?: number | null
           savings_calculation_id?: string | null
+          savings_period_id?: string | null
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -1045,6 +1050,7 @@ export type Database = {
           realization_status?: string | null
           realized_savings?: number | null
           savings_calculation_id?: string | null
+          savings_period_id?: string | null
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -1082,6 +1088,13 @@ export type Database = {
             columns: ["savings_calculation_id"]
             isOneToOne: false
             referencedRelation: "savings_calculations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "realization_periods_savings_period_id_fkey"
+            columns: ["savings_period_id"]
+            isOneToOne: true
+            referencedRelation: "savings_periods"
             referencedColumns: ["id"]
           },
           {
@@ -1195,6 +1208,9 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           event_id: string | null
+          executed_at: string | null
+          executed_by: string | null
+          execution_note: string | null
           gross_savings_amount: number | null
           id: string
           net_savings_amount: number | null
@@ -1224,6 +1240,9 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           event_id?: string | null
+          executed_at?: string | null
+          executed_by?: string | null
+          execution_note?: string | null
           gross_savings_amount?: number | null
           id?: string
           net_savings_amount?: number | null
@@ -1253,6 +1272,9 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           event_id?: string | null
+          executed_at?: string | null
+          executed_by?: string | null
+          execution_note?: string | null
           gross_savings_amount?: number | null
           id?: string
           net_savings_amount?: number | null
@@ -1320,6 +1342,12 @@ export type Database = {
           baseline_amount: number | null
           cost_avoidance_amount: number
           cost_reduction_amount: number | null
+          executed_baseline_amount: number | null
+          executed_cost_avoidance_amount: number | null
+          executed_cost_reduction_amount: number | null
+          executed_final_amount: number | null
+          executed_opening_amount: number | null
+          executed_total_savings_amount: number | null
           created_at: string
           created_by: string | null
           event_id: string
@@ -1342,6 +1370,12 @@ export type Database = {
           baseline_amount?: number | null
           cost_avoidance_amount?: number
           cost_reduction_amount?: number | null
+          executed_baseline_amount?: number | null
+          executed_cost_avoidance_amount?: number | null
+          executed_cost_reduction_amount?: number | null
+          executed_final_amount?: number | null
+          executed_opening_amount?: number | null
+          executed_total_savings_amount?: number | null
           created_at?: string
           created_by?: string | null
           event_id: string
@@ -1364,6 +1398,12 @@ export type Database = {
           baseline_amount?: number | null
           cost_avoidance_amount?: number
           cost_reduction_amount?: number | null
+          executed_baseline_amount?: number | null
+          executed_cost_avoidance_amount?: number | null
+          executed_cost_reduction_amount?: number | null
+          executed_final_amount?: number | null
+          executed_opening_amount?: number | null
+          executed_total_savings_amount?: number | null
           created_at?: string
           created_by?: string | null
           event_id?: string
@@ -1428,6 +1468,10 @@ export type Database = {
           procurement_owner_id: string | null
           project_due_date: string | null
           project_type: string | null
+          savings_disposition: string | null
+          savings_disposition_at: string | null
+          savings_disposition_by: string | null
+          savings_disposition_reason: string | null
           recognition_end_date: string | null
           recognition_start_date: string | null
           sourcing_method: string | null
@@ -1462,6 +1506,10 @@ export type Database = {
           procurement_owner_id?: string | null
           project_due_date?: string | null
           project_type?: string | null
+          savings_disposition?: string | null
+          savings_disposition_at?: string | null
+          savings_disposition_by?: string | null
+          savings_disposition_reason?: string | null
           recognition_end_date?: string | null
           recognition_start_date?: string | null
           sourcing_method?: string | null
@@ -1496,6 +1544,10 @@ export type Database = {
           procurement_owner_id?: string | null
           project_due_date?: string | null
           project_type?: string | null
+          savings_disposition?: string | null
+          savings_disposition_at?: string | null
+          savings_disposition_by?: string | null
+          savings_disposition_reason?: string | null
           recognition_end_date?: string | null
           recognition_start_date?: string | null
           sourcing_method?: string | null
@@ -1858,6 +1910,10 @@ export type Database = {
         Returns: number
       }
       current_org_id: { Args: never; Returns: string }
+      mark_savings_schedule_executed: {
+        Args: { p_execution_note?: string; p_savings_calculation_id: string }
+        Returns: undefined
+      }
       update_workspace_settings:
         | {
             Args: {
@@ -2025,6 +2081,30 @@ export type Database = {
           p_project_owners_enabled: boolean
           p_project_updates_enabled: boolean
           p_require_baseline: boolean
+          p_support_projects_enabled: boolean
+          p_timezone: string
+        }
+        Returns: undefined
+      }
+      update_workspace_settings_v9: {
+        Args: {
+          p_currency_code: string
+          p_date_format: string
+          p_default_recognition_method: string
+          p_fiscal_year_start_month: number
+          p_full_name: string
+          p_hard_reduction_approval_threshold: number | null
+          p_locale: string
+          p_organization_name: string
+          p_project_business_units_enabled: boolean
+          p_project_categories_enabled: boolean
+          p_project_cost_centers_enabled: boolean
+          p_project_descriptions_enabled: boolean
+          p_project_incumbent_suppliers_enabled: boolean
+          p_project_owners_enabled: boolean
+          p_project_updates_enabled: boolean
+          p_require_baseline: boolean
+          p_savings_realization_enabled: boolean
           p_support_projects_enabled: boolean
           p_timezone: string
         }

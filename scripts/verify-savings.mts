@@ -30,6 +30,8 @@ import {
   yearOverYear,
   baselineQuality,
   chainWithBaselineQuality,
+  scheduleLifecycleRollup,
+  toExecutedSchedulePeriods,
   type ChainAnchors,
   type PeriodType,
   type ScheduleRates,
@@ -672,6 +674,36 @@ section('16. Reclassifying a baseline never changes the Total')
   near('soft: avoidance absorbs all 300,000', s.avoidance, 300_000)
   near('both total 300,000', h.total, 300_000)
   near('both total 300,000', s.total, 300_000)
+}
+
+section('17. Estimated and executed schedules coexist without double counting')
+{
+  const calculations = [
+    { id: 'estimate', calculation_status: 'estimated', gross_savings_amount: 100 },
+    { id: 'execution', calculation_status: 'executed', gross_savings_amount: 100 },
+  ]
+  const periods = [
+    { savings_calculation_id: 'estimate', period_number: 1, period_month: 1, period_year: 2027, period_months: 1, baseline_amount: 500, total_savings_amount: 50 },
+    { savings_calculation_id: 'estimate', period_number: 2, period_month: 2, period_year: 2027, period_months: 1, baseline_amount: 500, total_savings_amount: 50 },
+    { savings_calculation_id: 'execution', period_number: 1, period_month: 1, period_year: 2027, period_months: 1, baseline_amount: 500, total_savings_amount: 50, executed_baseline_amount: 400, executed_total_savings_amount: 40 },
+    { savings_calculation_id: 'execution', period_number: 2, period_month: 2, period_year: 2027, period_months: 1, baseline_amount: 500, total_savings_amount: 50, executed_baseline_amount: 400, executed_total_savings_amount: 40 },
+  ]
+  const lifecycle = scheduleLifecycleRollup(calculations, periods, new Date('2027-01-15T12:00:00Z'))
+  near('pipeline reports only estimated schedules', lifecycle.estimatedPipeline, 100)
+  near('executed reports only executed snapshots', lifecycle.executed, 80)
+  near('the original estimate remains available on executed work', lifecycle.originalEstimateOnExecuted, 100)
+  near('only elapsed executed periods accrue', lifecycle.accruedExecuted, 40)
+  near('spend addressed does not double count estimate and execution on the same project', lifecycle.spendAddressed, 1800)
+  eq('one estimated schedule', lifecycle.estimatedCount, 1)
+  eq('one executed schedule', lifecycle.executedCount, 1)
+
+  const executedRows = toExecutedSchedulePeriods(periods)
+  eq('rows without an executed snapshot are omitted', executedRows.length, 2)
+  near('executed converter uses the preserved snapshot', scheduleTotals(executedRows).total, 80)
+
+  const january = scheduleLifecycleRollup(calculations, periods, new Date('2027-12-31T12:00:00Z'), 2027)
+  near('year filtering preserves the full 2027 estimated pipeline', january.estimatedPipeline, 100)
+  near('year filtering preserves the full 2027 executed value', january.executed, 80)
 }
 
 // ---------------------------------------------------------------------
