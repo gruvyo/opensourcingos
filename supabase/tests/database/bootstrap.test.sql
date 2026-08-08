@@ -25,8 +25,8 @@ select is(
   ),
   array[
     'Facilities & Real Estate', 'Laboratory & Scientific Equipment',
-    'Logistics & Transportation', 'MRO & Industrial Supplies',
-    'Marketing & Creative', 'Packaging', 'Professional Services',
+    'Logistics & Transportation', 'Marketing & Creative',
+    'MRO & Industrial Supplies', 'Packaging', 'Professional Services',
     'Technology & Telecom'
   ]::text[],
   'the demo template has the exact eight category defaults'
