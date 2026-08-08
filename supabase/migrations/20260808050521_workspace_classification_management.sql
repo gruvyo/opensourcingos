@@ -236,7 +236,7 @@ with canonical_ids as (
   select distinct canonical_id from _cost_center_merge_map
 ), merged as (
   select
-    canonical.id as canonical_id,
+    canonical.canonical_id,
     (
       array_agg(center.business_unit_id order by center.created_at, center.id)
       filter (where center.business_unit_id is not null)
@@ -254,7 +254,7 @@ with canonical_ids as (
       from _cost_center_merge_map map
       where map.canonical_id = canonical.canonical_id
     )
-  group by canonical.id
+  group by canonical.canonical_id
 )
 update public.cost_centers canonical
 set
