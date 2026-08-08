@@ -45,7 +45,7 @@ type ReportId =
 
 type ReportValue = string | number | null
 type ReportRow = Record<string, ReportValue>
-type ColumnFormat = 'text' | 'number' | 'currency' | 'date' | 'status'
+type ColumnFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status'
 
 type ReportColumn = {
   key: string
@@ -112,6 +112,10 @@ function sortRows(rows: ReportRow[], key: string): ReportRow[] {
 
 function formatValue(value: ReportValue, format: ColumnFormat = 'text'): string {
   if (format === 'currency') return formatCurrency(num(value))
+  if (format === 'reduction') {
+    const amount = num(value)
+    return amount < 0 ? `(${formatCurrency(Math.abs(amount))})` : formatCurrency(amount)
+  }
   if (format === 'date') return formatDate(typeof value === 'string' ? value : null)
   if (format === 'number') return num(value).toLocaleString('en-US')
   if (value === null || value === '') return '—'
@@ -240,7 +244,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
     const savingsColumns: ReportColumn[] = [
       { key: 'name', label: 'Group' },
       { key: 'projects', label: 'Projects', format: 'number' },
-      { key: 'reduction', label: 'Cost Reduction', format: 'currency' },
+      { key: 'reduction', label: 'Cost Reduction', format: 'reduction' },
       { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
       { key: 'savings', label: 'Total Savings', format: 'currency' },
       { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
@@ -275,7 +279,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
           { key: 'owner', label: 'Owner' },
           { key: 'businessUnit', label: 'Business Unit' },
           { key: 'status', label: 'Status', format: 'status' },
-          { key: 'reduction', label: 'Cost Reduction', format: 'currency' },
+          { key: 'reduction', label: 'Cost Reduction', format: 'reduction' },
           { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
           { key: 'savings', label: 'Total Savings', format: 'currency' },
           { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
@@ -444,7 +448,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
                 <tr key={`${reportId}-${rowIndex}`} className="transition-colors hover:bg-[var(--surface-2)]">
                   {report.columns.map(column => {
                     const formatted = formatValue(row[column.key], column.format)
-                    const numeric = column.format === 'currency' || column.format === 'number'
+                    const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number'
                     return (
                       <td key={column.key} className={`px-4 py-3 text-sm ${numeric ? 'text-right font-medium tabular-nums text-[var(--text)]' : 'text-left text-[var(--text-2)]'}`}>
                         {column.format === 'status' ? (
