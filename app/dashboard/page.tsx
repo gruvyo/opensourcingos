@@ -20,6 +20,8 @@ import {
   portfolioRollup,
   realizationRollup,
   reportedSavings,
+  scheduleLifecycleRollup,
+  toExecutedSchedulePeriods,
   toSchedulePeriods,
   type EventLiteRow,
   type RealizationPeriodRow,
@@ -192,6 +194,7 @@ export default async function DashboardPage({
     { data: savingsCalcs, error: calcsError },
     { data: periodRows, error: periodsError },
     { data: realizationPeriods, error: realizationError },
+    { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
       supabase.from('sourcing_events').select(`
@@ -217,7 +220,9 @@ export default async function DashboardPage({
       supabase.from('savings_periods').select(`
         id, savings_calculation_id, period_number, period_month, period_year, period_months,
         baseline_amount, opening_amount, final_amount,
-        cost_reduction_amount, cost_avoidance_amount, total_savings_amount
+        cost_reduction_amount, cost_avoidance_amount, total_savings_amount,
+        executed_baseline_amount, executed_opening_amount, executed_final_amount,
+        executed_cost_reduction_amount, executed_cost_avoidance_amount, executed_total_savings_amount
       `, { count: 'exact' })
         .order('savings_calculation_id', { ascending: true })
         .order('period_number', { ascending: true })
@@ -232,12 +237,14 @@ export default async function DashboardPage({
         .order('id', { ascending: true })
         .range(from, to)
     )),
+    supabase.from('organization_settings').select('savings_realization_enabled').maybeSingle(),
   ])
 
   const loadError = eventsError?.message
     || calcsError?.message
     || periodsError?.message
     || realizationError?.message
+    || settingsError?.message
     || null
 
   const eventList = (events || []) as EventRow[]
@@ -245,13 +252,25 @@ export default async function DashboardPage({
   const realizationList = (realizationPeriods || []) as DashboardRealizationPeriod[]
 
   const rollup = portfolioRollup(calcList, eventList, { topCategories: 8 })
+  const lifecycle = scheduleLifecycleRollup(
+    calcList,
+    (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+    new Date(),
+    selectedYear ?? undefined,
+  )
 
   const periodsByCalcId = new Map<string, SchedulePeriod[]>()
+  const calculationById = new Map(calcList.map(calculation => [calculation.id, calculation]))
   for (const row of periodRows || []) {
     const calculationId = (row as { savings_calculation_id?: string }).savings_calculation_id
     if (!calculationId) continue
     const list = periodsByCalcId.get(calculationId) || []
-    list.push(toSchedulePeriods([row as SchedulePeriodRow])[0])
+    const calculation = calculationById.get(calculationId)
+    const normalized = calculation?.calculation_status === 'executed'
+      ? toExecutedSchedulePeriods([row as SchedulePeriodRow])[0]
+      : toSchedulePeriods([row as SchedulePeriodRow])[0]
+    if (!normalized) continue
+    list.push(normalized)
     periodsByCalcId.set(calculationId, list)
   }
   const byYear = portfolioByYear(calcList, periodsByCalcId)
@@ -264,23 +283,19 @@ export default async function DashboardPage({
     : realizationList.filter(period => realizationYear(period) === selectedYear)
   const realization = realizationRollup(scopedRealizationPeriods)
 
-  const realizedByYear = new Map<number, number>()
-  for (const period of realizationList) {
-    const year = realizationYear(period)
-    if (year === null) continue
-    realizedByYear.set(year, (realizedByYear.get(year) || 0) + num(period.realized_savings))
-  }
-  const trendYears = new Set([
-    ...byYear.years.map(year => year.year),
-    ...realizedByYear.keys(),
-  ])
-  const trendData: DashboardTrendPoint[] = Array.from(trendYears)
-    .sort((a, b) => a - b)
-    .map(year => ({
+  const trendData: DashboardTrendPoint[] = byYear.years.map(({ year }) => {
+    const yearLifecycle = scheduleLifecycleRollup(
+      calcList,
+      (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+      new Date(),
       year,
-      total: byYear.years.find(bucket => bucket.year === year)?.total ?? 0,
-      realized: realizedByYear.get(year) ?? 0,
-    }))
+    )
+    return {
+      year,
+      estimated: yearLifecycle.estimatedPipeline,
+      executed: yearLifecycle.executed,
+    }
+  })
 
   const typeSplit = [
     {
@@ -329,7 +344,7 @@ export default async function DashboardPage({
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text)] sm:text-3xl">Overview</h1>
           <p className="mt-1 text-sm text-[var(--text-2)]">
-            Savings performance, realization, suppliers, and active sourcing work.
+            Estimated, executed, and accrued savings, suppliers, and active sourcing work.
           </p>
         </div>
         <YearFilter years={byYear.years.map(year => year.year)} selectedYear={selectedYear} />
@@ -343,13 +358,13 @@ export default async function DashboardPage({
       )}
 
       <DashboardStats stats={{
-        totalSavings: selectedYear === null ? rollup.totalSavings : (selectedSavings?.total ?? 0),
-        totalCostReduction: selectedYear === null ? rollup.totalCostReduction : (selectedSavings?.reduction ?? null),
-        totalCostAvoidance: selectedYear === null ? rollup.totalCostAvoidance : (selectedSavings?.avoidance ?? 0),
-        booked: rollup.booked,
-        forecast: rollup.forecast,
+        spendAddressed: lifecycle.spendAddressed,
+        estimatedPipeline: lifecycle.estimatedPipeline,
+        executedSavings: lifecycle.executed,
+        accruedExecuted: lifecycle.accruedExecuted,
         realizationRate: realization.realizationRate,
         realizedSavings: realization.totalRealized,
+        savingsRealizationEnabled: settings?.savings_realization_enabled ?? false,
         scopeLabel,
       }} />
 
@@ -368,7 +383,7 @@ export default async function DashboardPage({
           <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-[var(--text)]">Savings over fiscal year</h2>
-              <p className="mt-1 text-xs text-[var(--text-3)]">Reported total compared with recorded realization</p>
+              <p className="mt-1 text-xs text-[var(--text-3)]">Estimated pipeline compared with executed savings</p>
             </div>
             <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 text-xs font-medium text-[var(--brand-ink)]">
               {scopeLabel}

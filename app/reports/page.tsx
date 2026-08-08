@@ -24,7 +24,7 @@ export default async function ReportsPage() {
     )),
     fetchPortfolioRows('Savings calculations', (from, to) => (
       supabase.from('savings_calculations').select(`
-        id, event_id, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount
+        id, event_id, calculation_status, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount
       `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })

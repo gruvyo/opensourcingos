@@ -74,6 +74,7 @@ export default async function SettingsPage() {
     projectBusinessUnitsEnabled: settings?.project_business_units_enabled ?? true,
     projectUpdatesEnabled: settings?.project_updates_enabled ?? true,
     projectIncumbentSuppliersEnabled: settings?.project_incumbent_suppliers_enabled ?? true,
+    savingsRealizationEnabled: settings?.savings_realization_enabled ?? false,
     requireBaseline: settings?.require_baseline_for_hard_reduction ?? true,
     hardReductionApprovalThreshold: settings?.hard_reduction_approval_threshold ?? null,
   }

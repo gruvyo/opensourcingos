@@ -17,8 +17,8 @@
  * forecast, not a booked result. Everything else counts as booked.
  * Keep in step with the calculation_status CHECK constraint.
  */
-export const FORECAST_STATUSES = ['identified', 'negotiated'] as const
-export const BOOKED_STATUSES = ['contracted', 'realized'] as const
+export const FORECAST_STATUSES = ['estimated', 'identified', 'negotiated'] as const
+export const BOOKED_STATUSES = ['executed', 'contracted', 'realized'] as const
 
 /** Is this calculation still a forecast (pipeline), rather than a booked result? */
 export function isForecast(c: SavingsCalcRow): boolean {
@@ -404,6 +404,12 @@ export interface SchedulePeriodRow {
   cost_reduction_amount?: number | string | null
   cost_avoidance_amount?: number | string | null
   total_savings_amount?: number | string | null
+  executed_baseline_amount?: number | string | null
+  executed_opening_amount?: number | string | null
+  executed_final_amount?: number | string | null
+  executed_cost_reduction_amount?: number | string | null
+  executed_cost_avoidance_amount?: number | string | null
+  executed_total_savings_amount?: number | string | null
 }
 
 export interface ScheduleTotals {
@@ -527,6 +533,109 @@ export function toSchedulePeriods(rows: SchedulePeriodRow[]): SchedulePeriod[] {
     avoidance: num(r.cost_avoidance_amount),
     total: num(r.total_savings_amount),
   }))
+}
+
+/** The immutable executed side of schedule rows. Rows without a snapshot are omitted. */
+export function toExecutedSchedulePeriods(rows: SchedulePeriodRow[]): SchedulePeriod[] {
+  const nullable = (v: unknown) => (v === null || v === undefined || v === '' ? null : num(v))
+  return rows
+    .filter(row => row.executed_total_savings_amount !== null && row.executed_total_savings_amount !== undefined)
+    .map((row, index) => ({
+      periodNumber: Math.round(num(row.period_number)) || index + 1,
+      month: Math.round(num(row.period_month)),
+      year: Math.round(num(row.period_year)),
+      months: num(row.period_months),
+      baseline: nullable(row.executed_baseline_amount),
+      opening: nullable(row.executed_opening_amount),
+      final: num(row.executed_final_amount),
+      reduction: nullable(row.executed_cost_reduction_amount),
+      avoidance: num(row.executed_cost_avoidance_amount),
+      total: num(row.executed_total_savings_amount),
+    }))
+}
+
+export interface ScheduleLifecycleRollup {
+  spendAddressed: number
+  estimatedPipeline: number
+  executed: number
+  accruedExecuted: number
+  originalEstimateOnExecuted: number
+  estimatedCount: number
+  executedCount: number
+}
+
+/**
+ * Portfolio lifecycle measures from the shared schedule ledger. Pipeline and
+ * executed are mutually exclusive; the original estimate on executed deals is
+ * retained separately for estimate-versus-outcome comparison.
+ */
+export function scheduleLifecycleRollup(
+  calculations: SavingsCalcRow[],
+  periodRows: Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+  asOf: Date = new Date(),
+  reportingYear?: number,
+): ScheduleLifecycleRollup {
+  const calculationById = new Map(calculations.map(calculation => [calculation.id, calculation]))
+  const seenEstimated = new Set<string>()
+  const seenExecuted = new Set<string>()
+  let spendAddressed = 0
+  let estimatedPipeline = 0
+  let executed = 0
+  let accruedExecuted = 0
+  let originalEstimateOnExecuted = 0
+
+  const currentMonthIndex = asOf.getFullYear() * 12 + asOf.getMonth()
+  for (const row of periodRows) {
+    const calculationId = row.savings_calculation_id || ''
+    const calculation = calculationById.get(calculationId)
+    if (!calculation) continue
+    const estimatedTotal = num(row.total_savings_amount)
+    const baseline = row.baseline_amount === null || row.baseline_amount === undefined
+      ? 0 : num(row.baseline_amount)
+
+    const span = Math.max(0, Math.round(num(row.period_months)))
+    const allocatedMonths = Math.max(1, span)
+    const startMonth = Math.round(num(row.period_month))
+    const startYear = Math.round(num(row.period_year))
+    const startIndex = startYear * 12 + startMonth - 1
+    let reportingMonths = 0
+    let accruedReportingMonths = 0
+    for (let monthOffset = 0; monthOffset < allocatedMonths; monthOffset++) {
+      const monthIndex = startIndex + monthOffset
+      const year = Math.floor(monthIndex / 12)
+      if (reportingYear === undefined || year === reportingYear) {
+        reportingMonths++
+        if (monthIndex <= currentMonthIndex) accruedReportingMonths++
+      }
+    }
+    const reportingFraction = reportingMonths / allocatedMonths
+
+    if (isForecast(calculation)) {
+      estimatedPipeline += estimatedTotal * reportingFraction
+      spendAddressed += baseline * reportingFraction
+      seenEstimated.add(calculationId)
+      continue
+    }
+
+    const executedTotal = num(row.executed_total_savings_amount)
+    executed += executedTotal * reportingFraction
+    originalEstimateOnExecuted += estimatedTotal * reportingFraction
+    spendAddressed += (row.executed_baseline_amount === null || row.executed_baseline_amount === undefined
+      ? baseline : num(row.executed_baseline_amount)) * reportingFraction
+    seenExecuted.add(calculationId)
+
+    accruedExecuted += executedTotal * (accruedReportingMonths / allocatedMonths)
+  }
+
+  return {
+    spendAddressed,
+    estimatedPipeline,
+    executed,
+    accruedExecuted,
+    originalEstimateOnExecuted,
+    estimatedCount: seenEstimated.size,
+    executedCount: seenExecuted.size,
+  }
 }
 
 // ---- HARD vs SOFT BASELINES (the governing principle) -----------------

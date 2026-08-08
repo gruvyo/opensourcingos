@@ -3,7 +3,43 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(216);
+select plan(222);
+
+select is(
+  (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
+  false,
+  'Savings Realization is disabled by default'
+);
+
+select is(
+  (select calculation_status from public.savings_calculations where id = '00000000-0000-4000-8000-000000000051'),
+  'executed',
+  'the fictional finalized savings record uses the executed lifecycle'
+);
+
+select is(
+  (select count(*)::bigint from public.savings_periods where savings_calculation_id = '00000000-0000-4000-8000-000000000051'),
+  3::bigint,
+  'the fictional executed result remains fully scheduled'
+);
+
+select is(
+  (select sum(executed_total_savings_amount) from public.savings_periods where savings_calculation_id = '00000000-0000-4000-8000-000000000051'),
+  900000::numeric,
+  'executed schedule periods preserve the fictional 900,000 result'
+);
+
+select is(
+  (select sum(total_savings_amount) from public.savings_periods where savings_calculation_id = '00000000-0000-4000-8000-000000000051'),
+  900000::numeric,
+  'the original estimate remains alongside the executed snapshot'
+);
+
+select ok(
+  has_function_privilege('authenticated', 'public.mark_savings_schedule_executed(uuid,text)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.mark_savings_schedule_executed(uuid,text)', 'EXECUTE'),
+  'only authenticated users may invoke the audited schedule execution function'
+);
 
 select is(
   (

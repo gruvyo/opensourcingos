@@ -14,8 +14,8 @@ import { formatCurrency } from '@/lib/utils'
 
 export type DashboardTrendPoint = {
   year: number
-  total: number
-  realized: number
+  estimated: number
+  executed: number
 }
 
 const AXIS_TICK = { fontSize: 11, fill: '#94a3b8' }
@@ -45,7 +45,7 @@ export function DashboardOverviewChart({
   }
 
   return (
-    <div className="h-64 w-full" aria-label="Total and realized savings by fiscal year">
+    <div className="h-64 w-full" aria-label="Estimated pipeline and executed savings by fiscal year">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 12, right: 12, left: -12, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
@@ -70,8 +70,8 @@ export function DashboardOverviewChart({
           <Legend wrapperStyle={{ color: 'var(--text-2)', fontSize: 12 }} />
           <Line
             type="monotone"
-            dataKey="total"
-            name="Total savings"
+            dataKey="executed"
+            name="Executed savings"
             stroke="#4f46e5"
             strokeWidth={3}
             dot={({ cx, cy, payload }) => (
@@ -88,8 +88,8 @@ export function DashboardOverviewChart({
           />
           <Line
             type="monotone"
-            dataKey="realized"
-            name="Realized savings"
+            dataKey="estimated"
+            name="Estimated pipeline"
             stroke="#10b981"
             strokeWidth={2}
             strokeDasharray="6 4"

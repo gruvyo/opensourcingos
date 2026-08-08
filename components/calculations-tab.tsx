@@ -12,14 +12,7 @@ import {
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input, Select } from '@/components/ui/input'
-
-const CALC_STATUSES = [
-  { value: 'identified', label: 'Identified' },
-  { value: 'negotiated', label: 'Negotiated' },
-  { value: 'contracted', label: 'Contracted' },
-  { value: 'realized', label: 'Realized' },
-]
+import { Select } from '@/components/ui/input'
 
 type Anchor = {
   label: string
@@ -72,15 +65,13 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const [existing, setExisting] = useState<Tables<'savings_calculations'> | null>(null)
 
   const [basis, setBasis] = useState<RateBasis>('perYear')
-  const [status, setStatus] = useState('identified')
-  const [startDate, setStartDate] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
-      const [{ data: bases }, { data: offers }, { data: calcs }, { data: ev }] = await Promise.all([
+      const [{ data: bases }, { data: offers }, { data: calcs }] = await Promise.all([
         supabase.from('baselines')
           .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected, hard_reduction_override, hard_reduction_override_reason')
           .eq('event_id', eventId),
@@ -89,7 +80,6 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           .eq('event_id', eventId),
         supabase.from('savings_calculations').select('*').eq('event_id', eventId)
           .order('created_at', { ascending: true }),
-        supabase.from('sourcing_events').select('contract_start_date, contract_end_date').eq('id', eventId).maybeSingle(),
       ])
 
       if (cancelled) return
@@ -101,11 +91,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       const calc = (calcs || [])[0] ?? null
       setExisting(calc)
       if (calc) {
-        setStatus(calc.calculation_status || 'identified')
-        setStartDate(calc.savings_start_date || '')
         setSavedAt(calc.updated_at || calc.created_at || null)
-      } else {
-        setStartDate(ev?.contract_start_date || '')
       }
       setLoading(false)
     }
@@ -173,17 +159,6 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     },
   ]
 
-  // The end date is not a separate fact: the deal term already says how long
-  // the savings run. Derive it so it can never contradict the term.
-  const derivedEnd = (() => {
-    if (!startDate) return null
-    const d = new Date(startDate + 'T00:00:00')
-    if (isNaN(d.getTime())) return null
-    d.setMonth(d.getMonth() + dealMonths)
-    d.setDate(d.getDate() - 1)          // inclusive of the final day
-    return d.toISOString().slice(0, 10)
-  })()
-
   const basisLabel = basis === 'perMonth' ? 'per month' : basis === 'perYear' ? 'per year' : `over the ${dealMonths}-month term`
 
   const save = async () => {
@@ -226,7 +201,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       // records which one carried the deal. The dashboard splits on the two
       // amount columns, not on this.
       savings_type: (termChain.reduction ?? 0) >= termChain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
-      calculation_status: status,
+      calculation_status: existing?.calculation_status === 'executed' ? 'executed' : 'estimated',
       baseline_total_amount: overTerm(bRates, !!baseline),
       opening_proposal_amount: overTerm(oRates, !!opening),
       award_total_amount: overTerm(fRates, !!final) ?? 0,
@@ -235,8 +210,6 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       cost_avoidance_amount: termChain.avoidance,
       savings_percentage: reportableSavingsPct(termChain.total, quality.isHard ? baselineOverTerm : null),
       net_savings_amount: termChain.total,
-      savings_start_date: startDate || null,
-      savings_end_date: derivedEnd,
       recognition_notes: `Derived from the selected anchors over the ${dealMonths}-month deal term.`,
       updated_by: user.id,
     }
@@ -408,35 +381,23 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           </Card>
 
           <Card className="p-4">
-            <h3 className="mb-1 text-sm font-semibold text-[var(--text)]">Reporting</h3>
+            <h3 className="mb-1 text-sm font-semibold text-[var(--text)]">Savings lifecycle</h3>
             <p className="mb-3 text-xs text-[var(--text-3)]">
-              How this figure is reported. The savings type is derived from the chain, and the end
-              date from the {dealMonths}-month term, so neither can contradict the numbers above.
+              Calculations explain the amount. The Schedule controls when it is reported and owns
+              the explicit decision to preserve this estimate as an executed result.
             </p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[var(--surface-2)] p-3">
               <div>
-                <label className="block text-xs font-medium text-[var(--text-2)]">Stage</label>
-                <Select aria-label="Stage" value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1">
-                  {CALC_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </Select>
-                <p className="mt-1 text-[11px] text-[var(--text-3)]">
-                  Identified/Negotiated report as forecast; Contracted/Realized as booked.
+                <p className="text-xs font-medium text-[var(--text-3)]">Current result</p>
+                <p className="mt-1 text-sm font-semibold capitalize text-[var(--text)]">
+                  {existing?.calculation_status === 'executed' ? 'Executed' : 'Estimated'}
                 </p>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-2)]">Savings start</label>
-                <Input aria-label="Savings start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1" />
-                <p className="mt-1 text-[11px] text-[var(--text-3)]">When the new pricing takes effect.</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-2)]">Savings end</label>
-                <div className="mt-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-2)]">
-                  {derivedEnd ?? 'set a start date'}
-                </div>
-                <p className="mt-1 text-[11px] text-[var(--text-3)]">
-                  Start + {dealMonths} months, from the Final offer term.
-                </p>
-              </div>
+              <p className="max-w-xl text-xs text-[var(--text-2)]">
+                {existing?.calculation_status === 'executed'
+                  ? 'The executed schedule preserves this result. Its commercial anchors are now read-only.'
+                  : 'Save the estimate, spread it across periods, then mark it executed from the Schedule.'}
+              </p>
             </div>
 
             {error && (
@@ -449,7 +410,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                   <Check className="h-3.5 w-3.5" /> Saved
                 </span>
               )}
-              <Button onClick={save} disabled={saving}>
+              <Button onClick={save} disabled={saving || existing?.calculation_status === 'executed'}>
                 {saving ? 'Saving...' : existing ? 'Update savings record' : 'Save savings record'}
               </Button>
             </div>

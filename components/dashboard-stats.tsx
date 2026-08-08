@@ -1,16 +1,16 @@
-import { formatCurrency, formatReduction } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
-import { ArrowDownRight, ArrowUpRight, CircleDollarSign, Gauge } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, CircleDollarSign, Gauge, CalendarCheck } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 type Stats = {
-  totalSavings: number
-  totalCostReduction: number | null
-  totalCostAvoidance: number
-  booked: number
-  forecast: number
+  spendAddressed: number
+  estimatedPipeline: number
+  executedSavings: number
+  accruedExecuted: number
   realizationRate: number
   realizedSavings: number
+  savingsRealizationEnabled: boolean
   scopeLabel: string
 }
 
@@ -66,32 +66,40 @@ function StatCard({ card }: { card: CardDef }) {
 export function DashboardStats({ stats }: { stats: Stats }) {
   const cards: CardDef[] = [
     {
-      label: 'Total Savings',
-      value: formatCurrency(stats.totalSavings),
+      label: 'Spend Addressed',
+      value: formatCurrency(stats.spendAddressed),
       icon: CircleDollarSign,
       iconClass: 'text-emerald-600 dark:text-emerald-300',
       iconBackground: 'bg-emerald-50 dark:bg-emerald-500/15',
-      sub: stats.scopeLabel === 'All years'
-        ? `${formatCurrency(stats.booked)} booked · ${formatCurrency(stats.forecast)} forecast`
-        : `${stats.scopeLabel} cost reduction + cost avoidance`,
+      sub: `${stats.scopeLabel} scheduled spend with a defensible baseline`,
     },
     {
-      label: 'Cost Reduction',
-      value: formatReduction(stats.totalCostReduction),
+      label: 'Estimated Pipeline',
+      value: formatCurrency(stats.estimatedPipeline),
       icon: ArrowDownRight,
       iconClass: 'text-indigo-600 dark:text-indigo-300',
       iconBackground: 'bg-indigo-50 dark:bg-indigo-500/15',
-      sub: 'Hard reduction against a defensible spend baseline',
+      sub: 'Scheduled savings not yet confirmed as executed',
     },
     {
-      label: 'Cost Avoidance',
-      value: formatCurrency(stats.totalCostAvoidance),
+      label: 'Executed Savings',
+      value: formatCurrency(stats.executedSavings),
       icon: ArrowUpRight,
       iconClass: 'text-violet-600 dark:text-violet-300',
       iconBackground: 'bg-violet-50 dark:bg-violet-500/15',
-      sub: 'Negotiated value below the supplier’s opening position',
+      sub: 'Confirmed commercial result preserved from the estimate',
     },
     {
+      label: 'Accrued Executed',
+      value: formatCurrency(stats.accruedExecuted),
+      icon: CalendarCheck,
+      iconClass: 'text-violet-600 dark:text-violet-300',
+      iconBackground: 'bg-violet-50 dark:bg-violet-500/15',
+      sub: 'Executed savings scheduled through the current month',
+    },
+  ]
+
+  if (stats.savingsRealizationEnabled) cards.push({
       label: 'Realization',
       value: formatCurrency(stats.realizedSavings),
       icon: Gauge,
@@ -99,11 +107,10 @@ export function DashboardStats({ stats }: { stats: Stats }) {
       iconBackground: 'bg-[var(--brand-soft)]',
       sub: `${stats.realizationRate.toFixed(1)}% of projected savings recorded as realized`,
       progress: stats.realizationRate,
-    },
-  ]
+    })
 
   return (
-    <section aria-label={`${stats.scopeLabel} portfolio summary`} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label={`${stats.scopeLabel} portfolio summary`} className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${stats.savingsRealizationEnabled ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
       {cards.map(card => <StatCard key={card.label} card={card} />)}
     </section>
   )
