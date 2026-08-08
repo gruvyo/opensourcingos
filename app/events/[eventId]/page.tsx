@@ -22,6 +22,7 @@ export default async function EventDetailPage({
     { data: categories, error: categoriesError },
     { data: businessUnits, error: businessUnitsError },
     { data: costCenters, error: costCentersError },
+    { data: choiceOptions, error: choicesError },
     { data: updates, error: updatesError },
     { data: currentProfile },
     { data: settings, error: settingsError },
@@ -45,14 +46,18 @@ export default async function EventDetailPage({
       .select('id, supplier_name')
       .order('supplier_name'),
     supabase.from('categories')
-      .select('id, category_name')
+      .select('id, category_name, active_flag')
       .order('category_name'),
     supabase.from('business_units')
-      .select('id, business_unit_name')
+      .select('id, business_unit_name, active_flag')
       .order('business_unit_name'),
     supabase.from('cost_centers')
-      .select('id, cost_center_name')
+      .select('id, cost_center_name, active_flag')
       .order('cost_center_name'),
+    supabase.from('project_choice_options')
+      .select('id, choice_type, project_type, label, active_flag')
+      .order('sort_order')
+      .order('label'),
     supabase.from('project_updates')
       .select(`
         id,
@@ -78,7 +83,7 @@ export default async function EventDetailPage({
   // that's not a load failure, it's handled by notFound() above.
   const loadError = (eventError && eventError.code !== 'PGRST116' ? eventError.message : null)
     || scopeLinesError?.message || suppliersError?.message || categoriesError?.message
-    || businessUnitsError?.message || costCentersError?.message || updatesError?.message
+    || businessUnitsError?.message || costCentersError?.message || choicesError?.message || updatesError?.message
     || settingsError?.message || null
 
   return (
@@ -102,6 +107,7 @@ export default async function EventDetailPage({
         categories={categories || []}
         businessUnits={businessUnits || []}
         costCenters={costCenters || []}
+        choiceOptions={choiceOptions || []}
         updates={updates || []}
         currentProfile={currentProfile}
         projectDescriptionsEnabled={settings?.project_descriptions_enabled ?? true}

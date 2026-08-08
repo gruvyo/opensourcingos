@@ -8,7 +8,14 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import type { Tables } from '@/lib/database.types'
 
-type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string }
+type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string; active_flag?: boolean }
+type ChoiceOption = {
+  id: string
+  choice_type: 'event_type' | 'event_status' | 'owner'
+  project_type: 'Sourcing' | 'Support' | null
+  label: string
+  active_flag: boolean
+}
 type Project = Pick<
   Tables<'sourcing_events'>,
   | 'id'
@@ -30,23 +37,13 @@ type Project = Pick<
   | 'notes'
 >
 
-const SOURCING_STATUSES = [
-  'Pipeline', 'Scoped', 'Baseline Pending', 'Baseline Approved',
-  'In Market', 'Negotiation', 'Award Recommended', 'Award Approved',
-  'Contracted', 'Implemented', 'Realized', 'Finance Validated',
-  'Closed', 'Cancelled', 'Rejected'
-]
-
-const SUPPORT_STATUSES = [
-  'Not Started', 'In Progress', 'Hold', 'Complete', 'Cancelled'
-]
-
 export function EditProjectModal({
   project,
   categories,
   businessUnits,
   costCenters,
   suppliers,
+  choiceOptions,
   projectDescriptionsEnabled,
   projectOwnersEnabled,
   projectCostCentersEnabled,
@@ -60,6 +57,7 @@ export function EditProjectModal({
   businessUnits: Option[]
   costCenters: Option[]
   suppliers: Option[]
+  choiceOptions: ChoiceOption[]
   projectDescriptionsEnabled: boolean
   projectOwnersEnabled: boolean
   projectCostCentersEnabled: boolean
@@ -219,7 +217,16 @@ export function EditProjectModal({
 
   const labelClass = 'mb-1 block text-xs font-medium text-[var(--text-2)]'
   const textareaClass = 'w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] transition-colors focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30'
-  const statuses = isSupport ? SUPPORT_STATUSES : SOURCING_STATUSES
+  const projectType = isSupport ? 'Support' : 'Sourcing'
+  const choiceValues = (choiceType: ChoiceOption['choice_type'], current: string) =>
+    choiceOptions.filter(choice =>
+      choice.choice_type === choiceType
+      && (choiceType === 'owner' ? choice.project_type === null : choice.project_type === projectType)
+      && (choice.active_flag || choice.label === current)
+    )
+  const statuses = choiceValues('event_status', form.event_status)
+  const eventTypes = choiceValues('event_type', form.event_type)
+  const owners = choiceValues('owner', form.buyer_name)
 
   return (
     <>
@@ -264,17 +271,22 @@ export function EditProjectModal({
             <div>
               <label htmlFor="ep-status" className={labelClass}>Status</label>
               <Select id="ep-status" value={form.event_status} onChange={(e) => handleChange('event_status', e.target.value)}>
-                {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                {statuses.map(status => <option key={status.id} value={status.label}>{status.label}{status.active_flag ? '' : ' (Archived)'}</option>)}
               </Select>
             </div>
             <div>
               <label htmlFor="ep-type" className={labelClass}>Event Type</label>
-              <Input id="ep-type" type="text" value={form.event_type} onChange={(e) => handleChange('event_type', e.target.value)} />
+              <Select id="ep-type" value={form.event_type} onChange={(e) => handleChange('event_type', e.target.value)}>
+                {eventTypes.map(type => <option key={type.id} value={type.label}>{type.label}{type.active_flag ? '' : ' (Archived)'}</option>)}
+              </Select>
             </div>
             {projectOwnersEnabled ? (
               <div>
                 <label htmlFor="ep-buyer" className={labelClass}>Owner / Buyer</label>
-                <Input id="ep-buyer" type="text" value={form.buyer_name} onChange={(e) => handleChange('buyer_name', e.target.value)} placeholder="e.g. Jane Smith" />
+                <Select id="ep-buyer" value={form.buyer_name} onChange={(e) => handleChange('buyer_name', e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {owners.map(owner => <option key={owner.id} value={owner.label}>{owner.label}{owner.active_flag ? '' : ' (Archived)'}</option>)}
+                </Select>
               </div>
             ) : null}
           </div>
@@ -285,7 +297,7 @@ export function EditProjectModal({
                 <label htmlFor="ep-category" className={labelClass}>Category</label>
                 <Select id="ep-category" value={form.category_id} onChange={(e) => handleChange('category_id', e.target.value)}>
                   <option value="">Select category...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.category_name}</option>)}
+                  {categories.filter(c => c.active_flag || c.id === form.category_id).map(c => <option key={c.id} value={c.id}>{c.category_name}{c.active_flag ? '' : ' (Archived)'}</option>)}
                 </Select>
               </div>
             ) : null}
@@ -294,7 +306,7 @@ export function EditProjectModal({
                 <label htmlFor="ep-bu" className={labelClass}>Business Unit</label>
                 <Select id="ep-bu" value={form.business_unit_id} onChange={(e) => handleChange('business_unit_id', e.target.value)}>
                   <option value="">Select business unit...</option>
-                  {businessUnits.map(b => <option key={b.id} value={b.id}>{b.business_unit_name}</option>)}
+                  {businessUnits.filter(b => b.active_flag || b.id === form.business_unit_id).map(b => <option key={b.id} value={b.id}>{b.business_unit_name}{b.active_flag ? '' : ' (Archived)'}</option>)}
                 </Select>
               </div>
             ) : null}
@@ -303,7 +315,7 @@ export function EditProjectModal({
                 <label htmlFor="ep-cc" className={labelClass}>Cost Center</label>
                 <Select id="ep-cc" value={form.cost_center_id} onChange={(e) => handleChange('cost_center_id', e.target.value)}>
                   <option value="">Select cost center...</option>
-                  {costCenters.map(c => <option key={c.id} value={c.id}>{c.cost_center_name}</option>)}
+                  {costCenters.filter(c => c.active_flag || c.id === form.cost_center_id).map(c => <option key={c.id} value={c.id}>{c.cost_center_name}{c.active_flag ? '' : ' (Archived)'}</option>)}
                 </Select>
               </div>
             ) : null}

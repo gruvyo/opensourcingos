@@ -27,6 +27,56 @@ values (
   'monthly'
 );
 
+insert into public.project_choice_options (
+  organization_id,
+  choice_type,
+  project_type,
+  label,
+  sort_order
+)
+values
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Renewal', 10),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Competitive Rebid', 20),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Net New Purchase', 30),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Renegotiation', 40),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Demand Reduction', 50),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Specification Change', 60),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Supplier Consolidation', 70),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Market Index / Commodity', 80),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Payment Terms', 90),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Rebate / Credit', 100),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'One-Time Fee Waiver', 110),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Early Payment Discount', 120),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'TCO Improvement', 130),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Productivity Improvement', 140),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Support', 'Vendor Issue', 10),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Support', 'Support Ticket', 20),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Support', 'Contract Question', 30),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Support', 'Billing Dispute', 40),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Support', 'Service Request', 50),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Support', 'Compliance/Legal', 60),
+  ('00000000-0000-4000-8000-000000000001', 'event_type', 'Support', 'Other', 70),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Pipeline', 10),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Scoped', 20),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Baseline Pending', 30),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Baseline Approved', 40),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'In Market', 50),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Negotiation', 60),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Award Recommended', 70),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Award Approved', 80),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Contracted', 90),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Implemented', 100),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Realized', 110),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Finance Validated', 120),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Closed', 130),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Cancelled', 140),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Rejected', 150),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'Not Started', 10),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'In Progress', 20),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'Hold', 30),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'Complete', 40),
+  ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'Cancelled', 50);
+
 insert into public.categories (id, organization_id, category_name, default_baseline_type)
 values (
   '00000000-0000-4000-8000-000000000011',

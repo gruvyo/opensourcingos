@@ -1,6 +1,7 @@
 import { CircleUserRound, Database, KeyRound, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { SettingsForm } from '@/components/settings-form'
+import { ClassificationManager, type ManagedClassificationOption } from '@/components/classification-manager'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
@@ -15,17 +16,45 @@ export default async function SettingsPage() {
     : { data: null, error: null }
   const profile = profileResult.data
 
-  const [organizationResult, settingsResult] = profile?.organization_id
+  const [organizationResult, settingsResult, choicesResult, categoriesResult, businessUnitsResult, costCentersResult] = profile?.organization_id
     ? await Promise.all([
       supabase.from('organizations').select('id, name').eq('id', profile.organization_id).maybeSingle(),
       supabase.from('organization_settings').select('*').eq('organization_id', profile.organization_id).maybeSingle(),
+      supabase.from('project_choice_options').select('id, choice_type, project_type, label, active_flag, sort_order').eq('organization_id', profile.organization_id).order('sort_order').order('label'),
+      supabase.from('categories').select('id, category_name, active_flag').eq('organization_id', profile.organization_id).order('category_name'),
+      supabase.from('business_units').select('id, business_unit_name, active_flag').eq('organization_id', profile.organization_id).order('business_unit_name'),
+      supabase.from('cost_centers').select('id, cost_center_name, active_flag').eq('organization_id', profile.organization_id).order('cost_center_name'),
     ])
-    : [{ data: null, error: null }, { data: null, error: null }]
+    : [
+      { data: null, error: null }, { data: null, error: null }, { data: [], error: null },
+      { data: [], error: null }, { data: [], error: null }, { data: [], error: null },
+    ]
 
   const organization = organizationResult.data
   const settings = settingsResult.data
-  const loadError = authError?.message || profileResult.error?.message || organizationResult.error?.message || settingsResult.error?.message || null
+  const loadError = authError?.message || profileResult.error?.message || organizationResult.error?.message
+    || settingsResult.error?.message || choicesResult.error?.message || categoriesResult.error?.message
+    || businessUnitsResult.error?.message || costCentersResult.error?.message || null
   const canEdit = profile?.role === 'admin'
+
+  const classificationOptions: ManagedClassificationOption[] = [
+    ...(choicesResult.data || []).map(choice => ({
+      id: choice.id,
+      kind: choice.choice_type as ManagedClassificationOption['kind'],
+      label: choice.label,
+      active: choice.active_flag,
+      projectType: choice.project_type as ManagedClassificationOption['projectType'],
+    })),
+    ...(categoriesResult.data || []).map(category => ({
+      id: category.id, kind: 'category' as const, label: category.category_name, active: category.active_flag,
+    })),
+    ...(businessUnitsResult.data || []).map(unit => ({
+      id: unit.id, kind: 'business_unit' as const, label: unit.business_unit_name, active: unit.active_flag,
+    })),
+    ...(costCentersResult.data || []).map(center => ({
+      id: center.id, kind: 'cost_center' as const, label: center.cost_center_name, active: center.active_flag,
+    })),
+  ]
 
   const values = {
     organizationName: organization?.name || '',
@@ -58,7 +87,10 @@ export default async function SettingsPage() {
       {loadError ? <div className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300" role="alert"><strong>Settings are incomplete.</strong> {loadError}</div> : null}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="p-5 sm:p-6"><SettingsForm values={values} canEdit={canEdit} /></Card>
+        <div className="space-y-6">
+          <Card className="p-5 sm:p-6"><SettingsForm values={values} canEdit={canEdit} /></Card>
+          <Card className="p-5 sm:p-6"><ClassificationManager options={classificationOptions} canEdit={canEdit} /></Card>
+        </div>
 
         <aside className="space-y-4">
           <Card className="p-5">

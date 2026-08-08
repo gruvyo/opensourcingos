@@ -42,9 +42,10 @@ type DormantScopeLine = ScopeLine & Pick<
   category: CategoryRelation | null
 }
 type SupplierOption = Pick<Tables<'suppliers'>, 'id' | 'supplier_name'>
-type CategoryOption = Pick<Tables<'categories'>, 'id' | 'category_name'>
-type BusinessUnitOption = Pick<Tables<'business_units'>, 'id' | 'business_unit_name'>
-type CostCenterOption = Pick<Tables<'cost_centers'>, 'id' | 'cost_center_name'>
+type CategoryOption = Pick<Tables<'categories'>, 'id' | 'category_name' | 'active_flag'>
+type BusinessUnitOption = Pick<Tables<'business_units'>, 'id' | 'business_unit_name' | 'active_flag'>
+type CostCenterOption = Pick<Tables<'cost_centers'>, 'id' | 'cost_center_name' | 'active_flag'>
+type ChoiceOption = Pick<Tables<'project_choice_options'>, 'id' | 'choice_type' | 'project_type' | 'label' | 'active_flag'>
 
 function getFirst<T>(obj: ToOneRelation<T>): T | null {
   if (!obj) return null
@@ -127,6 +128,7 @@ export function EventDetail({
   categories,
   businessUnits,
   costCenters,
+  choiceOptions,
   updates,
   currentProfile,
   projectDescriptionsEnabled,
@@ -141,6 +143,7 @@ export function EventDetail({
   categories: CategoryOption[]
   businessUnits: BusinessUnitOption[]
   costCenters: CostCenterOption[]
+  choiceOptions: ChoiceOption[]
   updates: ProjectUpdate[]
   currentProfile: CurrentProfile
   projectDescriptionsEnabled: boolean
@@ -246,6 +249,7 @@ export function EventDetail({
           businessUnits={businessUnits}
           costCenters={costCenters}
           suppliers={suppliers}
+          choiceOptions={choiceOptions as Parameters<typeof EditProjectModal>[0]['choiceOptions']}
           projectDescriptionsEnabled={projectDescriptionsEnabled}
           projectOwnersEnabled={projectOwnersEnabled}
           projectCostCentersEnabled={projectCostCentersEnabled}
