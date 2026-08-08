@@ -17,6 +17,13 @@ Archived choices remain visible on historical projects but cannot be selected
 for new or changed values. Renaming a text-backed choice updates projects and
 reporting consistently; no project record is deleted or silently cleared.
 
+The beta template keeps these concepts separate. Categories describe what is
+being bought, using eight broad product/service markets. Business Units describe
+the internal organization that owns demand, using four editable sample units.
+Cost Centers receive no generic defaults because they are organization-specific
+accounting values; administrators add the values that match their own chart of
+accounts. Existing Cost Center relationships remain protected and auditable.
+
 Normalized supplier names are unique within each workspace. Membership
 invitations, performance reviews, certifications, duplicate merge, and portfolio
 concentration remain Release 3 work.

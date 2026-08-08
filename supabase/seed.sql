@@ -63,19 +63,22 @@ values
   ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'Cancelled', 50);
 
 insert into public.categories (id, organization_id, category_name, default_baseline_type)
-values (
-  '00000000-0000-4000-8000-000000000011',
-  '00000000-0000-4000-8000-000000000001',
-  'Enterprise Software',
-  'Current Contract'
-);
+values
+  ('000000c1-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'Technology & Telecom', 'Current Contract'),
+  ('000000c1-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Professional Services', 'Current Contract'),
+  ('000000c1-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000001', 'Marketing & Creative', 'Prior 12-Month Actual'),
+  ('000000c1-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000001', 'Facilities & Real Estate', 'Current Contract'),
+  ('000000c1-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000001', 'Logistics & Transportation', 'Prior 12-Month Actual'),
+  ('000000c1-0000-4000-8000-000000000006', '00000000-0000-4000-8000-000000000001', 'MRO & Industrial Supplies', 'Prior 12-Month Actual'),
+  ('000000c1-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000001', 'Packaging', 'Current Contract'),
+  ('000000c1-0000-4000-8000-000000000008', '00000000-0000-4000-8000-000000000001', 'Laboratory & Scientific Equipment', 'Current Contract');
 
 insert into public.business_units (id, organization_id, business_unit_name)
-values (
-  '00000000-0000-4000-8000-000000000012',
-  '00000000-0000-4000-8000-000000000001',
-  'Example Operations'
-);
+values
+  ('000000b1-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'Technology'),
+  ('000000b1-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Operations'),
+  ('000000b1-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000001', 'Manufacturing'),
+  ('000000b1-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000001', 'Corporate Services');
 
 insert into public.suppliers (
   id,
@@ -124,8 +127,8 @@ values (
   'ERP Platform Renewal',
   'Fictional reference deal demonstrating the three-anchor savings chain.',
   'Contract Renewal',
-  '00000000-0000-4000-8000-000000000011',
-  '00000000-0000-4000-8000-000000000012',
+  '000000c1-0000-4000-8000-000000000001',
+  '000000b1-0000-4000-8000-000000000001',
   '00000000-0000-4000-8000-000000000013',
   '00000000-0000-4000-8000-000000000013',
   'Award & Contracting',

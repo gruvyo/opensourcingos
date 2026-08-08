@@ -33,9 +33,9 @@ const sections: Section[] = [
   { title: 'Sourcing statuses', description: 'Workflow stages available to sourcing projects.', kind: 'event_status', projectType: 'Sourcing' },
   { title: 'Support statuses', description: 'Workflow stages available to support projects.', kind: 'event_status', projectType: 'Support' },
   { title: 'Owners / Buyers', description: 'Workspace-managed names available on projects.', kind: 'owner' },
-  { title: 'Categories', description: 'Portfolio categories used in projects and reporting.', kind: 'category' },
-  { title: 'Business Units', description: 'Organizational units used in projects and reporting.', kind: 'business_unit' },
-  { title: 'Cost Centers', description: 'Financial classifications available on projects.', kind: 'cost_center' },
+  { title: 'Categories', description: 'What is being bought, grouped for portfolio and spend reporting.', kind: 'category' },
+  { title: 'Business Units', description: 'Internal organizations that own demand for a project.', kind: 'business_unit' },
+  { title: 'Cost Centers', description: 'Your organization\'s accounting values. No generic defaults are created.', kind: 'cost_center' },
 ]
 
 const initialState: ClassificationActionState = { status: 'idle', message: '' }
@@ -145,7 +145,9 @@ export function ClassificationManager({
               <p className="mt-1 text-xs text-[var(--text-3)]">{section.description}</p>
               <div className="mt-3">
                 {matching.length ? matching.map(option => <ChoiceRow key={option.id} option={option} canEdit={canEdit} />) : (
-                  <p className="py-3 text-xs text-[var(--text-3)]">No choices yet.</p>
+                  <p className="py-3 text-xs text-[var(--text-3)]">
+                    {section.kind === 'cost_center' ? 'No Cost Centers yet. Add the accounting values used by your organization.' : 'No choices yet.'}
+                  </p>
                 )}
               </div>
               {canEdit ? <AddChoiceForm section={section} /> : null}

@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(211);
+select plan(216);
 
 select is(
   (
@@ -14,6 +14,67 @@ select is(
   ),
   22::bigint,
   'all 22 public application tables exist'
+);
+
+select is(
+  (
+    select array_agg(category_name order by category_name)
+    from public.categories
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and active_flag
+  ),
+  array[
+    'Facilities & Real Estate', 'Laboratory & Scientific Equipment',
+    'Logistics & Transportation', 'Marketing & Creative',
+    'MRO & Industrial Supplies', 'Packaging', 'Professional Services',
+    'Technology & Telecom'
+  ]::text[],
+  'the demo template has the exact eight category defaults'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from public.categories
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and default_baseline_type is null
+  ),
+  0::bigint,
+  'every default category has an explicit baseline type'
+);
+
+select is(
+  (
+    select array_agg(business_unit_name order by business_unit_name)
+    from public.business_units
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and active_flag
+  ),
+  array['Corporate Services', 'Manufacturing', 'Operations', 'Technology']::text[],
+  'the demo template has the exact four Business Unit defaults'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from public.cost_centers
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+  ),
+  0::bigint,
+  'the demo template creates no fictional Cost Center defaults'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.sourcing_events as event
+    join public.categories as category on category.id = event.category_id
+    join public.business_units as unit on unit.id = event.business_unit_id
+    where event.id = '00000000-0000-4000-8000-000000000021'
+      and category.category_name = 'Technology & Telecom'
+      and unit.business_unit_name = 'Technology'
+  ),
+  'the reference ERP project uses the refreshed Category and Business Unit'
 );
 
 select is(
