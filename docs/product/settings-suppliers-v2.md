@@ -4,11 +4,17 @@
 
 Release 2 is live on `main`: workspace settings are editable and atomic,
 administrators can govern Support projects and the optional project description,
-owner, Cost Center, and Category fields, supplier records can be created
+owner, Cost Center, Category, and Business Unit fields, supplier records can be created
 independently, and supplier profiles reconcile projects, awards, negotiated
 savings, realized savings, and audit history. Database policies make viewers
 read-only while administrators and procurement users receive the intended
 editing rights.
+
+Workspace Classification Management extends Settings with administrator-managed
+Event Type, Status, Owner, Category, Business Unit, and Cost Center choices.
+Archived choices remain visible on historical projects but cannot be selected
+for new or changed values. Renaming a text-backed choice updates projects and
+reporting consistently; no project record is deleted or silently cleared.
 
 Normalized supplier names are unique within each workspace. Membership
 invitations, performance reviews, certifications, duplicate merge, and portfolio
@@ -48,6 +54,9 @@ workspace-scoped, and auditable.
    health. Secrets remain in the deployment platform, never in browser forms.
 5. **Audit and safety** — recent administrative changes, workspace ID, RLS
    status, and clearly separated destructive actions.
+6. **Workspace choices** — active and archived Event Types, Statuses, Owners,
+   Categories, Business Units, and Cost Centers used by project forms and
+   portfolio reporting.
 
 ### Data additions
 
@@ -56,6 +65,24 @@ workspace-scoped, and auditable.
 - `organization_memberships` or an extension of `profiles`: explicit status,
   invitation state, and role-change timestamps.
 - `audit_log`: actor, workspace, action, entity, before/after summary, and time.
+- `project_choice_options`: organization-scoped Event Type, Status, and Owner
+  choices. Existing Category, Business Unit, and Cost Center tables use the
+  same active/archive behavior.
+
+### Workspace-choice behavior
+
+- Adding a choice makes it available to new and edited projects immediately.
+- Renaming an Event Type, Status, or Owner updates projects using that choice;
+  relational Category, Business Unit, and Cost Center names update through
+  their existing references.
+- Archiving removes a choice from new selections. Existing projects keep and
+  display it, and unrelated edits remain possible.
+- Restoring makes an archived choice selectable again.
+- Choice names are unique within their workspace and classification scope,
+  without regard to capitalization or surrounding spaces.
+- Only workspace administrators can add, rename, archive, or restore choices.
+  Database policies and project-write triggers enforce these rules even when a
+  client bypasses the application form.
 
 All new tables require forced Row Level Security, organization-scoped policies,
 indexes on `organization_id`, and tests proving cross-workspace isolation.

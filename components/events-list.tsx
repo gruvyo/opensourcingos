@@ -36,29 +36,13 @@ function getFirst<T>(obj: ToOneRelation<T>): T | null {
   return obj
 }
 
-const EVENT_STATUSES = [
-  'Pipeline', 'Scoped', 'Baseline Pending', 'Baseline Approved',
-  'In Market', 'Negotiation', 'Award Recommended', 'Award Approved',
-  'Contracted', 'Implemented', 'Realized', 'Finance Validated',
-  'Closed', 'Cancelled', 'Rejected',
-  'Not Started', 'In Progress', 'Hold', 'Complete',
-]
-
-const EVENT_TYPES = [
-  'Renewal', 'Competitive Rebid', 'Net New Purchase', 'Renegotiation',
-  'Demand Reduction', 'Specification Change', 'Supplier Consolidation',
-  'Market Index / Commodity', 'Payment Terms', 'Rebate / Credit',
-  'One-Time Fee Waiver', 'Early Payment Discount', 'TCO Improvement',
-  'Productivity Improvement',
-  'Vendor Issue', 'Support Ticket', 'Contract Question',
-  'Billing Dispute', 'Service Request', 'Compliance/Legal', 'Other',
-]
-
 export function EventsList({ events }: { events: EventRow[] }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [projectTypeFilter, setProjectTypeFilter] = useState('')
+  const eventStatuses = useMemo(() => Array.from(new Set(events.map(event => event.event_status))).sort(), [events])
+  const eventTypes = useMemo(() => Array.from(new Set(events.map(event => event.event_type))).sort(), [events])
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
@@ -91,13 +75,13 @@ export function EventsList({ events }: { events: EventRow[] }) {
         </Select>
         <Select aria-label="Filter by status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto">
           <option value="">All Statuses</option>
-          {EVENT_STATUSES.map((status) => (
+          {eventStatuses.map((status) => (
             <option key={status} value={status}>{status}</option>
           ))}
         </Select>
         <Select aria-label="Filter by event type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto">
           <option value="">All Types</option>
-          {EVENT_TYPES.map((type) => (
+          {eventTypes.map((type) => (
             <option key={type} value={type}>{type}</option>
           ))}
         </Select>

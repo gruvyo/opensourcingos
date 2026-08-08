@@ -491,7 +491,7 @@ export type Database = {
       }
       business_units: {
         Row: {
-          active_flag: boolean | null
+          active_flag: boolean
           business_unit_name: string
           created_at: string | null
           id: string
@@ -499,7 +499,7 @@ export type Database = {
           parent_business_unit_id: string | null
         }
         Insert: {
-          active_flag?: boolean | null
+          active_flag?: boolean
           business_unit_name: string
           created_at?: string | null
           id?: string
@@ -507,7 +507,7 @@ export type Database = {
           parent_business_unit_id?: string | null
         }
         Update: {
-          active_flag?: boolean | null
+          active_flag?: boolean
           business_unit_name?: string
           created_at?: string | null
           id?: string
@@ -533,6 +533,7 @@ export type Database = {
       }
       categories: {
         Row: {
+          active_flag: boolean
           category_name: string
           created_at: string | null
           default_baseline_type: string | null
@@ -541,6 +542,7 @@ export type Database = {
           parent_category_id: string | null
         }
         Insert: {
+          active_flag?: boolean
           category_name: string
           created_at?: string | null
           default_baseline_type?: string | null
@@ -549,6 +551,7 @@ export type Database = {
           parent_category_id?: string | null
         }
         Update: {
+          active_flag?: boolean
           category_name?: string
           created_at?: string | null
           default_baseline_type?: string | null
@@ -575,7 +578,7 @@ export type Database = {
       }
       cost_centers: {
         Row: {
-          active_flag: boolean | null
+          active_flag: boolean
           business_unit_id: string | null
           cost_center_name: string
           created_at: string | null
@@ -584,7 +587,7 @@ export type Database = {
           organization_id: string | null
         }
         Insert: {
-          active_flag?: boolean | null
+          active_flag?: boolean
           business_unit_id?: string | null
           cost_center_name: string
           created_at?: string | null
@@ -593,7 +596,7 @@ export type Database = {
           organization_id?: string | null
         }
         Update: {
-          active_flag?: boolean | null
+          active_flag?: boolean
           business_unit_id?: string | null
           cost_center_name?: string
           created_at?: string | null
@@ -846,6 +849,70 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_choice_options: {
+        Row: {
+          active_flag: boolean
+          choice_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          organization_id: string
+          project_type: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          active_flag?: boolean
+          choice_type: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          organization_id: string
+          project_type?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          active_flag?: boolean
+          choice_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          organization_id?: string
+          project_type?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_choice_options_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_choice_options_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_choice_options_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

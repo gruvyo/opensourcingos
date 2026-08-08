@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(153);
+select plan(170);
 
 select is(
   (
@@ -12,8 +12,8 @@ select is(
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
   ),
-  21::bigint,
-  'all 21 public application tables exist'
+  22::bigint,
+  'all 22 public application tables exist'
 );
 
 select is(
@@ -378,6 +378,11 @@ select throws_ok(
 insert into public.organizations (id, name)
 values ('00000000-0000-4000-8000-000000000019', 'No settings workspace');
 
+insert into public.project_choice_options (organization_id, choice_type, project_type, label)
+values
+  ('00000000-0000-4000-8000-000000000019', 'event_type', 'Support', 'Other'),
+  ('00000000-0000-4000-8000-000000000019', 'event_status', 'Support', 'Not Started');
+
 select lives_ok(
   $$
     insert into public.sourcing_events (
@@ -631,6 +636,11 @@ select throws_ok(
 insert into public.organizations (id, name)
 values ('90000000-0000-4000-8000-000000000025', 'No description settings workspace');
 
+insert into public.project_choice_options (organization_id, choice_type, project_type, label)
+values
+  ('90000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('90000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
+
 select lives_ok(
   $$
     insert into public.sourcing_events (
@@ -771,6 +781,15 @@ select ok(
   'service role can execute project owner enforcement'
 );
 
+insert into public.project_choice_options (organization_id, choice_type, project_type, label)
+values
+  ('00000000-0000-4000-8000-000000000001', 'owner', null, 'Owner to preserve'),
+  ('00000000-0000-4000-8000-000000000001', 'owner', null, 'Replacement owner'),
+  ('00000000-0000-4000-8000-000000000001', 'owner', null, 'Blocked owner'),
+  ('00000000-0000-4000-8000-000000000001', 'owner', null, 'Late owner'),
+  ('00000000-0000-4000-8000-000000000001', 'owner', null, 'Owner after re-enabling')
+on conflict do nothing;
+
 insert into public.sourcing_events (
   id,
   organization_id,
@@ -895,6 +914,12 @@ select throws_ok(
 
 insert into public.organizations (id, name)
 values ('a1000000-0000-4000-8000-000000000025', 'No project owner settings workspace');
+
+insert into public.project_choice_options (organization_id, choice_type, project_type, label)
+values
+  ('a1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('a1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline'),
+  ('a1000000-0000-4000-8000-000000000025', 'owner', null, 'Allowed by the default');
 
 select lives_ok(
   $$
@@ -1174,6 +1199,11 @@ select throws_ok(
 
 insert into public.organizations (id, name)
 values ('b1000000-0000-4000-8000-000000000025', 'No project Cost Center settings workspace');
+
+insert into public.project_choice_options (organization_id, choice_type, project_type, label)
+values
+  ('b1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('b1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
 
 insert into public.cost_centers (id, organization_id, cost_center_name)
 values ('b1000000-0000-4000-8000-000000000026', 'b1000000-0000-4000-8000-000000000025', 'Default-enabled Cost Center');
@@ -1464,6 +1494,11 @@ select throws_ok(
 insert into public.organizations (id, name)
 values ('c1000000-0000-4000-8000-000000000025', 'No project Category settings workspace');
 
+insert into public.project_choice_options (organization_id, choice_type, project_type, label)
+values
+  ('c1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('c1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
+
 insert into public.categories (id, organization_id, category_name)
 values ('c1000000-0000-4000-8000-000000000026', 'c1000000-0000-4000-8000-000000000025', 'Default-enabled Project Category');
 
@@ -1753,6 +1788,11 @@ select throws_ok(
 insert into public.organizations (id, name)
 values ('d1000000-0000-4000-8000-000000000025', 'No project Business Unit settings workspace');
 
+insert into public.project_choice_options (organization_id, choice_type, project_type, label)
+values
+  ('d1000000-0000-4000-8000-000000000025', 'event_type', 'Sourcing', 'Renewal'),
+  ('d1000000-0000-4000-8000-000000000025', 'event_status', 'Sourcing', 'Pipeline');
+
 insert into public.business_units (id, organization_id, business_unit_name)
 values ('d1000000-0000-4000-8000-000000000026', 'd1000000-0000-4000-8000-000000000025', 'Default-enabled Project Business Unit');
 
@@ -1808,6 +1848,226 @@ where id in (
 
 delete from public.organizations
 where id = 'd1000000-0000-4000-8000-000000000025';
+
+select ok(
+  (
+    select c.relforcerowsecurity
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'project_choice_options'
+  ),
+  'workspace choices force row-level security'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from public.project_choice_options
+    where organization_id = '00000000-0000-4000-8000-000000000001'
+      and choice_type in ('event_type', 'event_status')
+  ),
+  41::bigint,
+  'the demo workspace receives all built-in project types and statuses'
+);
+
+select ok(
+  (
+    select count(*) = 3
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name in ('categories', 'business_units', 'cost_centers')
+      and column_name = 'active_flag'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'Categories, Business Units, and Cost Centers support non-destructive archiving'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_choice_options()'::regprocedure
+  ),
+  'workspace choice enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_choice_options()'::regprocedure
+  ),
+  'workspace choice enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'sourcing_events'
+      and t.tgname = 'zz_sourcing_events_enforce_project_choice_options'
+      and not t.tgisinternal
+  ),
+  'projects have database-level workspace choice enforcement'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_project_choice_options()', 'EXECUTE'),
+  'anonymous users cannot execute workspace choice enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_project_choice_options()', 'EXECUTE'),
+  'signed-in users cannot execute workspace choice enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_project_choice_options()', 'EXECUTE'),
+  'service role can execute workspace choice enforcement'
+);
+
+insert into public.project_choice_options (
+  id, organization_id, choice_type, project_type, label
+) values
+  ('e1000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'event_type', 'Sourcing', 'Custom Project Type'),
+  ('e1000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'event_status', 'Sourcing', 'Custom Status');
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id, organization_id, event_name, event_type, event_status, project_type
+    ) values (
+      'e1000000-0000-4000-8000-000000000011',
+      '00000000-0000-4000-8000-000000000001',
+      'Managed choice project',
+      'Custom Project Type',
+      'Custom Status',
+      'Sourcing'
+    )
+  $$,
+  'custom workspace choices can be used on a project'
+);
+
+update public.project_choice_options
+set active_flag = false
+where id = 'e1000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set event_name = 'Managed choice project updated'
+    where id = 'e1000000-0000-4000-8000-000000000011'
+  $$,
+  'unrelated edits preserve an archived historical choice'
+);
+
+insert into public.sourcing_events (
+  id, organization_id, event_name, event_type, event_status, project_type
+) values (
+  'e1000000-0000-4000-8000-000000000012',
+  '00000000-0000-4000-8000-000000000001',
+  'Active choice project',
+  'Renewal',
+  'Pipeline',
+  'Sourcing'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set event_type = 'Custom Project Type'
+    where id = 'e1000000-0000-4000-8000-000000000012'
+  $$,
+  '23514',
+  'Project type is not an active workspace choice',
+  'archived project types cannot be selected on another project'
+);
+
+update public.project_choice_options
+set label = 'Renamed Custom Status'
+where id = 'e1000000-0000-4000-8000-000000000002';
+
+select is(
+  (
+    select event_status
+    from public.sourcing_events
+    where id = 'e1000000-0000-4000-8000-000000000011'
+  ),
+  'Renamed Custom Status',
+  'renaming a managed text choice updates the projects that use it'
+);
+
+insert into public.categories (
+  id, organization_id, category_name, active_flag
+) values (
+  'e1000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000001',
+  'Archived Category',
+  false
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set category_id = 'e1000000-0000-4000-8000-000000000021'
+    where id = 'e1000000-0000-4000-8000-000000000012'
+  $$,
+  '23514',
+  'Project Category is not an active workspace choice',
+  'archived relational choices cannot be newly selected'
+);
+
+select throws_ok(
+  $$
+    insert into public.project_choice_options (
+      organization_id, choice_type, project_type, label
+    ) values (
+      '00000000-0000-4000-8000-000000000001',
+      'event_status',
+      'Sourcing',
+      'renamed custom status'
+    )
+  $$,
+  '23505',
+  'duplicate key value violates unique constraint "uq_project_choice_options_org_type_label"',
+  'workspace choices are unique without regard to case or surrounding spaces'
+);
+
+delete from public.sourcing_events
+where id in ('e1000000-0000-4000-8000-000000000011', 'e1000000-0000-4000-8000-000000000012');
+delete from public.categories where id = 'e1000000-0000-4000-8000-000000000021';
+delete from public.project_choice_options
+where id in ('e1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000002');
+
+insert into public.organizations (id, name)
+values ('e1000000-0000-4000-8000-000000000031', 'Single managed choice workspace');
+insert into public.project_choice_options (
+  id, organization_id, choice_type, project_type, label
+) values (
+  'e1000000-0000-4000-8000-000000000032',
+  'e1000000-0000-4000-8000-000000000031',
+  'event_status',
+  'Sourcing',
+  'Only Status'
+);
+
+select throws_ok(
+  $$
+    update public.project_choice_options
+    set active_flag = false
+    where id = 'e1000000-0000-4000-8000-000000000032'
+  $$,
+  '23514',
+  'At least one active project choice is required for this project type',
+  'the last active type or status cannot be archived'
+);
+
+delete from public.organizations
+where id = 'e1000000-0000-4000-8000-000000000031';
 
 select ok(
   (
@@ -1868,6 +2128,18 @@ select is(
   ),
   1::bigint,
   'first signup receives a private copy of the fictional project'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from public.project_choice_options choice
+    join public.profiles profile on profile.organization_id = choice.organization_id
+    where profile.id = '10000000-0000-4000-8000-000000000001'
+      and choice.choice_type in ('event_type', 'event_status')
+  ),
+  41::bigint,
+  'first signup receives an isolated copy of the managed project choices'
 );
 
 insert into auth.users (

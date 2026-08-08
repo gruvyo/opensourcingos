@@ -11,19 +11,21 @@ export default async function NewEventPage() {
     { data: businessUnits, error: businessUnitsError },
     { data: costCenters, error: costCentersError },
     { data: suppliers, error: suppliersError },
+    { data: choiceOptions, error: choicesError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
-    supabase.from('categories').select('id, category_name').order('category_name'),
-    supabase.from('business_units').select('id, business_unit_name').order('business_unit_name'),
-    supabase.from('cost_centers').select('id, cost_center_name, business_unit_id').order('cost_center_name'),
+    supabase.from('categories').select('id, category_name').eq('active_flag', true).order('category_name'),
+    supabase.from('business_units').select('id, business_unit_name').eq('active_flag', true).order('business_unit_name'),
+    supabase.from('cost_centers').select('id, cost_center_name, business_unit_id').eq('active_flag', true).order('cost_center_name'),
     supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
+    supabase.from('project_choice_options').select('id, choice_type, project_type, label').eq('active_flag', true).order('sort_order').order('label'),
     supabase.from('organization_settings').select('currency_code, support_projects_enabled, project_descriptions_enabled, project_owners_enabled, project_cost_centers_enabled, project_categories_enabled, project_business_units_enabled').maybeSingle(),
   ])
 
   // A failed query here would render as an empty dropdown, which is indistinguishable
   // from a genuinely empty list. Say which one it is.
   const loadError = categoriesError?.message || businessUnitsError?.message
-    || costCentersError?.message || suppliersError?.message || settingsError?.message || null
+    || costCentersError?.message || suppliersError?.message || choicesError?.message || settingsError?.message || null
 
   return (
     <div className="p-8">
@@ -50,6 +52,7 @@ export default async function NewEventPage() {
         businessUnits={businessUnits || []}
         costCenters={costCenters || []}
         suppliers={suppliers || []}
+        choiceOptions={(choiceOptions || []) as Parameters<typeof EventForm>[0]['choiceOptions']}
         defaultCurrency={settings?.currency_code || 'USD'}
         supportProjectsEnabled={settings?.support_projects_enabled ?? true}
         projectDescriptionsEnabled={settings?.project_descriptions_enabled ?? true}

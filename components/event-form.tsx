@@ -9,37 +9,19 @@ import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string }
-
-const EVENT_TYPES = [
-  'Renewal', 'Competitive Rebid', 'Net New Purchase', 'Renegotiation',
-  'Demand Reduction', 'Specification Change', 'Supplier Consolidation',
-  'Market Index / Commodity', 'Payment Terms', 'Rebate / Credit',
-  'One-Time Fee Waiver', 'Early Payment Discount', 'TCO Improvement',
-  'Productivity Improvement'
-]
-
-const SOURCING_STATUSES = [
-  'Pipeline', 'Scoped', 'Baseline Pending', 'Baseline Approved',
-  'In Market', 'Negotiation', 'Award Recommended', 'Award Approved',
-  'Contracted', 'Implemented', 'Realized', 'Finance Validated',
-  'Closed', 'Cancelled', 'Rejected'
-]
-
-const SUPPORT_STATUSES = [
-  'Not Started', 'In Progress', 'Hold', 'Complete', 'Cancelled'
-]
-
-const SUPPORT_TYPES = [
-  'Vendor Issue', 'Support Ticket', 'Contract Question',
-  'Billing Dispute', 'Service Request', 'Compliance/Legal',
-  'Other'
-]
+type ChoiceOption = {
+  id: string
+  choice_type: 'event_type' | 'event_status' | 'owner'
+  project_type: 'Sourcing' | 'Support' | null
+  label: string
+}
 
 export function EventForm({
   categories,
   businessUnits,
   costCenters,
   suppliers: initialSuppliers,
+  choiceOptions,
   defaultCurrency,
   supportProjectsEnabled,
   projectDescriptionsEnabled,
@@ -52,6 +34,7 @@ export function EventForm({
   businessUnits: Option[]
   costCenters: Option[]
   suppliers: Option[]
+  choiceOptions: ChoiceOption[]
   defaultCurrency: string
   supportProjectsEnabled: boolean
   projectDescriptionsEnabled: boolean
@@ -73,6 +56,11 @@ export function EventForm({
 
   const [projectType, setProjectType] = useState<'Sourcing' | 'Support'>('Sourcing')
 
+  const choicesFor = (choiceType: ChoiceOption['choice_type'], type: 'Sourcing' | 'Support' | null) =>
+    choiceOptions.filter(choice => choice.choice_type === choiceType && choice.project_type === type)
+
+  const sourcingStatuses = choicesFor('event_status', 'Sourcing')
+
   const [form, setForm] = useState({
     event_name: '',
     event_description: '',
@@ -81,7 +69,7 @@ export function EventForm({
     business_unit_id: '',
     cost_center_id: '',
     incumbent_supplier_id: '',
-    event_status: 'Pipeline',
+    event_status: sourcingStatuses[0]?.label || '',
     event_start_date: '',
     project_due_date: '',
     buyer_name: '',
@@ -93,10 +81,11 @@ export function EventForm({
   }
 
   const handleProjectTypeChange = (type: 'Sourcing' | 'Support') => {
+    const statuses = choicesFor('event_status', type)
     setProjectType(type)
     setForm(prev => ({
       ...prev,
-      event_status: type === 'Sourcing' ? 'Pipeline' : 'Not Started',
+      event_status: statuses[0]?.label || '',
       event_type: '',
     }))
   }
@@ -243,8 +232,9 @@ export function EventForm({
   const textareaClass = 'mt-1 block w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] transition-colors focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30'
   const labelClass = 'block text-sm font-medium text-[var(--text-2)]'
 
-  const currentTypes = projectType === 'Sourcing' ? EVENT_TYPES : SUPPORT_TYPES
-  const currentStatuses = projectType === 'Sourcing' ? SOURCING_STATUSES : SUPPORT_STATUSES
+  const currentTypes = choicesFor('event_type', projectType)
+  const currentStatuses = choicesFor('event_status', projectType)
+  const owners = choicesFor('owner', null)
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-6">
@@ -342,7 +332,7 @@ export function EventForm({
             >
               <option value="">Select type...</option>
               {currentTypes.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type.id} value={type.label}>{type.label}</option>
               ))}
             </Select>
           </div>
@@ -355,21 +345,22 @@ export function EventForm({
               className="mt-1"
             >
               {currentStatuses.map((status) => (
-                <option key={status} value={status}>{status}</option>
+                <option key={status.id} value={status.label}>{status.label}</option>
               ))}
             </Select>
           </div>
           {projectOwnersEnabled ? (
             <div>
               <label className={labelClass}>Owner / Buyer</label>
-              <Input
+              <Select
                 aria-label="Owner or Buyer"
-                type="text"
                 value={form.buyer_name}
                 onChange={(e) => handleChange('buyer_name', e.target.value)}
                 className="mt-1"
-                placeholder="e.g. Jane Smith"
-              />
+              >
+                <option value="">Unassigned</option>
+                {owners.map(owner => <option key={owner.id} value={owner.label}>{owner.label}</option>)}
+              </Select>
             </div>
           ) : null}
         </div>
