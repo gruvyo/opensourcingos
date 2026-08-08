@@ -32,6 +32,8 @@ it?
   awards, savings, realization, status, risk, preference, and diversity.
 - Configures workspace identity, reporting defaults, and savings-methodology
   controls through settings reserved for workspace administrators.
+- Shows every workspace member and a paginated, human-readable audit history
+  without exposing mutation controls or raw internal record data.
 - Separates Cost Reduction from Cost Avoidance without losing the total deal
   movement.
 - Normalizes offers with different terms onto a comparable monthly basis.
@@ -65,7 +67,7 @@ Reduction requires a baseline grounded in the organization's own spend unless
 an explicit override is recorded.
 
 All screens use [`lib/savings/index.ts`](lib/savings/index.ts) as the single
-source of truth. The executable methodology suite currently covers 340 checks.
+source of truth. The executable methodology suite currently covers 351 checks.
 
 ## Try the demo
 
@@ -191,7 +193,7 @@ Current priorities are:
 1. Preserve methodology traceability, workspace isolation, accessibility, and
    cross-browser confidence as the product evolves.
 2. Complete workspace governance with broader module and optional-field
-   controls, membership administration, audit visibility, and
+   controls, membership administration, and
    workspace-managed selection lists.
 3. Expand dashboards, collaboration workflows, and supplier performance, risk,
    certification, duplicate-management, and reporting capabilities.
