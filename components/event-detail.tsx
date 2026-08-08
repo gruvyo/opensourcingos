@@ -137,6 +137,7 @@ export function EventDetail({
   projectCategoriesEnabled,
   projectBusinessUnitsEnabled,
   projectUpdatesEnabled,
+  projectIncumbentSuppliersEnabled,
 }: {
   event: Event
   scopeLines: ScopeLine[]
@@ -153,6 +154,7 @@ export function EventDetail({
   projectCategoriesEnabled: boolean
   projectBusinessUnitsEnabled: boolean
   projectUpdatesEnabled: boolean
+  projectIncumbentSuppliersEnabled: boolean
 }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEditModal, setShowEditModal] = useState(false)
@@ -258,6 +260,7 @@ export function EventDetail({
           projectCostCentersEnabled={projectCostCentersEnabled}
           projectCategoriesEnabled={projectCategoriesEnabled}
           projectBusinessUnitsEnabled={projectBusinessUnitsEnabled}
+          projectIncumbentSuppliersEnabled={projectIncumbentSuppliersEnabled}
           onClose={() => setShowEditModal(false)}
           onSaved={() => { setShowEditModal(false); window.location.reload(); }}
         />

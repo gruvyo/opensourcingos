@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(185);
+select plan(204);
 
 select is(
   (
@@ -2020,6 +2020,218 @@ select lives_ok(
 
 delete from public.project_updates
 where id = 'e2000000-0000-4000-8000-000000000001';
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'organization_settings'
+      and column_name = 'project_incumbent_suppliers_enabled'
+      and is_nullable = 'NO'
+      and column_default = 'true'
+  ),
+  'Project Incumbent Supplier defaults to enabled and cannot be null'
+);
+
+select ok(
+  to_regprocedure(
+    'public.update_workspace_settings_v8(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'
+  ) is not null,
+  'workspace settings v8 RPC accepts the Project Incumbent Supplier control'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v8(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v8 RPC runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v8(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'workspace settings v8 RPC has a fixed search path'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.update_workspace_settings_v8(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'signed-in users can invoke the workspace settings v8 RPC'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.update_workspace_settings_v8(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
+    'EXECUTE'
+  ),
+  'anonymous users cannot invoke the workspace settings v8 RPC'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_incumbent_supplier_setting()'::regprocedure
+  ),
+  'Project Incumbent Supplier enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.enforce_project_incumbent_supplier_setting()'::regprocedure
+  ),
+  'Project Incumbent Supplier enforcement has a fixed search path'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'sourcing_events'
+      and t.tgname = 'sourcing_events_enforce_incumbent_supplier_setting'
+      and not t.tgisinternal
+  ),
+  'sourcing_events has the Project Incumbent Supplier setting trigger'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.enforce_project_incumbent_supplier_setting()', 'EXECUTE'),
+  'anonymous users cannot execute Project Incumbent Supplier enforcement directly'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.enforce_project_incumbent_supplier_setting()', 'EXECUTE'),
+  'signed-in users cannot execute Project Incumbent Supplier enforcement directly'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.enforce_project_incumbent_supplier_setting()', 'EXECUTE'),
+  'service role can execute Project Incumbent Supplier enforcement'
+);
+
+insert into public.suppliers (
+  id, organization_id, supplier_name, supplier_status
+) values (
+  'e3000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000001',
+  'Incumbent Control Test Supplier',
+  'Active'
+);
+
+update public.organization_settings
+set project_incumbent_suppliers_enabled = false
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select is(
+  (
+    select incumbent_supplier_id
+    from public.sourcing_events
+    where id = '00000000-0000-4000-8000-000000000021'
+  ),
+  '00000000-0000-4000-8000-000000000013'::uuid,
+  'existing incumbent supplier assignments remain readable when the field is disabled'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set incumbent_supplier_id = 'e3000000-0000-4000-8000-000000000001'
+    where id = '00000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Incumbent Supplier is disabled for this workspace',
+  'incumbent supplier replacements are blocked when the setting is off'
+);
+
+select throws_ok(
+  $$
+    update public.sourcing_events
+    set incumbent_supplier_id = null
+    where id = '00000000-0000-4000-8000-000000000021'
+  $$,
+  '23514',
+  'Project Incumbent Supplier is disabled for this workspace',
+  'incumbent supplier clearing is blocked when the setting is off'
+);
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set event_description = event_description
+    where id = '00000000-0000-4000-8000-000000000021'
+  $$,
+  'unrelated project edits remain available when Incumbent Supplier is disabled'
+);
+
+select throws_ok(
+  $$
+    insert into public.sourcing_events (
+      id, organization_id, event_name, event_type, project_type,
+      event_status, currency_code, incumbent_supplier_id
+    ) values (
+      'e3000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000001',
+      'Blocked incumbent test project', 'Renewal', 'Sourcing',
+      'Pipeline', 'USD', 'e3000000-0000-4000-8000-000000000001'
+    )
+  $$,
+  '23514',
+  'Project Incumbent Supplier is disabled for this workspace',
+  'new incumbent supplier assignments are blocked when the setting is off'
+);
+
+select lives_ok(
+  $$
+    insert into public.sourcing_events (
+      id, organization_id, event_name, event_type, project_type,
+      event_status, currency_code, incumbent_supplier_id
+    ) values (
+      'e3000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000001',
+      'Allowed project without incumbent', 'Renewal', 'Sourcing',
+      'Pipeline', 'USD', null
+    )
+  $$,
+  'projects without an incumbent supplier remain creatable when the setting is off'
+);
+
+update public.organization_settings
+set project_incumbent_suppliers_enabled = true
+where organization_id = '00000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    update public.sourcing_events
+    set incumbent_supplier_id = 'e3000000-0000-4000-8000-000000000001'
+    where id = '00000000-0000-4000-8000-000000000021'
+  $$,
+  'incumbent suppliers can be changed again after the setting is re-enabled'
+);
+
+update public.sourcing_events
+set incumbent_supplier_id = '00000000-0000-4000-8000-000000000013'
+where id = '00000000-0000-4000-8000-000000000021';
+
+delete from public.sourcing_events
+where id = 'e3000000-0000-4000-8000-000000000003';
+
+delete from public.suppliers
+where id = 'e3000000-0000-4000-8000-000000000001';
 
 select ok(
   (

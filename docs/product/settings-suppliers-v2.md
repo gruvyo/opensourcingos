@@ -4,7 +4,8 @@
 
 Release 2 is live on `main`: workspace settings are editable and atomic,
 administrators can govern Support projects and the optional project description,
-owner, Cost Center, Category, Business Unit, and Project Updates features,
+owner, Cost Center, Category, Business Unit, Project Updates, and Incumbent
+Supplier features,
 supplier records can be created independently, and supplier profiles reconcile
 projects, awards, negotiated savings, realized savings, and audit history.
 Database policies make viewers read-only while administrators and procurement
@@ -95,6 +96,16 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - The Updates tab and all existing dated history remain readable.
 - Database enforcement rejects direct inserts while the setting is off, and
   re-enabling the setting restores new updates without changing history.
+
+### Project Incumbent Supplier behavior
+
+- The Incumbent Supplier setting defaults on for existing and new workspaces.
+- Turning it off removes the field from project creation and editing.
+- Existing incumbent assignments remain visible in project details, project
+  lists, supplier profiles, and reports.
+- Database enforcement rejects additions, replacements, and clearing while the
+  setting is off, while unrelated project edits remain available.
+- Re-enabling restores the field without changing existing assignments.
 
 ## Suppliers v2
 

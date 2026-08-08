@@ -49,6 +49,7 @@ export function EditProjectModal({
   projectCostCentersEnabled,
   projectCategoriesEnabled,
   projectBusinessUnitsEnabled,
+  projectIncumbentSuppliersEnabled,
   onClose,
   onSaved,
 }: {
@@ -63,6 +64,7 @@ export function EditProjectModal({
   projectCostCentersEnabled: boolean
   projectCategoriesEnabled: boolean
   projectBusinessUnitsEnabled: boolean
+  projectIncumbentSuppliersEnabled: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -156,7 +158,6 @@ export function EditProjectModal({
       event_close_date: form.event_close_date || null,
       contract_start_date: form.contract_start_date || null,
       contract_end_date: form.contract_end_date || null,
-      incumbent_supplier_id: form.incumbent_supplier_id || null,
       notes: form.notes || null,
       updated_at: new Date().toISOString(),
     }
@@ -179,6 +180,10 @@ export function EditProjectModal({
 
     if (projectBusinessUnitsEnabled) {
       updates.business_unit_id = form.business_unit_id || null
+    }
+
+    if (projectIncumbentSuppliersEnabled) {
+      updates.incumbent_supplier_id = form.incumbent_supplier_id || null
     }
 
     const { error: updateError } = await supabase
@@ -319,13 +324,13 @@ export function EditProjectModal({
                 </Select>
               </div>
             ) : null}
-            <div>
+            {projectIncumbentSuppliersEnabled ? <div>
               <label htmlFor="ep-supplier" className={labelClass}>Incumbent Supplier</label>
               <Select id="ep-supplier" value={form.incumbent_supplier_id} onChange={(e) => handleChange('incumbent_supplier_id', e.target.value)}>
                 <option value="">Select supplier...</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplier_name}</option>)}
               </Select>
-            </div>
+            </div> : null}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

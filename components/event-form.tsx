@@ -30,6 +30,7 @@ export function EventForm({
   projectCategoriesEnabled,
   projectBusinessUnitsEnabled,
   projectUpdatesEnabled,
+  projectIncumbentSuppliersEnabled,
 }: {
   categories: Option[]
   businessUnits: Option[]
@@ -44,6 +45,7 @@ export function EventForm({
   projectCategoriesEnabled: boolean
   projectBusinessUnitsEnabled: boolean
   projectUpdatesEnabled: boolean
+  projectIncumbentSuppliersEnabled: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -191,7 +193,7 @@ export function EventForm({
       category_id: projectCategoriesEnabled ? form.category_id || null : null,
       business_unit_id: projectBusinessUnitsEnabled ? form.business_unit_id || null : null,
       cost_center_id: projectCostCentersEnabled ? form.cost_center_id || null : null,
-      incumbent_supplier_id: form.incumbent_supplier_id || null,
+      incumbent_supplier_id: projectIncumbentSuppliersEnabled ? form.incumbent_supplier_id || null : null,
     }
 
 
@@ -420,7 +422,7 @@ export function EventForm({
               </Select>
             </div>
           ) : null}
-          <div>
+          {projectIncumbentSuppliersEnabled ? <div>
             <label className={labelClass}>Incumbent Supplier</label>
             <div className="mt-1 flex gap-2">
               <Select
@@ -467,7 +469,7 @@ export function EventForm({
                 </Button>
               </div>
             )}
-          </div>
+          </div> : null}
         </div>
       </Card>
 
