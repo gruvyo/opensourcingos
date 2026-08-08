@@ -730,8 +730,8 @@ export type Database = {
           project_incumbent_suppliers_enabled: boolean
           project_owners_enabled: boolean
           project_updates_enabled: boolean
-          savings_realization_enabled: boolean
           require_baseline_for_hard_reduction: boolean
+          savings_realization_enabled: boolean
           support_projects_enabled: boolean
           timezone: string
           updated_at: string
@@ -753,8 +753,8 @@ export type Database = {
           project_incumbent_suppliers_enabled?: boolean
           project_owners_enabled?: boolean
           project_updates_enabled?: boolean
-          savings_realization_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
+          savings_realization_enabled?: boolean
           support_projects_enabled?: boolean
           timezone?: string
           updated_at?: string
@@ -776,8 +776,8 @@ export type Database = {
           project_incumbent_suppliers_enabled?: boolean
           project_owners_enabled?: boolean
           project_updates_enabled?: boolean
-          savings_realization_enabled?: boolean
           require_baseline_for_hard_reduction?: boolean
+          savings_realization_enabled?: boolean
           support_projects_enabled?: boolean
           timezone?: string
           updated_at?: string
@@ -1093,7 +1093,7 @@ export type Database = {
           {
             foreignKeyName: "realization_periods_savings_period_id_fkey"
             columns: ["savings_period_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "savings_periods"
             referencedColumns: ["id"]
           },
@@ -1322,6 +1322,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "savings_calculations_executed_by_fkey"
+            columns: ["executed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "savings_calculations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -1342,15 +1349,15 @@ export type Database = {
           baseline_amount: number | null
           cost_avoidance_amount: number
           cost_reduction_amount: number | null
+          created_at: string
+          created_by: string | null
+          event_id: string
           executed_baseline_amount: number | null
           executed_cost_avoidance_amount: number | null
           executed_cost_reduction_amount: number | null
           executed_final_amount: number | null
           executed_opening_amount: number | null
           executed_total_savings_amount: number | null
-          created_at: string
-          created_by: string | null
-          event_id: string
           final_amount: number
           id: string
           is_edited: boolean
@@ -1370,15 +1377,15 @@ export type Database = {
           baseline_amount?: number | null
           cost_avoidance_amount?: number
           cost_reduction_amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          event_id: string
           executed_baseline_amount?: number | null
           executed_cost_avoidance_amount?: number | null
           executed_cost_reduction_amount?: number | null
           executed_final_amount?: number | null
           executed_opening_amount?: number | null
           executed_total_savings_amount?: number | null
-          created_at?: string
-          created_by?: string | null
-          event_id: string
           final_amount?: number
           id?: string
           is_edited?: boolean
@@ -1398,15 +1405,15 @@ export type Database = {
           baseline_amount?: number | null
           cost_avoidance_amount?: number
           cost_reduction_amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          event_id?: string
           executed_baseline_amount?: number | null
           executed_cost_avoidance_amount?: number | null
           executed_cost_reduction_amount?: number | null
           executed_final_amount?: number | null
           executed_opening_amount?: number | null
           executed_total_savings_amount?: number | null
-          created_at?: string
-          created_by?: string | null
-          event_id?: string
           final_amount?: number
           id?: string
           is_edited?: boolean
@@ -1468,12 +1475,12 @@ export type Database = {
           procurement_owner_id: string | null
           project_due_date: string | null
           project_type: string | null
+          recognition_end_date: string | null
+          recognition_start_date: string | null
           savings_disposition: string | null
           savings_disposition_at: string | null
           savings_disposition_by: string | null
           savings_disposition_reason: string | null
-          recognition_end_date: string | null
-          recognition_start_date: string | null
           sourcing_method: string | null
           updated_at: string | null
           updated_by: string | null
@@ -1506,12 +1513,12 @@ export type Database = {
           procurement_owner_id?: string | null
           project_due_date?: string | null
           project_type?: string | null
+          recognition_end_date?: string | null
+          recognition_start_date?: string | null
           savings_disposition?: string | null
           savings_disposition_at?: string | null
           savings_disposition_by?: string | null
           savings_disposition_reason?: string | null
-          recognition_end_date?: string | null
-          recognition_start_date?: string | null
           sourcing_method?: string | null
           updated_at?: string | null
           updated_by?: string | null
@@ -1544,12 +1551,12 @@ export type Database = {
           procurement_owner_id?: string | null
           project_due_date?: string | null
           project_type?: string | null
+          recognition_end_date?: string | null
+          recognition_start_date?: string | null
           savings_disposition?: string | null
           savings_disposition_at?: string | null
           savings_disposition_by?: string | null
           savings_disposition_reason?: string | null
-          recognition_end_date?: string | null
-          recognition_start_date?: string | null
           sourcing_method?: string | null
           updated_at?: string | null
           updated_by?: string | null
@@ -1621,6 +1628,13 @@ export type Database = {
           {
             foreignKeyName: "sourcing_events_procurement_owner_id_fkey"
             columns: ["procurement_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sourcing_events_savings_disposition_by_fkey"
+            columns: ["savings_disposition_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2093,7 +2107,7 @@ export type Database = {
           p_default_recognition_method: string
           p_fiscal_year_start_month: number
           p_full_name: string
-          p_hard_reduction_approval_threshold: number | null
+          p_hard_reduction_approval_threshold: number
           p_locale: string
           p_organization_name: string
           p_project_business_units_enabled: boolean
