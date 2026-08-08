@@ -67,7 +67,7 @@ type SavingsTotals = {
   total: number
 }
 
-const INACTIVE_STATUSES = new Set(['Closed', 'Cancelled', 'Rejected', 'Complete'])
+const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
 
 const REPORT_OPTIONS: Array<{ id: ReportId; label: string; group: string }> = [
   { id: 'pipeline', label: 'Sourcing Project Pipeline', group: 'Pipeline' },

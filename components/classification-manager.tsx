@@ -17,6 +17,7 @@ export type ManagedClassificationOption = {
   label: string
   active: boolean
   projectType?: 'Sourcing' | 'Support' | null
+  sortOrder?: number
 }
 
 type Section = {
@@ -27,8 +28,8 @@ type Section = {
 }
 
 const sections: Section[] = [
-  { title: 'Sourcing event types', description: 'The kind of sourcing work being performed.', kind: 'event_type', projectType: 'Sourcing' },
-  { title: 'Support project types', description: 'The kind of non-commercial support being performed.', kind: 'event_type', projectType: 'Support' },
+  { title: 'Sourcing event types', description: 'Why the sourcing project exists. Savings strategies and value levers are tracked separately.', kind: 'event_type', projectType: 'Sourcing' },
+  { title: 'Support project types', description: 'Why the non-commercial support request exists.', kind: 'event_type', projectType: 'Support' },
   { title: 'Sourcing statuses', description: 'Workflow stages available to sourcing projects.', kind: 'event_status', projectType: 'Sourcing' },
   { title: 'Support statuses', description: 'Workflow stages available to support projects.', kind: 'event_status', projectType: 'Support' },
   { title: 'Owners / Buyers', description: 'Workspace-managed names available on projects.', kind: 'owner' },
@@ -137,7 +138,7 @@ export function ClassificationManager({
         {sections.map(section => {
           const matching = options
             .filter(option => option.kind === section.kind && (option.projectType || undefined) === section.projectType)
-            .sort((a, b) => Number(b.active) - Number(a.active) || a.label.localeCompare(b.label))
+            .sort((a, b) => Number(b.active) - Number(a.active) || (a.sortOrder ?? 1000) - (b.sortOrder ?? 1000) || a.label.localeCompare(b.label))
           return (
             <div key={`${section.kind}-${section.projectType || 'all'}`} className="rounded-xl border border-[var(--border)] p-4">
               <h3 className="text-sm font-semibold text-[var(--text)]">{section.title}</h3>
