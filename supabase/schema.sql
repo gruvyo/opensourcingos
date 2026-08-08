@@ -76,7 +76,14 @@ begin
   else
     v_org := case when tg_op = 'DELETE' then old.organization_id else new.organization_id end;
     v_entity_id := case when tg_op = 'DELETE' then old.id else new.id end;
-    v_entity_type := 'supplier';
+    v_entity_type := case tg_table_name
+      when 'suppliers' then 'supplier'
+      when 'project_choice_options' then 'project_choice_option'
+      when 'categories' then 'category'
+      when 'business_units' then 'business_unit'
+      when 'cost_centers' then 'cost_center'
+      else 'supplier'
+    end;
   end if;
 
   insert into public.audit_log (
@@ -1299,7 +1306,7 @@ CREATE TABLE public.audit_log (
     after_data jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT audit_log_action_check CHECK ((action = ANY (ARRAY['insert'::text, 'update'::text, 'delete'::text]))),
-    CONSTRAINT audit_log_entity_type_check CHECK ((entity_type = ANY (ARRAY['organization'::text, 'organization_settings'::text, 'supplier'::text])))
+    CONSTRAINT audit_log_entity_type_check CHECK ((entity_type = ANY (ARRAY['organization'::text, 'organization_settings'::text, 'supplier'::text, 'project_choice_option'::text, 'category'::text, 'business_unit'::text, 'cost_center'::text, 'project_classification_reset'::text])))
 );
 
 ALTER TABLE ONLY public.audit_log FORCE ROW LEVEL SECURITY;

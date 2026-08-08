@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(209);
+select plan(211);
 
 select is(
   (
@@ -2321,6 +2321,23 @@ select is(
   ),
   'Contract Renewal|Award & Contracting',
   'the fictional reference project uses the refreshed beta taxonomy'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.audit_log
+    where entity_type = 'project_choice_option'
+      and after_data ->> 'label' = 'Contract Renewal'
+  ),
+  'managed project choices use their own audit entity type'
+);
+
+select ok(
+  exists (select 1 from public.audit_log where entity_type = 'category')
+  and exists (select 1 from public.audit_log where entity_type = 'business_unit')
+  and exists (select 1 from public.audit_log where entity_type = 'cost_center'),
+  'relational workspace choices use accurate audit entity types'
 );
 
 select ok(
