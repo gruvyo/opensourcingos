@@ -197,6 +197,9 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - Supplier Portfolio Value reporting is shipped for awarded spend, spend and
   savings concentration, preferred/diverse attributes, risk, estimated and
   executed savings, and optional realized savings.
+- Named supplier contacts are shipped with role/title, email, phone, one
+  primary-contact designation, role-aware maintenance, tenant isolation, and
+  workspace audit history.
 - Supplier performance reviews, certifications, and risk evidence.
 - Duplicate detection and audited supplier merge.
 - Broader diverse-spend and preferred-supplier target reporting remains planned.

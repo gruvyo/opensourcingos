@@ -28,8 +28,9 @@ it?
 - Tracks project due dates and dated updates alongside each project's commercial
   record.
 - Records scope lines, baselines, supplier offers, and final awards.
-- Maintains editable supplier records and profiles covering sourcing history,
-  awards, savings, realization, status, risk, preference, and diversity.
+- Maintains editable supplier records and profiles covering named contacts,
+  sourcing history, awards, savings, optional realization, status, risk,
+  preference, and diversity.
 - Configures workspace identity, reporting defaults, and savings-methodology
   controls through settings reserved for workspace administrators.
 - Shows every workspace member and a paginated, human-readable audit history

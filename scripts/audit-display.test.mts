@@ -10,6 +10,7 @@ import {
 
 test('turns stored audit names into workspace language', () => {
   assert.equal(auditEntityLabel('organization_settings'), 'Workspace settings')
+  assert.equal(auditEntityLabel('supplier_contact'), 'Supplier contact')
   assert.equal(auditEntityLabel('future_entity'), 'Future Entity')
   assert.equal(auditActionLabel('insert'), 'Added')
   assert.equal(auditActionLabel('update', 'project_classification_reset'), 'Reset')
@@ -17,6 +18,7 @@ test('turns stored audit names into workspace language', () => {
 
 test('uses the most useful record name as the subject', () => {
   assert.equal(auditSubject(null, { supplier_name: 'Acme Supply', id: '1' }), 'Acme Supply')
+  assert.equal(auditSubject(null, { contact_name: 'Sam Buyer', id: '2' }), 'Sam Buyer')
   assert.equal(auditSubject({ label: 'Legacy status' }, { label: 'Pipeline' }), 'Pipeline')
   assert.equal(auditSubject({ id: '1' }, { id: '1' }), null)
 })
