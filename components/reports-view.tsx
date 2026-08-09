@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
 import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
 import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savings'
-import { assessSupplierReadiness } from '@/lib/supplier-readiness'
+import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -194,7 +194,7 @@ export function ReportsView({
   const [supplierStatusFilter, setSupplierStatusFilter] = useState('')
   const [supplierRiskFilter, setSupplierRiskFilter] = useState('')
   const [supplierAttributeFilter, setSupplierAttributeFilter] = useState('')
-  const [supplierReadinessFilter, setSupplierReadinessFilter] = useState('')
+  const [supplierReadinessFilter, setSupplierReadinessFilter] = useState<SupplierReadinessFilter>('')
 
   const sourcingEvents = useMemo(
     () => events.filter(event => (event.project_type || 'Sourcing') === 'Sourcing'),
@@ -246,10 +246,7 @@ export function ReportsView({
     if (supplierRiskFilter && risk !== supplierRiskFilter) return false
     if (supplierAttributeFilter === 'Preferred' && !supplier.preferred_flag) return false
     if (supplierAttributeFilter === 'Diverse' && !supplier.diversity_flag) return false
-    if (supplierReadinessFilter === 'Needs attention' && readiness.state !== 'attention') return false
-    if (supplierReadinessFilter === 'Setup incomplete' && readiness.state !== 'incomplete') return false
-    if (supplierReadinessFilter === 'Ready' && readiness.state !== 'ready') return false
-    return true
+    return matchesSupplierReadinessFilter(readiness, supplierReadinessFilter)
   }), [asOfDate, supplierAttributeFilter, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
 
   const report = useMemo<ReportDefinition>(() => {
@@ -540,7 +537,7 @@ export function ReportsView({
             <FilterSelect label="Supplier status" value={supplierStatusFilter} onChange={setSupplierStatusFilter} options={supplierStatuses} allLabel="All supplier statuses" />
             <FilterSelect label="Risk" value={supplierRiskFilter} onChange={setSupplierRiskFilter} options={supplierRisks} allLabel="All risk ratings" />
             <FilterSelect label="Attribute" value={supplierAttributeFilter} onChange={setSupplierAttributeFilter} options={['Preferred', 'Diverse']} allLabel="All attributes" />
-            <FilterSelect label="Readiness" value={supplierReadinessFilter} onChange={setSupplierReadinessFilter} options={['Needs attention', 'Setup incomplete', 'Ready']} allLabel="All readiness states" />
+            <FilterSelect label="Readiness" value={supplierReadinessFilter} onChange={value => setSupplierReadinessFilter(value as SupplierReadinessFilter)} options={['Needs attention', 'Setup incomplete', 'Ready']} allLabel="All readiness states" />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">

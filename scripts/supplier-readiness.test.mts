@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assessSupplierReadiness, dateKeyInTimeZone } from '../lib/supplier-readiness.ts'
+import { assessSupplierReadiness, dateKeyInTimeZone, matchesSupplierReadinessFilter } from '../lib/supplier-readiness.ts'
 
 test('derives a stable ISO date key in the workspace timezone', () => {
   const instant = new Date('2026-08-09T02:00:00Z')
@@ -28,6 +28,9 @@ test('flags high risk ahead of setup gaps', () => {
   assert.equal(result.priority, 0)
   assert.deepEqual(result.alerts, ['High risk'])
   assert.deepEqual(result.gaps, ['Missing owner', 'Missing review date'])
+  assert.equal(matchesSupplierReadinessFilter(result, 'Needs attention'), true)
+  assert.equal(matchesSupplierReadinessFilter(result, 'Setup incomplete'), true)
+  assert.equal(matchesSupplierReadinessFilter(result, 'Ready'), false)
 })
 
 test('treats a past review date as overdue but today as current', () => {
@@ -43,8 +46,11 @@ test('treats a past review date as overdue but today as current', () => {
 })
 
 test('marks a governed relationship ready', () => {
+  const result = assessSupplierReadiness({ relationshipOwner: 'Joe Torres', nextReviewDate: '2026-09-01', risk: 'Medium' }, '2026-08-08')
   assert.deepEqual(
-    assessSupplierReadiness({ relationshipOwner: 'Joe Torres', nextReviewDate: '2026-09-01', risk: 'Medium' }, '2026-08-08'),
+    result,
     { alerts: [], gaps: [], label: 'Ready', priority: 3, state: 'ready' },
   )
+  assert.equal(matchesSupplierReadinessFilter(result, 'Ready'), true)
+  assert.equal(matchesSupplierReadinessFilter(result, 'Setup incomplete'), false)
 })

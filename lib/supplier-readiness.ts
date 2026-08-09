@@ -12,6 +12,18 @@ export type SupplierReadiness = {
   state: 'attention' | 'incomplete' | 'ready'
 }
 
+export type SupplierReadinessFilter = '' | 'Needs attention' | 'Setup incomplete' | 'Ready'
+
+export function matchesSupplierReadinessFilter(
+  readiness: SupplierReadiness,
+  filter: SupplierReadinessFilter,
+): boolean {
+  if (!filter) return true
+  if (filter === 'Needs attention') return readiness.alerts.length > 0
+  if (filter === 'Setup incomplete') return readiness.gaps.length > 0
+  return readiness.alerts.length === 0 && readiness.gaps.length === 0
+}
+
 export function dateKeyInTimeZone(date: Date, timeZone: string): string {
   let parts: Intl.DateTimeFormatPart[]
   try {
