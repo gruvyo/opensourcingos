@@ -206,7 +206,8 @@ Current priorities are:
 3. Expand dashboards, collaboration workflows, and supplier performance,
    certification, duplicate-management, and reporting capabilities. Supplier
    profiles already include named contacts, append-only relationship notes for
-   dated review context and risk evidence, and certification validity records.
+   dated review context and risk evidence, certification validity records, and
+   scored performance reviews.
 
 ## Contributing
 

@@ -206,7 +206,11 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - Supplier certifications are shipped with issuer, certificate number,
   issue/expiration dates, optional evidence links, expired-state visibility,
   tenant isolation, role-aware maintenance, and workspace audit history.
-- Supplier performance reviews and structured risk evidence.
+- Supplier performance reviews are shipped with a required overall 1–5 score,
+  optional unweighted delivery, quality, commercial, and compliance scores,
+  dated summaries, next-review dates, reviewer attribution, tenant isolation,
+  role-aware maintenance, and workspace audit history.
+- Broader structured risk evidence remains planned.
 - Duplicate detection and audited supplier merge.
 - Broader diverse-spend and preferred-supplier target reporting remains planned.
 
