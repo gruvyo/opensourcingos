@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(222);
+select plan(239);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -48,9 +48,149 @@ select is(
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
   ),
-  22::bigint,
-  'all 22 public application tables exist'
+  23::bigint,
+  'all 23 public application tables exist'
 );
+
+select ok(
+  to_regclass('public.supplier_contacts') is not null,
+  'supplier_contacts exists'
+);
+
+select ok(
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'supplier_contacts'
+      and column_name = 'is_primary'
+      and is_nullable = 'NO'
+      and column_default = 'false'
+  ),
+  'supplier contacts have a non-null primary designation'
+);
+
+select ok(
+  (
+    select pg_get_constraintdef(oid) like '%supplier_contact%'
+    from pg_catalog.pg_constraint
+    where conrelid = 'public.audit_log'::regclass
+      and conname = 'audit_log_entity_type_check'
+  ),
+  'workspace audit accepts supplier contact records'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.set_single_primary_supplier_contact()'::regprocedure
+  ),
+  'primary-contact enforcement runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.set_single_primary_supplier_contact()'::regprocedure
+  ),
+  'primary-contact enforcement has a fixed search path'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.set_single_primary_supplier_contact()', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.set_single_primary_supplier_contact()', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.set_single_primary_supplier_contact()', 'EXECUTE'),
+  'primary-contact enforcement is callable only by the trigger owner path'
+);
+
+select ok(
+  not (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.stamp_supplier_contact_actor()'::regprocedure
+  ),
+  'supplier-contact actor stamping runs with invoker privileges'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.stamp_supplier_contact_actor()'::regprocedure
+  ),
+  'supplier-contact actor stamping has a fixed search path'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.stamp_supplier_contact_actor()', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.stamp_supplier_contact_actor()', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.stamp_supplier_contact_actor()', 'EXECUTE'),
+  'supplier-contact actor stamping is callable only by the trigger owner path'
+);
+
+insert into public.supplier_contacts (
+  id, organization_id, supplier_id, contact_name, is_primary
+) values (
+  'c1000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000013',
+  'First Contact',
+  true
+);
+
+insert into public.supplier_contacts (
+  id, organization_id, supplier_id, contact_name, is_primary
+) values (
+  'c1000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000013',
+  'Second Contact',
+  true
+);
+
+select is(
+  (
+    select contact_name
+    from public.supplier_contacts
+    where supplier_id = '00000000-0000-4000-8000-000000000013'
+      and is_primary
+  ),
+  'Second Contact',
+  'saving a new primary contact atomically demotes the previous primary'
+);
+
+select ok(
+  exists (
+    select 1 from public.audit_log
+    where entity_type = 'supplier_contact'
+      and entity_id = 'c1000000-0000-4000-8000-000000000002'
+      and action = 'insert'
+  ),
+  'supplier contact changes enter the workspace audit'
+);
+
+insert into public.organizations (id, name)
+values ('c1000000-0000-4000-8000-000000000003', 'Contact integrity test');
+
+select throws_ok(
+  $$
+    insert into public.supplier_contacts (
+      organization_id, supplier_id, contact_name
+    ) values (
+      'c1000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000013',
+      'Wrong Workspace'
+    )
+  $$,
+  '23503',
+  'insert or update on table "supplier_contacts" violates foreign key constraint "supplier_contacts_supplier_workspace_fkey"',
+  'a contact cannot attach a supplier from another workspace'
+);
+
+delete from public.organizations
+where id = 'c1000000-0000-4000-8000-000000000003';
 
 select is(
   (
@@ -2738,6 +2878,113 @@ select isnt(
   (select organization_id from public.profiles where id = '20000000-0000-4000-8000-000000000002'),
   'different signups receive different workspaces'
 );
+
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+insert into public.supplier_contacts (
+  id, organization_id, supplier_id, contact_name
+)
+select
+  'c1000000-0000-4000-8000-000000000004',
+  profile.organization_id,
+  supplier.id,
+  'Alex Private Contact'
+from public.profiles as profile
+join lateral (
+  select id from public.suppliers
+  where organization_id = profile.organization_id
+  order by id
+  limit 1
+) as supplier on true
+where profile.id = '10000000-0000-4000-8000-000000000001';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select is(
+  (
+    select count(*)::bigint
+    from public.supplier_contacts
+    where id = 'c1000000-0000-4000-8000-000000000004'
+  ),
+  0::bigint,
+  'one workspace cannot read another workspace supplier contact'
+);
+reset role;
+
+update public.profiles
+set role = 'viewer'
+where id = '20000000-0000-4000-8000-000000000002';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select throws_ok(
+  $$
+    insert into public.supplier_contacts (
+      organization_id, supplier_id, contact_name
+    )
+    select profile.organization_id, supplier.id, 'Viewer Contact'
+    from public.profiles as profile
+    join lateral (
+      select id from public.suppliers
+      where organization_id = profile.organization_id
+      order by id
+      limit 1
+    ) as supplier on true
+    where profile.id = '20000000-0000-4000-8000-000000000002'
+  $$,
+  '42501',
+  'new row violates row-level security policy for table "supplier_contacts"',
+  'viewers cannot add supplier contacts'
+);
+reset role;
+
+update public.profiles
+set role = 'procurement_user'
+where id = '20000000-0000-4000-8000-000000000002';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select lives_ok(
+  $$
+    insert into public.supplier_contacts (
+      id, organization_id, supplier_id, contact_name
+    )
+    select
+      'c1000000-0000-4000-8000-000000000005',
+      profile.organization_id,
+      supplier.id,
+      'Procurement Contact'
+    from public.profiles as profile
+    join lateral (
+      select id from public.suppliers
+      where organization_id = profile.organization_id
+      order by id
+      limit 1
+    ) as supplier on true
+    where profile.id = '20000000-0000-4000-8000-000000000002'
+  $$,
+  'procurement users can add supplier contacts'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from public.supplier_contacts
+    where id = 'c1000000-0000-4000-8000-000000000005'
+  ),
+  1::bigint,
+  'procurement users can read the contact they added'
+);
+
+select is(
+  (
+    select created_by
+    from public.supplier_contacts
+    where id = 'c1000000-0000-4000-8000-000000000005'
+  ),
+  '20000000-0000-4000-8000-000000000002'::uuid,
+  'supplier contacts stamp the authenticated author instead of trusting the payload'
+);
+reset role;
 
 select is(
   (
