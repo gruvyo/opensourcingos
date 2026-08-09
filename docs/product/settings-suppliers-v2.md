@@ -24,9 +24,17 @@ Cost Centers receive no generic defaults because they are organization-specific
 accounting values; administrators add the values that match their own chart of
 accounts. Existing Cost Center relationships remain protected and auditable.
 
+Workspace Governance Visibility adds a dedicated, read-only Governance page.
+Every signed-in workspace member can see the current member roster and the same
+organization-scoped audit records already protected by Row Level Security. The
+history is newest-first, filterable, and paginated in groups of 50. It translates
+database actions into business language and shows a small allowlisted change
+summary rather than dumping raw records, notes, identifiers, or internal metadata.
+System migrations and former members remain distinguishable from current actors.
+
 Normalized supplier names are unique within each workspace. Membership
-invitations, performance reviews, certifications, duplicate merge, and portfolio
-concentration remain Release 3 work.
+invitations and role changes, performance reviews, certifications, duplicate
+merge, and portfolio concentration remain Release 3 work.
 
 ## Product intent
 
@@ -56,12 +64,13 @@ workspace-scoped, and auditable.
 2. **Savings methodology** — default recognition method, baseline requirements,
    hard-reduction approval policy, forecast/contracted/realized terminology,
    and reporting thresholds.
-3. **People and roles** — invite members, assign `admin`, `procurement_user`, or
-   `viewer`, and show pending access.
+3. **People and roles** — the current roster is visible; inviting members,
+   assigning `admin`, `procurement_user`, or `viewer`, and showing pending access
+   remain planned.
 4. **Data and integrations** — exports, API/integration status, and connection
    health. Secrets remain in the deployment platform, never in browser forms.
-5. **Audit and safety** — recent administrative changes, workspace ID, RLS
-   status, and clearly separated destructive actions.
+5. **Audit and safety** — a read-only audit history is now available; workspace
+   ID, detailed RLS status, and clearly separated destructive actions remain planned.
 6. **Workspace choices** — active and archived Event Types, Statuses, Owners,
    Categories, Business Units, and Cost Centers used by project forms and
    portfolio reporting.
@@ -171,7 +180,8 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 
 ### Release 3 — planned governance and intelligence
 
-- Membership administration and audit log.
+- Read-only membership roster and audit history are shipped; invitations and
+  role administration remain planned.
 - Supplier performance reviews, certifications, risk evidence, and reminders.
 - Duplicate detection and audited supplier merge.
 - Portfolio concentration, diverse-spend, preferred-supplier, risk, savings, and

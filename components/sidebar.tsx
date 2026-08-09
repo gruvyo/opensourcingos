@@ -12,6 +12,7 @@ import {
   Briefcase,
   LogOut,
   TrendingUp,
+  ShieldCheck,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { createClient } from '@/lib/supabase/client'
@@ -36,7 +37,10 @@ const navGroups = [
   },
   {
     label: 'Workspace',
-    items: [{ label: 'Settings', href: '/settings', icon: Settings }],
+    items: [
+      { label: 'Governance', href: '/governance', icon: ShieldCheck },
+      { label: 'Settings', href: '/settings', icon: Settings },
+    ],
   },
 ]
 
