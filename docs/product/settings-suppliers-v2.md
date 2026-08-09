@@ -191,7 +191,10 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
   role administration remain planned.
 - Supplier Relationship Readiness reporting is shipped; it exposes owner,
   review-date, risk, attribute, and linkage gaps from the current supplier model.
-- Supplier performance reviews, certifications, risk evidence, and reminders.
+- The dashboard attention queue is shipped for urgent supplier risk and overdue
+  review items, alongside overdue and upcoming project deadlines. Automated
+  reminders remain planned.
+- Supplier performance reviews, certifications, and risk evidence.
 - Duplicate detection and audited supplier merge.
 - Portfolio concentration, diverse-spend, preferred-supplier, risk, savings, and
   realization reporting.

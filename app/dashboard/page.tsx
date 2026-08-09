@@ -31,6 +31,9 @@ import {
 } from '@/lib/savings'
 import { formatCurrency, statusColor } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
+import { AttentionQueue } from '@/components/attention-queue'
+import { buildAttentionQueue } from '@/lib/attention-queue'
+import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 import { clsx } from 'clsx'
 
 const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
@@ -85,6 +88,14 @@ type SupplierSummary = {
   savings: number
   projects: number
   share: number
+}
+
+type SupplierAttentionRow = {
+  id: string
+  supplier_name?: string | null
+  supplier_status?: string | null
+  risk_rating?: string | null
+  next_review_date?: string | null
 }
 
 function relationName(relation: unknown, key: string, fallback: string): string {
@@ -194,6 +205,7 @@ export default async function DashboardPage({
     { data: savingsCalcs, error: calcsError },
     { data: periodRows, error: periodsError },
     { data: realizationPeriods, error: realizationError },
+    { data: supplierRows, error: suppliersError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
@@ -237,19 +249,45 @@ export default async function DashboardPage({
         .order('id', { ascending: true })
         .range(from, to)
     )),
-    supabase.from('organization_settings').select('savings_realization_enabled').maybeSingle(),
+    fetchPortfolioRows('Suppliers', (from, to) => (
+      supabase.from('suppliers').select(`
+        id, supplier_name, supplier_status, risk_rating, next_review_date
+      `, { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    supabase.from('organization_settings').select('savings_realization_enabled, timezone').maybeSingle(),
   ])
 
   const loadError = eventsError?.message
     || calcsError?.message
     || periodsError?.message
     || realizationError?.message
+    || suppliersError?.message
     || settingsError?.message
     || null
 
   const eventList = (events || []) as EventRow[]
   const calcList = (savingsCalcs || []) as CalculationRow[]
   const realizationList = (realizationPeriods || []) as DashboardRealizationPeriod[]
+  const supplierAttentionList = (supplierRows || []) as SupplierAttentionRow[]
+  const asOfDate = dateKeyInTimeZone(new Date(), settings?.timezone || 'America/Chicago')
+  const attentionQueue = buildAttentionQueue(
+    eventList.map(event => ({
+      id: event.id,
+      name: event.event_name || null,
+      status: event.event_status || null,
+      dueDate: event.project_due_date || null,
+    })),
+    supplierAttentionList.map(supplier => ({
+      id: supplier.id,
+      name: supplier.supplier_name || null,
+      status: supplier.supplier_status || null,
+      risk: supplier.risk_rating || null,
+      nextReviewDate: supplier.next_review_date || null,
+    })),
+    asOfDate,
+  )
 
   const rollup = portfolioRollup(calcList, eventList, { topCategories: 8 })
   const lifecycle = scheduleLifecycleRollup(
@@ -367,6 +405,8 @@ export default async function DashboardPage({
         savingsRealizationEnabled: settings?.savings_realization_enabled ?? false,
         scopeLabel,
       }} />
+
+      <AttentionQueue queue={attentionQueue} />
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <Card className="overflow-hidden">
