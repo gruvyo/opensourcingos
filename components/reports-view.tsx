@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/input'
 import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
 import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savings'
 import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
+import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -45,6 +46,13 @@ type SupplierRow = {
 type SavingsRow = SavingsCalcRow & {
   id: string
   event_id: string | null
+  baseline_total_amount: number | null
+}
+
+type RealizationRow = {
+  event_id: string | null
+  projected_savings: number | null
+  realized_savings: number | null
 }
 
 type ReportId =
@@ -56,11 +64,12 @@ type ReportId =
   | 'projects-buyer'
   | 'pipeline-business-unit'
   | 'pipeline-buyer'
+  | 'supplier-portfolio'
   | 'supplier-readiness'
 
 type ReportValue = string | number | null
 type ReportRow = Record<string, ReportValue>
-type ColumnFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status'
+type ColumnFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status' | 'percent'
 
 type ReportColumn = {
   key: string
@@ -95,6 +104,7 @@ const REPORT_OPTIONS: Array<{ id: ReportId; label: string; group: string }> = [
   { id: 'savings-buyer', label: 'Savings by Buyer', group: 'Savings' },
   { id: 'projects-business-unit', label: 'Projects by Business Unit', group: 'Projects' },
   { id: 'projects-buyer', label: 'Projects by Buyer', group: 'Projects' },
+  { id: 'supplier-portfolio', label: 'Supplier Portfolio Value', group: 'Suppliers' },
   { id: 'supplier-readiness', label: 'Supplier Relationship Readiness', group: 'Suppliers' },
 ]
 
@@ -139,6 +149,7 @@ function formatValue(value: ReportValue, format: ColumnFormat = 'text'): string 
   }
   if (format === 'date') return formatDate(typeof value === 'string' ? value : null)
   if (format === 'number') return num(value).toLocaleString('en-US')
+  if (format === 'percent') return value === null ? '—' : `${num(value).toFixed(1)}%`
   if (value === null || value === '') return '—'
   return String(value)
 }
@@ -179,11 +190,15 @@ export function ReportsView({
   events,
   savingsCalcs,
   suppliers,
+  realizationPeriods,
+  savingsRealizationEnabled,
   asOfDate,
 }: {
   events: EventRow[]
   savingsCalcs: SavingsRow[]
   suppliers: SupplierRow[]
+  realizationPeriods: RealizationRow[]
+  savingsRealizationEnabled: boolean
   asOfDate: string
 }) {
   const [reportId, setReportId] = useState<ReportId>('pipeline')
@@ -246,10 +261,62 @@ export function ReportsView({
     if (supplierRiskFilter && risk !== supplierRiskFilter) return false
     if (supplierAttributeFilter === 'Preferred' && !supplier.preferred_flag) return false
     if (supplierAttributeFilter === 'Diverse' && !supplier.diversity_flag) return false
-    return matchesSupplierReadinessFilter(readiness, supplierReadinessFilter)
-  }), [asOfDate, supplierAttributeFilter, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
+    return reportId !== 'supplier-readiness' || matchesSupplierReadinessFilter(readiness, supplierReadinessFilter)
+  }), [asOfDate, reportId, supplierAttributeFilter, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
 
   const report = useMemo<ReportDefinition>(() => {
+    if (reportId === 'supplier-portfolio') {
+      const portfolioValues = supplierPortfolioValues(
+        events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
+        savingsCalcs,
+        realizationPeriods,
+      )
+      const rows = filteredSuppliers.map(supplier => {
+        const value = portfolioValues.get(supplier.id)
+        return {
+          supplier: supplier.supplier_name,
+          status: supplier.supplier_status || 'Active',
+          risk: supplier.risk_rating || 'Unrated',
+          preferred: supplier.preferred_flag ? 'Yes' : 'No',
+          diverse: supplier.diversity_flag ? 'Yes' : 'No',
+          awards: value?.awards || 0,
+          spendAddressed: value?.spendAddressed || 0,
+          spendShare: value?.spendShare ?? null,
+          estimated: value?.estimatedSavings || 0,
+          executed: value?.executedSavings || 0,
+          totalSavings: value?.totalSavings || 0,
+          savingsShare: value?.savingsShare ?? null,
+          realized: value?.realizedSavings || 0,
+          realizationRate: value?.realizationRate ?? null,
+        }
+      }).sort((a, b) => b.spendAddressed - a.spendAddressed || b.totalSavings - a.totalSavings || a.supplier.localeCompare(b.supplier))
+
+      return {
+        title: 'Supplier Portfolio Value',
+        description: 'Awarded-project spend, estimated and executed savings, concentration, and supplier attributes.',
+        filename: 'supplier-portfolio-value.csv',
+        columns: [
+          { key: 'supplier', label: 'Supplier' },
+          { key: 'status', label: 'Status' },
+          { key: 'risk', label: 'Risk' },
+          { key: 'preferred', label: 'Preferred' },
+          { key: 'diverse', label: 'Diverse' },
+          { key: 'awards', label: 'Awards', format: 'number' },
+          { key: 'spendAddressed', label: 'Spend Addressed', format: 'currency' },
+          { key: 'spendShare', label: 'Spend Share', format: 'percent' },
+          { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
+          { key: 'executed', label: 'Executed Savings', format: 'currency' },
+          { key: 'totalSavings', label: 'Total Savings', format: 'currency' },
+          { key: 'savingsShare', label: 'Savings Share', format: 'percent' },
+          ...(savingsRealizationEnabled ? [
+            { key: 'realized', label: 'Realized Savings', format: 'currency' as const },
+            { key: 'realizationRate', label: 'Realization Rate', format: 'percent' as const },
+          ] : []),
+        ],
+        rows,
+      }
+    }
+
     if (reportId === 'supplier-readiness') {
       const linkedProjectsBySupplier = new Map<string, Set<string>>()
       const awardsBySupplier = new Map<string, Set<string>>()
@@ -463,11 +530,12 @@ export function ReportsView({
       ],
       rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
     }
-  }, [asOfDate, events, filteredEvents, filteredSuppliers, savingsCalcs, reportId])
+  }, [asOfDate, events, filteredEvents, filteredSuppliers, realizationPeriods, reportId, savingsCalcs, savingsRealizationEnabled])
 
-  const supplierReport = reportId === 'supplier-readiness'
+  const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio'
+  const readinessReport = reportId === 'supplier-readiness'
   const filtersActive = supplierReport
-    ? Boolean(supplierStatusFilter || supplierRiskFilter || supplierAttributeFilter || supplierReadinessFilter)
+    ? Boolean(supplierStatusFilter || supplierRiskFilter || supplierAttributeFilter || (readinessReport && supplierReadinessFilter))
     : Boolean(typeFilter || statusFilter || businessUnitFilter || buyerFilter)
 
   const resetFilters = () => {
@@ -537,7 +605,7 @@ export function ReportsView({
             <FilterSelect label="Supplier status" value={supplierStatusFilter} onChange={setSupplierStatusFilter} options={supplierStatuses} allLabel="All supplier statuses" />
             <FilterSelect label="Risk" value={supplierRiskFilter} onChange={setSupplierRiskFilter} options={supplierRisks} allLabel="All risk ratings" />
             <FilterSelect label="Attribute" value={supplierAttributeFilter} onChange={setSupplierAttributeFilter} options={['Preferred', 'Diverse']} allLabel="All attributes" />
-            <FilterSelect label="Readiness" value={supplierReadinessFilter} onChange={value => setSupplierReadinessFilter(value as SupplierReadinessFilter)} options={['Needs attention', 'Setup incomplete', 'Ready']} allLabel="All readiness states" />
+            {readinessReport && <FilterSelect label="Readiness" value={supplierReadinessFilter} onChange={value => setSupplierReadinessFilter(value as SupplierReadinessFilter)} options={['Needs attention', 'Setup incomplete', 'Ready']} allLabel="All readiness states" />}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -568,7 +636,7 @@ export function ReportsView({
                   <th
                     key={column.key}
                     scope="col"
-                    className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)] ${column.format === 'currency' || column.format === 'number' ? 'text-right' : 'text-left'}`}
+                    className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)] ${column.format === 'currency' || column.format === 'number' || column.format === 'percent' ? 'text-right' : 'text-left'}`}
                   >
                     {column.label}
                   </th>
@@ -586,7 +654,7 @@ export function ReportsView({
                 <tr key={`${reportId}-${rowIndex}`} className="transition-colors hover:bg-[var(--surface-2)]">
                   {report.columns.map(column => {
                     const formatted = formatValue(row[column.key], column.format)
-                    const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number'
+                    const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number' || column.format === 'percent'
                     return (
                       <td key={column.key} className={`px-4 py-3 text-sm ${numeric ? 'text-right font-medium tabular-nums text-[var(--text)]' : 'text-left text-[var(--text-2)]'}`}>
                         {column.format === 'status' ? (

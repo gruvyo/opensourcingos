@@ -47,6 +47,9 @@ it?
   and review items in a dashboard attention queue.
 - Produces an exportable supplier relationship-readiness report covering owner,
   review planning, risk coverage, attributes, and project/award linkage.
+- Produces an exportable supplier portfolio-value report covering awarded spend,
+  estimated and executed savings, concentration, attributes, and optional
+  realized savings.
 - Gives every demo user a private workspace with isolated sample data.
 
 ## The savings methodology
