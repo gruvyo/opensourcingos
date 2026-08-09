@@ -11,6 +11,7 @@ export type AttentionSupplier = {
   status: string | null
   risk: string | null
   nextReviewDate: string | null
+  performanceNextReviewDate?: string | null
   criticalRiskIssues?: number
   highRiskIssues?: number
 }
@@ -89,7 +90,10 @@ export function buildAttentionQueue(
     if (supplier.risk === 'High') reasons.push('High risk')
     if (supplier.criticalRiskIssues) reasons.push(issueReason(supplier.criticalRiskIssues, 'critical'))
     if (supplier.highRiskIssues) reasons.push(issueReason(supplier.highRiskIssues, 'high'))
-    if (supplier.nextReviewDate && supplier.nextReviewDate < asOfDate) reasons.push('Review overdue')
+    const relationshipReviewOverdue = Boolean(supplier.nextReviewDate && supplier.nextReviewDate < asOfDate)
+    const performanceReviewOverdue = Boolean(supplier.performanceNextReviewDate && supplier.performanceNextReviewDate < asOfDate)
+    if (relationshipReviewOverdue) reasons.push('Relationship review overdue')
+    if (performanceReviewOverdue) reasons.push('Performance review overdue')
     if (reasons.length === 0) continue
 
     supplierItems.push({
@@ -98,7 +102,10 @@ export function buildAttentionQueue(
       title: supplier.name || 'Unnamed supplier',
       href: `/suppliers/${supplier.id}`,
       reasons,
-      date: reasons.includes('Review overdue') ? supplier.nextReviewDate : null,
+      date: [
+        relationshipReviewOverdue ? supplier.nextReviewDate : null,
+        performanceReviewOverdue ? supplier.performanceNextReviewDate : null,
+      ].filter((date): date is string => Boolean(date)).sort()[0] || null,
       priority: supplier.criticalRiskIssues ? 0.5 : supplier.risk === 'High' || supplier.highRiskIssues ? 1 : 1.5,
     })
   }

@@ -195,6 +195,9 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
   unresolved High/Critical risk-register issues, and overdue review items,
   alongside overdue and upcoming project deadlines. Automated reminders remain
   planned.
+- Relationship review plans from the supplier master and performance review
+  plans from the latest scored review remain distinct. If either is overdue,
+  the Attention Queue names the specific review plan instead of merging them.
 - Supplier Portfolio Value reporting is shipped for awarded spend, spend and
   savings concentration, preferred/diverse attributes, risk, estimated and
   executed savings, and optional realized savings.

@@ -34,6 +34,7 @@ import { Card } from '@/components/ui/card'
 import { AttentionQueue } from '@/components/attention-queue'
 import { buildAttentionQueue } from '@/lib/attention-queue'
 import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
+import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow } from '@/lib/supplier-governance-report'
 import { clsx } from 'clsx'
 
 const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
@@ -212,6 +213,7 @@ export default async function DashboardPage({
     { data: realizationPeriods, error: realizationError },
     { data: supplierRows, error: suppliersError },
     { data: supplierRiskRows, error: supplierRisksError },
+    { data: supplierReviewRows, error: supplierReviewsError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
@@ -268,6 +270,16 @@ export default async function DashboardPage({
         .order('id', { ascending: true })
         .range(from, to)
     )),
+    fetchPortfolioRows('Supplier performance reviews', (from, to) => (
+      supabase.from('supplier_performance_reviews').select(`
+        id, supplier_id, review_date, created_at, overall_score, next_review_date
+      `, { count: 'exact' })
+        .order('supplier_id', { ascending: true })
+        .order('review_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+    )),
     supabase.from('organization_settings').select('savings_realization_enabled, timezone').maybeSingle(),
   ])
 
@@ -277,6 +289,7 @@ export default async function DashboardPage({
     || realizationError?.message
     || suppliersError?.message
     || supplierRisksError?.message
+    || supplierReviewsError?.message
     || settingsError?.message
     || null
 
@@ -284,6 +297,10 @@ export default async function DashboardPage({
   const calcList = (savingsCalcs || []) as CalculationRow[]
   const realizationList = (realizationPeriods || []) as DashboardRealizationPeriod[]
   const supplierAttentionList = (supplierRows || []) as SupplierAttentionRow[]
+  const supplierGovernance = supplierGovernanceSummaries(
+    (supplierReviewRows || []) as SupplierPerformanceReviewSummaryRow[],
+    [],
+  )
   const riskIssueCounts = new Map<string, { critical: number; high: number }>()
   for (const risk of (supplierRiskRows || []) as SupplierRiskAttentionRow[]) {
     if (risk.severity !== 'Critical' && risk.severity !== 'High') continue
@@ -308,6 +325,7 @@ export default async function DashboardPage({
         status: supplier.supplier_status || null,
         risk: supplier.risk_rating || null,
         nextReviewDate: supplier.next_review_date || null,
+        performanceNextReviewDate: supplierGovernance.get(supplier.id)?.performanceNextReviewDate || null,
         criticalRiskIssues: issueCounts?.critical || 0,
         highRiskIssues: issueCounts?.high || 0,
       }
