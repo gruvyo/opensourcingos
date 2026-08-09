@@ -1648,6 +1648,83 @@ export type Database = {
           },
         ]
       }
+      supplier_certifications: {
+        Row: {
+          certificate_number: string | null
+          certification_name: string
+          created_at: string
+          created_by: string | null
+          evidence_url: string | null
+          expires_on: string | null
+          id: string
+          issued_on: string | null
+          issuer: string | null
+          organization_id: string
+          supplier_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          certificate_number?: string | null
+          certification_name: string
+          created_at?: string
+          created_by?: string | null
+          evidence_url?: string | null
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuer?: string | null
+          organization_id: string
+          supplier_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          certificate_number?: string | null
+          certification_name?: string
+          created_at?: string
+          created_by?: string | null
+          evidence_url?: string | null
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuer?: string | null
+          organization_id?: string
+          supplier_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_certifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_certifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_certifications_supplier_workspace_fkey"
+            columns: ["supplier_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "supplier_certifications_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_contacts: {
         Row: {
           contact_name: string

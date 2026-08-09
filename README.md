@@ -205,8 +205,8 @@ Current priorities are:
    workspace-managed selection lists.
 3. Expand dashboards, collaboration workflows, and supplier performance,
    certification, duplicate-management, and reporting capabilities. Supplier
-   profiles already include named contacts and append-only relationship notes
-   for dated review context and risk evidence.
+   profiles already include named contacts, append-only relationship notes for
+   dated review context and risk evidence, and certification validity records.
 
 ## Contributing
 
