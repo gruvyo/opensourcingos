@@ -15,6 +15,7 @@
     "test:supplier-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-readiness.test.mts",
     "test:attention-queue": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/attention-queue.test.mts",
     "test:supplier-portfolio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-portfolio.test.mts",
+    "test:supplier-governance-report": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-governance-report.test.mts",
     "verify:env": "node scripts/verify-supabase-env.mjs",
     "verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-savings.mts",
     "db:start": "supabase start",

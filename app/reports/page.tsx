@@ -10,6 +10,8 @@ export default async function ReportsPage() {
     { data: events, error: eventsError },
     { data: savingsCalcs, error: savingsCalcsError },
     { data: suppliers, error: suppliersError },
+    { data: supplierReviews, error: supplierReviewsError },
+    { data: supplierRisks, error: supplierRisksError },
     { data: realizationPeriods, error: realizationError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
@@ -45,6 +47,24 @@ export default async function ReportsPage() {
         .order('id', { ascending: true })
         .range(from, to)
     )),
+    fetchPortfolioRows('Supplier performance reviews', (from, to) => (
+      supabase.from('supplier_performance_reviews').select(`
+        id, supplier_id, review_date, created_at, overall_score, next_review_date
+      `, { count: 'exact' })
+        .order('supplier_id', { ascending: true })
+        .order('review_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Supplier risks', (from, to) => (
+      supabase.from('supplier_risks').select(`
+        id, supplier_id, severity, risk_status
+      `, { count: 'exact' })
+        .order('supplier_id', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
     fetchPortfolioRows('Realization periods', (from, to) => (
       supabase.from('realization_periods').select(`
         id, event_id, projected_savings, realized_savings
@@ -57,7 +77,7 @@ export default async function ReportsPage() {
 
   // A failed query here would render as an empty report, which is indistinguishable
   // from a genuinely empty portfolio. Say which one it is.
-  const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || realizationError?.message || settingsError?.message || null
+  const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || supplierReviewsError?.message || supplierRisksError?.message || realizationError?.message || settingsError?.message || null
   const timezone = settings?.timezone || 'America/Chicago'
   const asOfDate = dateKeyInTimeZone(new Date(), timezone)
 
@@ -82,6 +102,8 @@ export default async function ReportsPage() {
         events={events || []}
         savingsCalcs={savingsCalcs || []}
         suppliers={suppliers || []}
+        supplierReviews={supplierReviews || []}
+        supplierRiskIssues={supplierRisks || []}
         realizationPeriods={realizationPeriods || []}
         savingsRealizationEnabled={settings?.savings_realization_enabled ?? false}
         asOfDate={asOfDate}

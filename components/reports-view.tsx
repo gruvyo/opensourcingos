@@ -9,6 +9,7 @@ import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
 import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savings'
 import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
 import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
+import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow, type SupplierRiskSummaryRow } from '@/lib/supplier-governance-report'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -66,10 +67,11 @@ type ReportId =
   | 'pipeline-buyer'
   | 'supplier-portfolio'
   | 'supplier-readiness'
+  | 'supplier-performance-risk'
 
 type ReportValue = string | number | null
 type ReportRow = Record<string, ReportValue>
-type ColumnFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status' | 'percent'
+type ColumnFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status' | 'percent' | 'score'
 
 type ReportColumn = {
   key: string
@@ -106,6 +108,7 @@ const REPORT_OPTIONS: Array<{ id: ReportId; label: string; group: string }> = [
   { id: 'projects-buyer', label: 'Projects by Buyer', group: 'Projects' },
   { id: 'supplier-portfolio', label: 'Supplier Portfolio Value', group: 'Suppliers' },
   { id: 'supplier-readiness', label: 'Supplier Relationship Readiness', group: 'Suppliers' },
+  { id: 'supplier-performance-risk', label: 'Supplier Performance & Risk', group: 'Suppliers' },
 ]
 
 function relationName(relation: unknown, key: keyof NamedRelation, fallback: string): string {
@@ -149,6 +152,7 @@ function formatValue(value: ReportValue, format: ColumnFormat = 'text'): string 
   }
   if (format === 'date') return formatDate(typeof value === 'string' ? value : null)
   if (format === 'number') return num(value).toLocaleString('en-US')
+  if (format === 'score') return value === null ? '—' : `${num(value).toFixed(1)} / 5`
   if (format === 'percent') return value === null ? '—' : `${num(value).toFixed(1)}%`
   if (value === null || value === '') return '—'
   return String(value)
@@ -190,6 +194,8 @@ export function ReportsView({
   events,
   savingsCalcs,
   suppliers,
+  supplierReviews,
+  supplierRiskIssues,
   realizationPeriods,
   savingsRealizationEnabled,
   asOfDate,
@@ -197,6 +203,8 @@ export function ReportsView({
   events: EventRow[]
   savingsCalcs: SavingsRow[]
   suppliers: SupplierRow[]
+  supplierReviews: SupplierPerformanceReviewSummaryRow[]
+  supplierRiskIssues: SupplierRiskSummaryRow[]
   realizationPeriods: RealizationRow[]
   savingsRealizationEnabled: boolean
   asOfDate: string
@@ -265,6 +273,56 @@ export function ReportsView({
   }), [asOfDate, reportId, supplierAttributeFilter, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
 
   const report = useMemo<ReportDefinition>(() => {
+    if (reportId === 'supplier-performance-risk') {
+      const governance = supplierGovernanceSummaries(supplierReviews, supplierRiskIssues)
+      const rows = filteredSuppliers.map(supplier => {
+        const summary = governance.get(supplier.id)
+        return {
+          supplier: supplier.supplier_name,
+          status: supplier.supplier_status || 'Active',
+          relationshipRisk: supplier.risk_rating || 'Unrated',
+          owner: personName(supplier.relationship_owner) || 'Unassigned',
+          latestReview: summary?.latestReviewDate || null,
+          latestScore: summary?.latestOverallScore ?? null,
+          performanceNextReview: summary?.performanceNextReviewDate || null,
+          relationshipNextReview: supplier.next_review_date,
+          unresolvedRisks: summary?.unresolvedRisks || 0,
+          criticalRisks: summary?.criticalRisks || 0,
+          highRisks: summary?.highRisks || 0,
+          mediumRisks: summary?.mediumRisks || 0,
+          lowRisks: summary?.lowRisks || 0,
+        }
+      }).sort((a, b) => (
+        b.criticalRisks - a.criticalRisks
+        || b.highRisks - a.highRisks
+        || b.unresolvedRisks - a.unresolvedRisks
+        || (a.latestScore ?? 6) - (b.latestScore ?? 6)
+        || a.supplier.localeCompare(b.supplier)
+      ))
+
+      return {
+        title: 'Supplier Performance & Risk',
+        description: 'Latest explicit performance score, separately labeled review plans, and unresolved structured risks. Historical scores are not silently averaged.',
+        filename: 'supplier-performance-risk.csv',
+        columns: [
+          { key: 'supplier', label: 'Supplier' },
+          { key: 'status', label: 'Status' },
+          { key: 'relationshipRisk', label: 'Relationship Risk' },
+          { key: 'owner', label: 'Relationship Owner' },
+          { key: 'latestReview', label: 'Latest Performance Review', format: 'date' },
+          { key: 'latestScore', label: 'Latest Overall Score', format: 'score' },
+          { key: 'performanceNextReview', label: 'Performance Next Review', format: 'date' },
+          { key: 'relationshipNextReview', label: 'Relationship Next Review', format: 'date' },
+          { key: 'unresolvedRisks', label: 'Unresolved Risks', format: 'number' },
+          { key: 'criticalRisks', label: 'Critical', format: 'number' },
+          { key: 'highRisks', label: 'High', format: 'number' },
+          { key: 'mediumRisks', label: 'Medium', format: 'number' },
+          { key: 'lowRisks', label: 'Low', format: 'number' },
+        ],
+        rows,
+      }
+    }
+
     if (reportId === 'supplier-portfolio') {
       const portfolioValues = supplierPortfolioValues(
         events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
@@ -530,9 +588,9 @@ export function ReportsView({
       ],
       rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
     }
-  }, [asOfDate, events, filteredEvents, filteredSuppliers, realizationPeriods, reportId, savingsCalcs, savingsRealizationEnabled])
+  }, [asOfDate, events, filteredEvents, filteredSuppliers, realizationPeriods, reportId, savingsCalcs, savingsRealizationEnabled, supplierReviews, supplierRiskIssues])
 
-  const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio'
+  const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio' || reportId === 'supplier-performance-risk'
   const readinessReport = reportId === 'supplier-readiness'
   const filtersActive = supplierReport
     ? Boolean(supplierStatusFilter || supplierRiskFilter || supplierAttributeFilter || (readinessReport && supplierReadinessFilter))
@@ -636,7 +694,7 @@ export function ReportsView({
                   <th
                     key={column.key}
                     scope="col"
-                    className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)] ${column.format === 'currency' || column.format === 'number' || column.format === 'percent' ? 'text-right' : 'text-left'}`}
+                    className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)] ${column.format === 'currency' || column.format === 'number' || column.format === 'percent' || column.format === 'score' ? 'text-right' : 'text-left'}`}
                   >
                     {column.label}
                   </th>
@@ -654,7 +712,7 @@ export function ReportsView({
                 <tr key={`${reportId}-${rowIndex}`} className="transition-colors hover:bg-[var(--surface-2)]">
                   {report.columns.map(column => {
                     const formatted = formatValue(row[column.key], column.format)
-                    const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number' || column.format === 'percent'
+                    const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number' || column.format === 'percent' || column.format === 'score'
                     return (
                       <td key={column.key} className={`px-4 py-3 text-sm ${numeric ? 'text-right font-medium tabular-nums text-[var(--text)]' : 'text-left text-[var(--text-2)]'}`}>
                         {column.format === 'status' ? (

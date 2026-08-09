@@ -52,6 +52,9 @@ it?
 - Produces an exportable supplier portfolio-value report covering awarded spend,
   estimated and executed savings, concentration, attributes, and optional
   realized savings.
+- Produces an exportable supplier performance-and-risk report covering the latest
+  explicit review score, separately labeled relationship and performance review
+  dates, and unresolved structured risks by severity without averaging history.
 - Gives every demo user a private workspace with isolated sample data.
 
 ## The savings methodology
