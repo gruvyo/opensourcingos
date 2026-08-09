@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(276);
+select plan(277);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -74,6 +74,11 @@ select ok(
 select ok(
   exists (select 1 from pg_catalog.pg_constraint where conrelid='public.supplier_performance_reviews'::regclass and conname='supplier_performance_reviews_overall_score_check'),
   'supplier performance review overall scores are constrained'
+);
+
+select ok(
+  to_regclass('public.idx_supplier_performance_reviews_supplier_workspace') is not null,
+  'supplier performance review workspace relationship has a covering index'
 );
 
 select ok(
