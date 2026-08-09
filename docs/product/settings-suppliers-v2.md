@@ -198,6 +198,10 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - Supplier Portfolio Value reporting is shipped for awarded spend, spend and
   savings concentration, preferred/diverse attributes, risk, estimated and
   executed savings, and optional realized savings.
+- Supplier Performance & Risk reporting is shipped as a read-only portfolio view.
+  It shows the latest explicit overall review score without silently averaging
+  historical reviews, keeps relationship-level and performance-review planning
+  dates separately labeled, and counts unresolved structured risks by severity.
 - Named supplier contacts are shipped with role/title, email, phone, one
   primary-contact designation, role-aware maintenance, tenant isolation, and
   workspace audit history.
