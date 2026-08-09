@@ -203,7 +203,10 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - Dated supplier relationship notes are shipped as an append-only timeline for
   review context, risk evidence, and follow-up. Workspace members can read the
   timeline; administrators and procurement users can add entries.
-- Supplier performance reviews, certifications, and risk evidence.
+- Supplier certifications are shipped with issuer, certificate number,
+  issue/expiration dates, optional evidence links, expired-state visibility,
+  tenant isolation, role-aware maintenance, and workspace audit history.
+- Supplier performance reviews and structured risk evidence.
 - Duplicate detection and audited supplier merge.
 - Broader diverse-spend and preferred-supplier target reporting remains planned.
 
