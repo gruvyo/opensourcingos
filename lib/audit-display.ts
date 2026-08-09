@@ -7,6 +7,7 @@ export const AUDIT_ENTITY_FILTERS = [
   'supplier_contact',
   'supplier_certification',
   'supplier_performance_review',
+  'supplier_risk',
   'project_choice_option',
   'category',
   'business_unit',
@@ -27,6 +28,7 @@ const entityLabels: Record<AuditEntityType, string> = {
   supplier_contact: 'Supplier contact',
   supplier_certification: 'Supplier certification',
   supplier_performance_review: 'Supplier performance review',
+  supplier_risk: 'Supplier risk',
   project_choice_option: 'Workspace choice',
   category: 'Category',
   business_unit: 'Business unit',
@@ -52,6 +54,11 @@ const fieldLabels: Record<string, string> = {
   quality_score: 'Quality score',
   commercial_score: 'Commercial score',
   compliance_score: 'Compliance score',
+  risk_title: 'Risk title',
+  identified_on: 'Identified on',
+  severity: 'Severity',
+  risk_status: 'Risk status',
+  target_resolution_date: 'Target resolution',
   job_title: 'Role or title',
   email: 'Email',
   phone: 'Phone',
@@ -106,6 +113,7 @@ const excludedFields = new Set([
   'token',
   'notes',
   'summary',
+  'description',
   'tax_id',
 ])
 
@@ -149,7 +157,7 @@ export function auditActionLabel(action: string, entityType?: string): string {
 
 export function auditSubject(beforeData: Json | null, afterData: Json | null): string | null {
   const record = { ...asRecord(beforeData), ...asRecord(afterData) }
-  for (const key of ['supplier_name', 'contact_name', 'certification_name', 'review_title', 'label', 'category_name', 'business_unit_name', 'cost_center_name', 'calculation_name', 'name']) {
+  for (const key of ['supplier_name', 'contact_name', 'certification_name', 'review_title', 'risk_title', 'label', 'category_name', 'business_unit_name', 'cost_center_name', 'calculation_name', 'name']) {
     const value = record[key]
     if (typeof value === 'string' && value.trim()) return value
   }
