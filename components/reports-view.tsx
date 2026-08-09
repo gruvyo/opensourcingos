@@ -287,7 +287,8 @@ export function ReportsView({
           diverse: supplier.diversity_flag ? 'Yes' : 'No',
           linkedProjects: linkedProjectsBySupplier.get(supplier.id)?.size || 0,
           awards: awardsBySupplier.get(supplier.id)?.size || 0,
-          readiness: readiness.label,
+          attention: readiness.alerts.join('; ') || '—',
+          setupGaps: readiness.gaps.join('; ') || 'Complete',
           _priority: readiness.priority,
         }
       }).sort((a, b) => a._priority - b._priority || a.supplier.localeCompare(b.supplier))
@@ -306,7 +307,8 @@ export function ReportsView({
           { key: 'diverse', label: 'Diverse' },
           { key: 'linkedProjects', label: 'Linked Projects', format: 'number' },
           { key: 'awards', label: 'Awards', format: 'number' },
-          { key: 'readiness', label: 'Readiness' },
+          { key: 'attention', label: 'Attention' },
+          { key: 'setupGaps', label: 'Setup Gaps' },
         ],
         rows,
       }

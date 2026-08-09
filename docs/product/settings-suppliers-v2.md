@@ -35,8 +35,8 @@ System migrations and former members remain distinguishable from current actors.
 Supplier Relationship Readiness extends Reports using the supplier fields already
 shipped in Release 2. The report makes relationship owner, next review, risk,
 preferred/diverse attributes, and project/award linkage visible in one exportable
-view. It calls out high risk and overdue reviews separately from setup gaps such
-as a missing owner, review date, or risk rating. Filters cover supplier status,
+view. Separate Attention and Setup Gaps columns keep high risk and overdue
+reviews visible alongside a missing owner, review date, or risk rating. Filters cover supplier status,
 risk, attributes, and readiness without changing supplier records.
 
 Normalized supplier names are unique within each workspace. Membership
