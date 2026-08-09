@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { ReportsView } from '@/components/reports-view'
+import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 
 export default async function ReportsPage() {
   const supabase = await createClient()
@@ -8,10 +9,13 @@ export default async function ReportsPage() {
   const [
     { data: events, error: eventsError },
     { data: savingsCalcs, error: savingsCalcsError },
+    { data: suppliers, error: suppliersError },
+    { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
       supabase.from('sourcing_events').select(`
         id, event_name, event_type, event_status, project_type, buyer_name,
+        incumbent_supplier_id, awarded_supplier_id,
         event_start_date, project_due_date, event_close_date, contract_start_date, contract_end_date,
         category:categories(category_name),
         business_unit:business_units(business_unit_name),
@@ -30,11 +34,23 @@ export default async function ReportsPage() {
         .order('id', { ascending: false })
         .range(from, to)
     )),
+    fetchPortfolioRows('Suppliers', (from, to) => (
+      supabase.from('suppliers').select(`
+        id, supplier_name, supplier_status, risk_rating, preferred_flag, diversity_flag,
+        next_review_date, relationship_owner:profiles!suppliers_relationship_owner_id_fkey(full_name, email)
+      `, { count: 'exact' })
+        .order('supplier_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    supabase.from('organization_settings').select('timezone').maybeSingle(),
   ])
 
   // A failed query here would render as an empty report, which is indistinguishable
   // from a genuinely empty portfolio. Say which one it is.
-  const loadError = eventsError?.message || savingsCalcsError?.message || null
+  const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || settingsError?.message || null
+  const timezone = settings?.timezone || 'America/Chicago'
+  const asOfDate = dateKeyInTimeZone(new Date(), timezone)
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
@@ -53,7 +69,7 @@ export default async function ReportsPage() {
         </div>
       )}
 
-      <ReportsView events={events || []} savingsCalcs={savingsCalcs || []} />
+      <ReportsView events={events || []} savingsCalcs={savingsCalcs || []} suppliers={suppliers || []} asOfDate={asOfDate} />
     </div>
   )
 }

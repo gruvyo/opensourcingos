@@ -12,6 +12,7 @@
     "test:env": "node --test scripts/verify-supabase-env.test.mjs",
     "test:portfolio-queries": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/portfolio-query-pagination.test.mts",
     "test:audit-display": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/audit-display.test.mts",
+    "test:supplier-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-readiness.test.mts",
     "verify:env": "node scripts/verify-supabase-env.mjs",
     "verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-savings.mts",
     "db:start": "supabase start",

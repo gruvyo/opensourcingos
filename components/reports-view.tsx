@@ -7,8 +7,9 @@ import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
 import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
 import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savings'
+import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
 
-type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string }
+type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
 type EventRow = {
   id: string
@@ -17,6 +18,8 @@ type EventRow = {
   event_status: string
   project_type: string | null
   buyer_name: string | null
+  incumbent_supplier_id: string | null
+  awarded_supplier_id: string | null
   event_start_date: string | null
   project_due_date: string | null
   event_close_date: string | null
@@ -26,6 +29,17 @@ type EventRow = {
   business_unit: unknown
   incumbent_supplier: unknown
   awarded_supplier: unknown
+}
+
+type SupplierRow = {
+  id: string
+  supplier_name: string
+  supplier_status: string | null
+  risk_rating: string | null
+  preferred_flag: boolean | null
+  diversity_flag: boolean | null
+  next_review_date: string | null
+  relationship_owner: unknown
 }
 
 type SavingsRow = SavingsCalcRow & {
@@ -42,6 +56,7 @@ type ReportId =
   | 'projects-buyer'
   | 'pipeline-business-unit'
   | 'pipeline-buyer'
+  | 'supplier-readiness'
 
 type ReportValue = string | number | null
 type ReportRow = Record<string, ReportValue>
@@ -80,11 +95,17 @@ const REPORT_OPTIONS: Array<{ id: ReportId; label: string; group: string }> = [
   { id: 'savings-buyer', label: 'Savings by Buyer', group: 'Savings' },
   { id: 'projects-business-unit', label: 'Projects by Business Unit', group: 'Projects' },
   { id: 'projects-buyer', label: 'Projects by Buyer', group: 'Projects' },
+  { id: 'supplier-readiness', label: 'Supplier Relationship Readiness', group: 'Suppliers' },
 ]
 
 function relationName(relation: unknown, key: keyof NamedRelation, fallback: string): string {
   const value = getFirst<NamedRelation>(relation)?.[key]
   return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+function personName(relation: unknown): string | null {
+  const person = getFirst<NamedRelation>(relation)
+  return person?.full_name || person?.email || null
 }
 
 function csvCell(value: ReportValue): string {
@@ -154,12 +175,26 @@ function aggregateBy(
   return groups
 }
 
-export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savingsCalcs: SavingsRow[] }) {
+export function ReportsView({
+  events,
+  savingsCalcs,
+  suppliers,
+  asOfDate,
+}: {
+  events: EventRow[]
+  savingsCalcs: SavingsRow[]
+  suppliers: SupplierRow[]
+  asOfDate: string
+}) {
   const [reportId, setReportId] = useState<ReportId>('pipeline')
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [businessUnitFilter, setBusinessUnitFilter] = useState('')
   const [buyerFilter, setBuyerFilter] = useState('')
+  const [supplierStatusFilter, setSupplierStatusFilter] = useState('')
+  const [supplierRiskFilter, setSupplierRiskFilter] = useState('')
+  const [supplierAttributeFilter, setSupplierAttributeFilter] = useState('')
+  const [supplierReadinessFilter, setSupplierReadinessFilter] = useState<SupplierReadinessFilter>('')
 
   const sourcingEvents = useMemo(
     () => events.filter(event => (event.project_type || 'Sourcing') === 'Sourcing'),
@@ -182,6 +217,14 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
     () => Array.from(new Set(sourcingEvents.map(event => event.buyer_name || 'Unassigned'))).sort(),
     [sourcingEvents],
   )
+  const supplierStatuses = useMemo(
+    () => Array.from(new Set(suppliers.map(supplier => supplier.supplier_status || 'Active'))).sort(),
+    [suppliers],
+  )
+  const supplierRisks = useMemo(
+    () => Array.from(new Set(suppliers.map(supplier => supplier.risk_rating || 'Unrated'))).sort(),
+    [suppliers],
+  )
 
   const filteredEvents = useMemo(() => sourcingEvents.filter(event => {
     if (typeFilter && event.event_type !== typeFilter) return false
@@ -191,7 +234,83 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
     return true
   }), [sourcingEvents, typeFilter, statusFilter, businessUnitFilter, buyerFilter])
 
+  const filteredSuppliers = useMemo(() => suppliers.filter(supplier => {
+    const status = supplier.supplier_status || 'Active'
+    const risk = supplier.risk_rating || 'Unrated'
+    const readiness = assessSupplierReadiness({
+      relationshipOwner: personName(supplier.relationship_owner),
+      nextReviewDate: supplier.next_review_date,
+      risk: supplier.risk_rating,
+    }, asOfDate)
+    if (supplierStatusFilter && status !== supplierStatusFilter) return false
+    if (supplierRiskFilter && risk !== supplierRiskFilter) return false
+    if (supplierAttributeFilter === 'Preferred' && !supplier.preferred_flag) return false
+    if (supplierAttributeFilter === 'Diverse' && !supplier.diversity_flag) return false
+    return matchesSupplierReadinessFilter(readiness, supplierReadinessFilter)
+  }), [asOfDate, supplierAttributeFilter, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
+
   const report = useMemo<ReportDefinition>(() => {
+    if (reportId === 'supplier-readiness') {
+      const linkedProjectsBySupplier = new Map<string, Set<string>>()
+      const awardsBySupplier = new Map<string, Set<string>>()
+      for (const event of events) {
+        for (const supplierId of [event.incumbent_supplier_id, event.awarded_supplier_id]) {
+          if (!supplierId) continue
+          const linked = linkedProjectsBySupplier.get(supplierId) ?? new Set<string>()
+          linked.add(event.id)
+          linkedProjectsBySupplier.set(supplierId, linked)
+        }
+        if (event.awarded_supplier_id) {
+          const awards = awardsBySupplier.get(event.awarded_supplier_id) ?? new Set<string>()
+          awards.add(event.id)
+          awardsBySupplier.set(event.awarded_supplier_id, awards)
+        }
+      }
+
+      const rows = filteredSuppliers.map(supplier => {
+        const owner = personName(supplier.relationship_owner)
+        const readiness = assessSupplierReadiness({
+          relationshipOwner: owner,
+          nextReviewDate: supplier.next_review_date,
+          risk: supplier.risk_rating,
+        }, asOfDate)
+        return {
+          supplier: supplier.supplier_name,
+          status: supplier.supplier_status || 'Active',
+          risk: supplier.risk_rating || 'Unrated',
+          owner: owner || 'Unassigned',
+          nextReview: supplier.next_review_date,
+          preferred: supplier.preferred_flag ? 'Yes' : 'No',
+          diverse: supplier.diversity_flag ? 'Yes' : 'No',
+          linkedProjects: linkedProjectsBySupplier.get(supplier.id)?.size || 0,
+          awards: awardsBySupplier.get(supplier.id)?.size || 0,
+          attention: readiness.alerts.join('; ') || '—',
+          setupGaps: readiness.gaps.join('; ') || 'Complete',
+          _priority: readiness.priority,
+        }
+      }).sort((a, b) => a._priority - b._priority || a.supplier.localeCompare(b.supplier))
+
+      return {
+        title: 'Supplier Relationship Readiness',
+        description: 'Ownership, review planning, risk coverage, attributes, and project linkage for every supplier relationship.',
+        filename: 'supplier-relationship-readiness.csv',
+        columns: [
+          { key: 'supplier', label: 'Supplier' },
+          { key: 'status', label: 'Status' },
+          { key: 'risk', label: 'Risk' },
+          { key: 'owner', label: 'Relationship Owner' },
+          { key: 'nextReview', label: 'Next Review', format: 'date' },
+          { key: 'preferred', label: 'Preferred' },
+          { key: 'diverse', label: 'Diverse' },
+          { key: 'linkedProjects', label: 'Linked Projects', format: 'number' },
+          { key: 'awards', label: 'Awards', format: 'number' },
+          { key: 'attention', label: 'Attention' },
+          { key: 'setupGaps', label: 'Setup Gaps' },
+        ],
+        rows,
+      }
+    }
+
     const filteredIds = new Set(filteredEvents.map(event => event.id))
     const totalsByEvent = new Map<string, SavingsTotals>()
     for (const calculation of savingsCalcs) {
@@ -344,15 +463,25 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
       ],
       rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
     }
-  }, [filteredEvents, savingsCalcs, reportId])
+  }, [asOfDate, events, filteredEvents, filteredSuppliers, savingsCalcs, reportId])
 
-  const filtersActive = Boolean(typeFilter || statusFilter || businessUnitFilter || buyerFilter)
+  const supplierReport = reportId === 'supplier-readiness'
+  const filtersActive = supplierReport
+    ? Boolean(supplierStatusFilter || supplierRiskFilter || supplierAttributeFilter || supplierReadinessFilter)
+    : Boolean(typeFilter || statusFilter || businessUnitFilter || buyerFilter)
 
   const resetFilters = () => {
-    setTypeFilter('')
-    setStatusFilter('')
-    setBusinessUnitFilter('')
-    setBuyerFilter('')
+    if (supplierReport) {
+      setSupplierStatusFilter('')
+      setSupplierRiskFilter('')
+      setSupplierAttributeFilter('')
+      setSupplierReadinessFilter('')
+    } else {
+      setTypeFilter('')
+      setStatusFilter('')
+      setBusinessUnitFilter('')
+      setBuyerFilter('')
+    }
   }
 
   return (
@@ -367,7 +496,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
               onChange={event => setReportId(event.target.value as ReportId)}
               className="mt-2"
             >
-              {['Pipeline', 'Savings', 'Projects'].map(group => (
+              {['Pipeline', 'Savings', 'Projects', 'Suppliers'].map(group => (
                 <optgroup key={group} label={group}>
                   {REPORT_OPTIONS.filter(option => option.group === group).map(option => (
                     <option key={option.id} value={option.id}>{option.label}</option>
@@ -394,7 +523,7 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-[var(--brand-ink)]" aria-hidden="true" />
-            <h2 className="text-sm font-semibold text-[var(--text)]">Portfolio filters</h2>
+            <h2 className="text-sm font-semibold text-[var(--text)]">{supplierReport ? 'Supplier filters' : 'Portfolio filters'}</h2>
           </div>
           {filtersActive && (
             <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--brand-ink)] hover:underline">
@@ -403,12 +532,21 @@ export function ReportsView({ events, savingsCalcs }: { events: EventRow[]; savi
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <FilterSelect label="Project type" value={typeFilter} onChange={setTypeFilter} options={eventTypes} allLabel="All project types" />
-          <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses} allLabel="All statuses" />
-          <FilterSelect label="Business unit" value={businessUnitFilter} onChange={setBusinessUnitFilter} options={businessUnits} allLabel="All business units" />
-          <FilterSelect label="Buyer" value={buyerFilter} onChange={setBuyerFilter} options={buyers} allLabel="All buyers" />
-        </div>
+        {supplierReport ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <FilterSelect label="Supplier status" value={supplierStatusFilter} onChange={setSupplierStatusFilter} options={supplierStatuses} allLabel="All supplier statuses" />
+            <FilterSelect label="Risk" value={supplierRiskFilter} onChange={setSupplierRiskFilter} options={supplierRisks} allLabel="All risk ratings" />
+            <FilterSelect label="Attribute" value={supplierAttributeFilter} onChange={setSupplierAttributeFilter} options={['Preferred', 'Diverse']} allLabel="All attributes" />
+            <FilterSelect label="Readiness" value={supplierReadinessFilter} onChange={value => setSupplierReadinessFilter(value as SupplierReadinessFilter)} options={['Needs attention', 'Setup incomplete', 'Ready']} allLabel="All readiness states" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <FilterSelect label="Project type" value={typeFilter} onChange={setTypeFilter} options={eventTypes} allLabel="All project types" />
+            <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses} allLabel="All statuses" />
+            <FilterSelect label="Business unit" value={businessUnitFilter} onChange={setBusinessUnitFilter} options={businessUnits} allLabel="All business units" />
+            <FilterSelect label="Buyer" value={buyerFilter} onChange={setBuyerFilter} options={buyers} allLabel="All buyers" />
+          </div>
+        )}
       </Card>
 
       <Card className="overflow-hidden">
