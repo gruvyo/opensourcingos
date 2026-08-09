@@ -207,7 +207,7 @@ Current priorities are:
    certification, duplicate-management, and reporting capabilities. Supplier
    profiles already include named contacts, append-only relationship notes for
    dated review context and risk evidence, certification validity records, and
-   scored performance reviews.
+   scored performance reviews, plus a structured risk register.
 
 ## Contributing
 

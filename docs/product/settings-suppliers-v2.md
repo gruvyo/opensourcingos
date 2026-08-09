@@ -40,8 +40,8 @@ reviews visible alongside a missing owner, review date, or risk rating. Filters 
 risk, attributes, and readiness without changing supplier records.
 
 Normalized supplier names are unique within each workspace. Membership
-invitations and role changes, scored performance reviews, certifications,
-duplicate merge, and portfolio concentration remain Release 3 work.
+invitations and role changes, duplicate merge, automated reminders, and deeper
+portfolio concentration remain Release 3 work.
 
 ## Product intent
 
@@ -210,7 +210,12 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
   optional unweighted delivery, quality, commercial, and compliance scores,
   dated summaries, next-review dates, reviewer attribution, tenant isolation,
   role-aware maintenance, and workspace audit history.
-- Broader structured risk evidence remains planned.
+- A structured supplier risk register is shipped with identification dates,
+  Low/Medium/High/Critical severity, Open/Monitoring/Resolved status,
+  narrative evidence, optional target-resolution dates and evidence links,
+  actor attribution, tenant isolation, role-aware maintenance, and workspace
+  audit history. Individual risks do not silently change the relationship-level
+  risk rating.
 - Duplicate detection and audited supplier merge.
 - Broader diverse-spend and preferred-supplier target reporting remains planned.
 

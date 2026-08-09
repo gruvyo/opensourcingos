@@ -11,6 +11,7 @@ import {
 test('turns stored audit names into workspace language', () => {
   assert.equal(auditEntityLabel('organization_settings'), 'Workspace settings')
   assert.equal(auditEntityLabel('supplier_contact'), 'Supplier contact')
+  assert.equal(auditEntityLabel('supplier_risk'), 'Supplier risk')
   assert.equal(auditEntityLabel('future_entity'), 'Future Entity')
   assert.equal(auditActionLabel('insert'), 'Added')
   assert.equal(auditActionLabel('update', 'project_classification_reset'), 'Reset')
@@ -19,8 +20,20 @@ test('turns stored audit names into workspace language', () => {
 test('uses the most useful record name as the subject', () => {
   assert.equal(auditSubject(null, { supplier_name: 'Acme Supply', id: '1' }), 'Acme Supply')
   assert.equal(auditSubject(null, { contact_name: 'Sam Buyer', id: '2' }), 'Sam Buyer')
+  assert.equal(auditSubject(null, { risk_title: 'Continuity gap', id: '3' }), 'Continuity gap')
   assert.equal(auditSubject({ label: 'Legacy status' }, { label: 'Pipeline' }), 'Pipeline')
   assert.equal(auditSubject({ id: '1' }, { id: '1' }), null)
+})
+
+test('shows structured risk changes without exposing the narrative', () => {
+  const changes = auditChanges(
+    { severity: 'Medium', risk_status: 'Open', description: 'private evidence' },
+    { severity: 'High', risk_status: 'Monitoring', description: 'more private evidence' },
+  )
+  assert.deepEqual(changes, [
+    { field: 'severity', label: 'Severity', before: 'Medium', after: 'High' },
+    { field: 'risk_status', label: 'Risk status', before: 'Open', after: 'Monitoring' },
+  ])
 })
 
 test('shows meaningful changes while excluding private and noisy fields', () => {

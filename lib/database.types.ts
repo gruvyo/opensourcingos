@@ -2134,6 +2134,86 @@ export type Database = {
           },
         ]
       }
+      supplier_risks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          evidence_url: string | null
+          id: string
+          identified_on: string
+          organization_id: string
+          risk_status: string
+          risk_title: string
+          severity: string
+          supplier_id: string
+          target_resolution_date: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description: string
+          evidence_url?: string | null
+          id?: string
+          identified_on: string
+          organization_id: string
+          risk_status?: string
+          risk_title: string
+          severity: string
+          supplier_id: string
+          target_resolution_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          evidence_url?: string | null
+          id?: string
+          identified_on?: string
+          organization_id?: string
+          risk_status?: string
+          risk_title?: string
+          severity?: string
+          supplier_id?: string
+          target_resolution_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_risks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_risks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_risks_supplier_workspace_fkey"
+            columns: ["supplier_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "supplier_risks_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           country_code: string | null

@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(277);
+select plan(291);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -48,8 +48,8 @@ select is(
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
   ),
-  26::bigint,
-  'all 26 public application tables exist'
+  27::bigint,
+  'all 27 public application tables exist'
 );
 
 select ok(
@@ -101,6 +101,51 @@ select ok(
   and not has_function_privilege('authenticated','public.stamp_supplier_performance_review_actor()','EXECUTE')
   and has_function_privilege('service_role','public.stamp_supplier_performance_review_actor()','EXECUTE'),
   'supplier-performance-review actor stamping is callable only by the trigger owner path'
+);
+
+select ok(to_regclass('public.supplier_risks') is not null, 'supplier_risks exists');
+
+select ok(
+  exists (select 1 from information_schema.columns where table_schema='public' and table_name='supplier_risks' and column_name='severity' and is_nullable='NO')
+  and exists (select 1 from information_schema.columns where table_schema='public' and table_name='supplier_risks' and column_name='risk_status' and is_nullable='NO'),
+  'supplier risks require severity and status'
+);
+
+select ok(
+  exists (select 1 from pg_catalog.pg_constraint where conrelid='public.supplier_risks'::regclass and conname='supplier_risks_severity_check'),
+  'supplier risk severity is constrained'
+);
+
+select ok(
+  exists (select 1 from pg_catalog.pg_constraint where conrelid='public.supplier_risks'::regclass and conname='supplier_risks_status_check'),
+  'supplier risk status is constrained'
+);
+
+select ok(
+  to_regclass('public.idx_supplier_risks_supplier_workspace') is not null,
+  'supplier risk workspace relationship has a covering index'
+);
+
+select ok(
+  (select pg_get_constraintdef(oid) like '%supplier_risk%' from pg_catalog.pg_constraint where conrelid='public.audit_log'::regclass and conname='audit_log_entity_type_check'),
+  'workspace audit accepts supplier risk records'
+);
+
+select ok(
+  not (select p.prosecdef from pg_catalog.pg_proc p where p.oid='public.stamp_supplier_risk_actor()'::regprocedure),
+  'supplier-risk actor stamping runs with invoker privileges'
+);
+
+select ok(
+  (select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%' from pg_catalog.pg_proc p where p.oid='public.stamp_supplier_risk_actor()'::regprocedure),
+  'supplier-risk actor stamping has a fixed search path'
+);
+
+select ok(
+  not has_function_privilege('anon','public.stamp_supplier_risk_actor()','EXECUTE')
+  and not has_function_privilege('authenticated','public.stamp_supplier_risk_actor()','EXECUTE')
+  and has_function_privilege('service_role','public.stamp_supplier_risk_actor()','EXECUTE'),
+  'supplier-risk actor stamping is callable only by the trigger owner path'
 );
 
 select ok(
@@ -3327,6 +3372,64 @@ select is(
   (select count(*)::bigint from public.audit_log where entity_type='supplier_performance_review' and entity_id='f1000000-0000-4000-8000-000000000002'),
   1::bigint,
   'supplier performance review changes enter the workspace audit'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+insert into public.supplier_risks (id, organization_id, supplier_id, risk_title, identified_on, severity, risk_status, description)
+select '91000000-0000-4000-8000-000000000001', profile.organization_id, supplier.id, 'Private Risk', date '2026-08-08', 'High', 'Open', 'Private risk context'
+from public.profiles profile
+join lateral (select id from public.suppliers where organization_id=profile.organization_id order by id limit 1) supplier on true
+where profile.id='10000000-0000-4000-8000-000000000001';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select is(
+  (select count(*)::bigint from public.supplier_risks where id='91000000-0000-4000-8000-000000000001'),
+  0::bigint,
+  'one workspace cannot read another workspace supplier risk'
+);
+reset role;
+
+update public.profiles set role='viewer' where id='20000000-0000-4000-8000-000000000002';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select throws_ok(
+  $$
+    insert into public.supplier_risks (organization_id, supplier_id, risk_title, identified_on, severity, risk_status, description)
+    select profile.organization_id, supplier.id, 'Viewer Risk', date '2026-08-08', 'Medium', 'Open', 'Viewer cannot add this'
+    from public.profiles profile
+    join lateral (select id from public.suppliers where organization_id=profile.organization_id order by id limit 1) supplier on true
+    where profile.id='20000000-0000-4000-8000-000000000002'
+  $$,
+  '42501',
+  'new row violates row-level security policy for table "supplier_risks"',
+  'viewers cannot add supplier risks'
+);
+reset role;
+
+update public.profiles set role='procurement_user' where id='20000000-0000-4000-8000-000000000002';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select lives_ok(
+  $$
+    insert into public.supplier_risks (id, organization_id, supplier_id, risk_title, identified_on, severity, risk_status, description, created_by)
+    select '91000000-0000-4000-8000-000000000002', profile.organization_id, supplier.id, 'Procurement Risk', date '2026-08-08', 'High', 'Monitoring', 'Procurement risk context', '10000000-0000-4000-8000-000000000001'
+    from public.profiles profile
+    join lateral (select id from public.suppliers where organization_id=profile.organization_id order by id limit 1) supplier on true
+    where profile.id='20000000-0000-4000-8000-000000000002'
+  $$,
+  'procurement users can add supplier risks'
+);
+select is(
+  (select created_by from public.supplier_risks where id='91000000-0000-4000-8000-000000000002'),
+  '20000000-0000-4000-8000-000000000002'::uuid,
+  'supplier risks stamp the authenticated author instead of trusting the payload'
+);
+select is(
+  (select count(*)::bigint from public.audit_log where entity_type='supplier_risk' and entity_id='91000000-0000-4000-8000-000000000002'),
+  1::bigint,
+  'supplier risk changes enter the workspace audit'
 );
 reset role;
 
