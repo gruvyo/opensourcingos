@@ -205,6 +205,9 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
   It shows the latest explicit overall review score without silently averaging
   historical reviews, keeps relationship-level and performance-review planning
   dates separately labeled, and counts unresolved structured risks by severity.
+- Supplier Portfolio Segmentation is shipped for preferred status, diversity,
+  relationship risk, and supplier status. It uses the same awarded spend and
+  savings methodology as Supplier Portfolio Value and does not invent targets.
 - Named supplier contacts are shipped with role/title, email, phone, one
   primary-contact designation, role-aware maintenance, tenant isolation, and
   workspace audit history.

@@ -10,6 +10,7 @@ import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savin
 import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
 import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
 import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow, type SupplierRiskSummaryRow } from '@/lib/supplier-governance-report'
+import { supplierPortfolioSegments, type SupplierSegmentDimension } from '@/lib/supplier-segmentation'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -68,6 +69,7 @@ type ReportId =
   | 'supplier-portfolio'
   | 'supplier-readiness'
   | 'supplier-performance-risk'
+  | 'supplier-segmentation'
 
 type ReportValue = string | number | null
 type ReportRow = Record<string, ReportValue>
@@ -109,6 +111,7 @@ const REPORT_OPTIONS: Array<{ id: ReportId; label: string; group: string }> = [
   { id: 'supplier-portfolio', label: 'Supplier Portfolio Value', group: 'Suppliers' },
   { id: 'supplier-readiness', label: 'Supplier Relationship Readiness', group: 'Suppliers' },
   { id: 'supplier-performance-risk', label: 'Supplier Performance & Risk', group: 'Suppliers' },
+  { id: 'supplier-segmentation', label: 'Supplier Portfolio Segmentation', group: 'Suppliers' },
 ]
 
 function relationName(relation: unknown, key: keyof NamedRelation, fallback: string): string {
@@ -218,6 +221,7 @@ export function ReportsView({
   const [supplierRiskFilter, setSupplierRiskFilter] = useState('')
   const [supplierAttributeFilter, setSupplierAttributeFilter] = useState('')
   const [supplierReadinessFilter, setSupplierReadinessFilter] = useState<SupplierReadinessFilter>('')
+  const [supplierSegmentDimension, setSupplierSegmentDimension] = useState<SupplierSegmentDimension>('Preferred status')
 
   const sourcingEvents = useMemo(
     () => events.filter(event => (event.project_type || 'Sourcing') === 'Sourcing'),
@@ -273,6 +277,57 @@ export function ReportsView({
   }), [asOfDate, reportId, supplierAttributeFilter, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
 
   const report = useMemo<ReportDefinition>(() => {
+    if (reportId === 'supplier-segmentation') {
+      const portfolioValues = supplierPortfolioValues(
+        events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
+        savingsCalcs,
+        realizationPeriods,
+      )
+      const rows = supplierPortfolioSegments(
+        filteredSuppliers.map(supplier => ({
+          id: supplier.id,
+          supplierStatus: supplier.supplier_status,
+          riskRating: supplier.risk_rating,
+          preferred: Boolean(supplier.preferred_flag),
+          diverse: Boolean(supplier.diversity_flag),
+        })),
+        portfolioValues,
+        supplierSegmentDimension,
+      ).map(segment => ({
+        segment: segment.label,
+        suppliers: segment.suppliers,
+        awardedSuppliers: segment.awardedSuppliers,
+        awards: segment.awards,
+        spendAddressed: segment.spendAddressed,
+        spendShare: segment.spendShare,
+        estimated: segment.estimatedSavings,
+        executed: segment.executedSavings,
+        totalSavings: segment.totalSavings,
+        savingsShare: segment.savingsShare,
+        realized: segment.realizedSavings,
+      }))
+
+      return {
+        title: 'Supplier Portfolio Segmentation',
+        description: `Awarded spend and savings grouped by ${supplierSegmentDimension.toLowerCase()}, with no invented targets or thresholds.`,
+        filename: 'supplier-portfolio-segmentation.csv',
+        columns: [
+          { key: 'segment', label: supplierSegmentDimension },
+          { key: 'suppliers', label: 'Suppliers', format: 'number' },
+          { key: 'awardedSuppliers', label: 'Awarded Suppliers', format: 'number' },
+          { key: 'awards', label: 'Awards', format: 'number' },
+          { key: 'spendAddressed', label: 'Spend Addressed', format: 'currency' },
+          { key: 'spendShare', label: 'Spend Share', format: 'percent' },
+          { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
+          { key: 'executed', label: 'Executed Savings', format: 'currency' },
+          { key: 'totalSavings', label: 'Total Savings', format: 'currency' },
+          { key: 'savingsShare', label: 'Savings Share', format: 'percent' },
+          ...(savingsRealizationEnabled ? [{ key: 'realized', label: 'Realized Savings', format: 'currency' as const }] : []),
+        ],
+        rows,
+      }
+    }
+
     if (reportId === 'supplier-performance-risk') {
       const governance = supplierGovernanceSummaries(supplierReviews, supplierRiskIssues)
       const rows = filteredSuppliers.map(supplier => {
@@ -588,10 +643,11 @@ export function ReportsView({
       ],
       rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
     }
-  }, [asOfDate, events, filteredEvents, filteredSuppliers, realizationPeriods, reportId, savingsCalcs, savingsRealizationEnabled, supplierReviews, supplierRiskIssues])
+  }, [asOfDate, events, filteredEvents, filteredSuppliers, realizationPeriods, reportId, savingsCalcs, savingsRealizationEnabled, supplierReviews, supplierRiskIssues, supplierSegmentDimension])
 
-  const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio' || reportId === 'supplier-performance-risk'
+  const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio' || reportId === 'supplier-performance-risk' || reportId === 'supplier-segmentation'
   const readinessReport = reportId === 'supplier-readiness'
+  const segmentationReport = reportId === 'supplier-segmentation'
   const filtersActive = supplierReport
     ? Boolean(supplierStatusFilter || supplierRiskFilter || supplierAttributeFilter || (readinessReport && supplierReadinessFilter))
     : Boolean(typeFilter || statusFilter || businessUnitFilter || buyerFilter)
@@ -664,6 +720,21 @@ export function ReportsView({
             <FilterSelect label="Risk" value={supplierRiskFilter} onChange={setSupplierRiskFilter} options={supplierRisks} allLabel="All risk ratings" />
             <FilterSelect label="Attribute" value={supplierAttributeFilter} onChange={setSupplierAttributeFilter} options={['Preferred', 'Diverse']} allLabel="All attributes" />
             {readinessReport && <FilterSelect label="Readiness" value={supplierReadinessFilter} onChange={value => setSupplierReadinessFilter(value as SupplierReadinessFilter)} options={['Needs attention', 'Setup incomplete', 'Ready']} allLabel="All readiness states" />}
+            {segmentationReport && (
+              <div>
+                <label htmlFor="report-segment-by" className="text-xs font-medium text-[var(--text-3)]">Segment by</label>
+                <Select
+                  id="report-segment-by"
+                  value={supplierSegmentDimension}
+                  onChange={event => setSupplierSegmentDimension(event.target.value as SupplierSegmentDimension)}
+                  className="mt-1.5"
+                >
+                  {(['Preferred status', 'Diversity', 'Relationship risk', 'Supplier status'] as SupplierSegmentDimension[]).map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -55,6 +55,9 @@ it?
 - Produces an exportable supplier performance-and-risk report covering the latest
   explicit review score, separately labeled relationship and performance review
   dates, and unresolved structured risks by severity without averaging history.
+- Produces exportable supplier portfolio segmentation by preferred status,
+  diversity, relationship risk, or supplier status using reconciled awarded
+  spend and savings, without inventing organization targets.
 - Gives every demo user a private workspace with isolated sample data.
 
 ## The savings methodology
