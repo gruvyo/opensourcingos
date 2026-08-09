@@ -32,9 +32,16 @@ database actions into business language and shows a small allowlisted change
 summary rather than dumping raw records, notes, identifiers, or internal metadata.
 System migrations and former members remain distinguishable from current actors.
 
+Supplier Relationship Readiness extends Reports using the supplier fields already
+shipped in Release 2. The report makes relationship owner, next review, risk,
+preferred/diverse attributes, and project/award linkage visible in one exportable
+view. It calls out high risk and overdue reviews separately from setup gaps such
+as a missing owner, review date, or risk rating. Filters cover supplier status,
+risk, attributes, and readiness without changing supplier records.
+
 Normalized supplier names are unique within each workspace. Membership
-invitations and role changes, performance reviews, certifications, duplicate
-merge, and portfolio concentration remain Release 3 work.
+invitations and role changes, scored performance reviews, certifications,
+duplicate merge, and portfolio concentration remain Release 3 work.
 
 ## Product intent
 
@@ -182,6 +189,8 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 
 - Read-only membership roster and audit history are shipped; invitations and
   role administration remain planned.
+- Supplier Relationship Readiness reporting is shipped; it exposes owner,
+  review-date, risk, attribute, and linkage gaps from the current supplier model.
 - Supplier performance reviews, certifications, risk evidence, and reminders.
 - Duplicate detection and audited supplier merge.
 - Portfolio concentration, diverse-spend, preferred-supplier, risk, savings, and

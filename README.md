@@ -43,6 +43,8 @@ it?
   year boundaries.
 - Separates forecast savings from contracted and realized results.
 - Produces dashboard, supplier, project, savings, and fiscal-year reporting.
+- Produces an exportable supplier relationship-readiness report covering owner,
+  review planning, risk coverage, attributes, and project/award linkage.
 - Gives every demo user a private workspace with isolated sample data.
 
 ## The savings methodology
