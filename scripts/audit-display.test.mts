@@ -23,8 +23,8 @@ test('uses the most useful record name as the subject', () => {
 
 test('shows meaningful changes while excluding private and noisy fields', () => {
   const changes = auditChanges(
-    { supplier_status: 'Active', preferred_flag: false, notes: 'private', updated_at: 'before' },
-    { supplier_status: 'Inactive', preferred_flag: true, notes: 'more private', updated_at: 'after' },
+    { supplier_status: 'Active', preferred_flag: false, relationship_owner_id: null, notes: 'private', updated_at: 'before' },
+    { supplier_status: 'Inactive', preferred_flag: true, relationship_owner_id: 'private-uuid', notes: 'more private', updated_at: 'after' },
   )
   assert.deepEqual(changes, [
     { field: 'supplier_status', label: 'Status', before: 'Active', after: 'Inactive' },

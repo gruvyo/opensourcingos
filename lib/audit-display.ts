@@ -36,7 +36,6 @@ const fieldLabels: Record<string, string> = {
   risk_rating: 'Risk rating',
   preferred_flag: 'Preferred supplier',
   diversity_flag: 'Diverse supplier',
-  relationship_owner_id: 'Relationship owner',
   next_review_date: 'Next review',
   website: 'Website',
   country_code: 'Country',
@@ -73,6 +72,7 @@ const fieldLabels: Record<string, string> = {
 const excludedFields = new Set([
   'id',
   'organization_id',
+  'relationship_owner_id',
   'created_at',
   'updated_at',
   'created_by',
