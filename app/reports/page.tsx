@@ -10,6 +10,7 @@ export default async function ReportsPage() {
     { data: events, error: eventsError },
     { data: savingsCalcs, error: savingsCalcsError },
     { data: suppliers, error: suppliersError },
+    { data: realizationPeriods, error: realizationError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
@@ -28,7 +29,8 @@ export default async function ReportsPage() {
     )),
     fetchPortfolioRows('Savings calculations', (from, to) => (
       supabase.from('savings_calculations').select(`
-        id, event_id, calculation_status, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount
+        id, event_id, calculation_status, gross_savings_amount, baseline_total_amount,
+        cost_reduction_amount, cost_avoidance_amount
       `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
@@ -43,12 +45,19 @@ export default async function ReportsPage() {
         .order('id', { ascending: true })
         .range(from, to)
     )),
-    supabase.from('organization_settings').select('timezone').maybeSingle(),
+    fetchPortfolioRows('Realization periods', (from, to) => (
+      supabase.from('realization_periods').select(`
+        id, event_id, projected_savings, realized_savings
+      `, { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    supabase.from('organization_settings').select('timezone, savings_realization_enabled').maybeSingle(),
   ])
 
   // A failed query here would render as an empty report, which is indistinguishable
   // from a genuinely empty portfolio. Say which one it is.
-  const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || settingsError?.message || null
+  const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || realizationError?.message || settingsError?.message || null
   const timezone = settings?.timezone || 'America/Chicago'
   const asOfDate = dateKeyInTimeZone(new Date(), timezone)
 
@@ -69,7 +78,14 @@ export default async function ReportsPage() {
         </div>
       )}
 
-      <ReportsView events={events || []} savingsCalcs={savingsCalcs || []} suppliers={suppliers || []} asOfDate={asOfDate} />
+      <ReportsView
+        events={events || []}
+        savingsCalcs={savingsCalcs || []}
+        suppliers={suppliers || []}
+        realizationPeriods={realizationPeriods || []}
+        savingsRealizationEnabled={settings?.savings_realization_enabled ?? false}
+        asOfDate={asOfDate}
+      />
     </div>
   )
 }

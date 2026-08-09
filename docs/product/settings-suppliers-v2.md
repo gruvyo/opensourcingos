@@ -194,10 +194,12 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - The dashboard attention queue is shipped for urgent supplier risk and overdue
   review items, alongside overdue and upcoming project deadlines. Automated
   reminders remain planned.
+- Supplier Portfolio Value reporting is shipped for awarded spend, spend and
+  savings concentration, preferred/diverse attributes, risk, estimated and
+  executed savings, and optional realized savings.
 - Supplier performance reviews, certifications, and risk evidence.
 - Duplicate detection and audited supplier merge.
-- Portfolio concentration, diverse-spend, preferred-supplier, risk, savings, and
-  realization reporting.
+- Broader diverse-spend and preferred-supplier target reporting remains planned.
 
 ## Release 2 acceptance criteria
 
