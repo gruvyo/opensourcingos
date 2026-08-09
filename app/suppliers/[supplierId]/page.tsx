@@ -6,6 +6,7 @@ import { SupplierForm, type SupplierFormValues } from '@/components/supplier-for
 import { SupplierContacts, type SupplierContact } from '@/components/supplier-contacts'
 import { SupplierCertifications, type SupplierCertification } from '@/components/supplier-certifications'
 import { SupplierNotes, type SupplierNote } from '@/components/supplier-notes'
+import { SupplierPerformanceReviews, type SupplierPerformanceReview } from '@/components/supplier-performance-reviews'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
@@ -34,12 +35,13 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     ? await supabase.from('profiles').select('organization_id, role').eq('id', authData.user.id).maybeSingle()
     : { data: null }
 
-  const [{ data: supplier, error: supplierError }, { data: owners }, { data: currencySettings }, { data: contacts, error: contactsError }, { data: certifications, error: certificationsError }, { data: notes, error: notesError }] = await Promise.all([
+  const [{ data: supplier, error: supplierError }, { data: owners }, { data: currencySettings }, { data: contacts, error: contactsError }, { data: certifications, error: certificationsError }, { data: reviews, error: reviewsError }, { data: notes, error: notesError }] = await Promise.all([
     supabase.from('suppliers').select('*').eq('id', supplierId).maybeSingle(),
     profile?.organization_id ? supabase.from('profiles').select('id, full_name, email').eq('organization_id', profile.organization_id).order('full_name') : Promise.resolve({ data: [] }),
     profile?.organization_id ? supabase.from('organization_settings').select('currency_code, savings_realization_enabled, timezone').eq('organization_id', profile.organization_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from('supplier_contacts').select('id, contact_name, job_title, email, phone, is_primary').eq('supplier_id', supplierId).order('is_primary', { ascending: false }).order('contact_name'),
     supabase.from('supplier_certifications').select('id, certification_name, issuer, certificate_number, issued_on, expires_on, evidence_url').eq('supplier_id', supplierId).order('expires_on', { ascending: true, nullsFirst: false }).order('certification_name'),
+    supabase.from('supplier_performance_reviews').select('id, review_title, review_date, overall_score, delivery_score, quality_score, commercial_score, compliance_score, summary, next_review_date, reviewer:profiles!supplier_performance_reviews_created_by_fkey(full_name, email)').eq('supplier_id', supplierId).order('review_date', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('supplier_notes').select('id, occurred_on, body, created_at, author:profiles!supplier_notes_created_by_fkey(full_name, email)').eq('supplier_id', supplierId).order('occurred_on', { ascending: false }).order('created_at', { ascending: false }),
   ])
 
@@ -59,7 +61,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     supabase.from('audit_log').select('id, action, actor_id, before_data, after_data, created_at').eq('entity_type', 'supplier').eq('entity_id', supplierId).order('created_at', { ascending: false }).limit(20),
   ])
 
-  const loadError = contactsError?.message || certificationsError?.message || notesError?.message || eventsError?.message || calculationsError?.message || periodsError?.message || auditError?.message
+  const loadError = contactsError?.message || certificationsError?.message || reviewsError?.message || notesError?.message || eventsError?.message || calculationsError?.message || periodsError?.message || auditError?.message
   const calculationRows = (calculations || []) as Array<Record<string, unknown>>
   const periodRows = (periods || []) as Array<Record<string, unknown>>
   const eventMap = new Map(events.map(event => [event.id, event.event_name]))
@@ -67,6 +69,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
   const currency = currencySettings?.currency_code || 'USD'
   const savingsRealizationEnabled = currencySettings?.savings_realization_enabled ?? false
   const canEdit = profile?.role === 'admin' || profile?.role === 'procurement_user'
+  const todayKey = dateKeyInTimeZone(new Date(), currencySettings?.timezone || 'UTC')
   const values: SupplierFormValues = {
     supplierName: supplier.supplier_name,
     supplierStatus: supplier.supplier_status || 'Active',
@@ -113,11 +116,15 @@ export default async function SupplierProfilePage({ params }: PageProps) {
           </Card>
 
           <Card className="overflow-hidden">
-            <SupplierCertifications supplierId={supplierId} certifications={(certifications || []) as SupplierCertification[]} canEdit={canEdit} today={dateKeyInTimeZone(new Date(), currencySettings?.timezone || 'UTC')} />
+            <SupplierCertifications supplierId={supplierId} certifications={(certifications || []) as SupplierCertification[]} canEdit={canEdit} today={todayKey} />
           </Card>
 
           <Card className="overflow-hidden">
-            <SupplierNotes supplierId={supplierId} notes={(notes || []) as SupplierNote[]} canEdit={canEdit} today={dateKeyInTimeZone(new Date(), currencySettings?.timezone || 'UTC')} />
+            <SupplierPerformanceReviews supplierId={supplierId} reviews={(reviews || []) as SupplierPerformanceReview[]} canEdit={canEdit} today={todayKey} />
+          </Card>
+
+          <Card className="overflow-hidden">
+            <SupplierNotes supplierId={supplierId} notes={(notes || []) as SupplierNote[]} canEdit={canEdit} today={todayKey} />
           </Card>
 
           <Card className="overflow-hidden">

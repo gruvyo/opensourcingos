@@ -2048,6 +2048,92 @@ export type Database = {
           },
         ]
       }
+      supplier_performance_reviews: {
+        Row: {
+          commercial_score: number | null
+          compliance_score: number | null
+          created_at: string
+          created_by: string | null
+          delivery_score: number | null
+          id: string
+          next_review_date: string | null
+          organization_id: string
+          overall_score: number
+          quality_score: number | null
+          review_date: string
+          review_title: string
+          summary: string
+          supplier_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          commercial_score?: number | null
+          compliance_score?: number | null
+          created_at?: string
+          created_by?: string | null
+          delivery_score?: number | null
+          id?: string
+          next_review_date?: string | null
+          organization_id: string
+          overall_score: number
+          quality_score?: number | null
+          review_date: string
+          review_title: string
+          summary: string
+          supplier_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          commercial_score?: number | null
+          compliance_score?: number | null
+          created_at?: string
+          created_by?: string | null
+          delivery_score?: number | null
+          id?: string
+          next_review_date?: string | null
+          organization_id?: string
+          overall_score?: number
+          quality_score?: number | null
+          review_date?: string
+          review_title?: string
+          summary?: string
+          supplier_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_performance_reviews_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_performance_reviews_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_performance_reviews_supplier_workspace_fkey"
+            columns: ["supplier_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "supplier_performance_reviews_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           country_code: string | null

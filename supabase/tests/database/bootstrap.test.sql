@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(264);
+select plan(277);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -48,8 +48,8 @@ select is(
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
   ),
-  25::bigint,
-  'all 25 public application tables exist'
+  26::bigint,
+  'all 26 public application tables exist'
 );
 
 select ok(
@@ -63,6 +63,45 @@ select ok(
 );
 
 select ok(to_regclass('public.supplier_certifications') is not null, 'supplier_certifications exists');
+
+select ok(to_regclass('public.supplier_performance_reviews') is not null, 'supplier_performance_reviews exists');
+
+select ok(
+  exists (select 1 from information_schema.columns where table_schema='public' and table_name='supplier_performance_reviews' and column_name='overall_score' and is_nullable='NO'),
+  'supplier performance reviews require an overall score'
+);
+
+select ok(
+  exists (select 1 from pg_catalog.pg_constraint where conrelid='public.supplier_performance_reviews'::regclass and conname='supplier_performance_reviews_overall_score_check'),
+  'supplier performance review overall scores are constrained'
+);
+
+select ok(
+  to_regclass('public.idx_supplier_performance_reviews_supplier_workspace') is not null,
+  'supplier performance review workspace relationship has a covering index'
+);
+
+select ok(
+  (select pg_get_constraintdef(oid) like '%supplier_performance_review%' from pg_catalog.pg_constraint where conrelid='public.audit_log'::regclass and conname='audit_log_entity_type_check'),
+  'workspace audit accepts supplier performance review records'
+);
+
+select ok(
+  not (select p.prosecdef from pg_catalog.pg_proc p where p.oid='public.stamp_supplier_performance_review_actor()'::regprocedure),
+  'supplier-performance-review actor stamping runs with invoker privileges'
+);
+
+select ok(
+  (select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%' from pg_catalog.pg_proc p where p.oid='public.stamp_supplier_performance_review_actor()'::regprocedure),
+  'supplier-performance-review actor stamping has a fixed search path'
+);
+
+select ok(
+  not has_function_privilege('anon','public.stamp_supplier_performance_review_actor()','EXECUTE')
+  and not has_function_privilege('authenticated','public.stamp_supplier_performance_review_actor()','EXECUTE')
+  and has_function_privilege('service_role','public.stamp_supplier_performance_review_actor()','EXECUTE'),
+  'supplier-performance-review actor stamping is callable only by the trigger owner path'
+);
 
 select ok(
   exists (select 1 from information_schema.columns where table_schema='public' and table_name='supplier_certifications' and column_name='certification_name' and is_nullable='NO'),
@@ -3230,6 +3269,64 @@ select is(
   (select count(*)::bigint from public.audit_log where entity_type='supplier_certification' and entity_id='e1000000-0000-4000-8000-000000000002'),
   1::bigint,
   'supplier certification changes enter the workspace audit'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+insert into public.supplier_performance_reviews (id, organization_id, supplier_id, review_title, review_date, overall_score, summary)
+select 'f1000000-0000-4000-8000-000000000001', profile.organization_id, supplier.id, 'Private Review', date '2026-08-08', 4, 'Private performance context'
+from public.profiles profile
+join lateral (select id from public.suppliers where organization_id=profile.organization_id order by id limit 1) supplier on true
+where profile.id='10000000-0000-4000-8000-000000000001';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select is(
+  (select count(*)::bigint from public.supplier_performance_reviews where id='f1000000-0000-4000-8000-000000000001'),
+  0::bigint,
+  'one workspace cannot read another workspace supplier performance review'
+);
+reset role;
+
+update public.profiles set role='viewer' where id='20000000-0000-4000-8000-000000000002';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select throws_ok(
+  $$
+    insert into public.supplier_performance_reviews (organization_id, supplier_id, review_title, review_date, overall_score, summary)
+    select profile.organization_id, supplier.id, 'Viewer Review', date '2026-08-08', 3, 'Viewer cannot add this'
+    from public.profiles profile
+    join lateral (select id from public.suppliers where organization_id=profile.organization_id order by id limit 1) supplier on true
+    where profile.id='20000000-0000-4000-8000-000000000002'
+  $$,
+  '42501',
+  'new row violates row-level security policy for table "supplier_performance_reviews"',
+  'viewers cannot add supplier performance reviews'
+);
+reset role;
+
+update public.profiles set role='procurement_user' where id='20000000-0000-4000-8000-000000000002';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select lives_ok(
+  $$
+    insert into public.supplier_performance_reviews (id, organization_id, supplier_id, review_title, review_date, overall_score, delivery_score, summary, created_by)
+    select 'f1000000-0000-4000-8000-000000000002', profile.organization_id, supplier.id, 'Procurement Review', date '2026-08-08', 4, 5, 'Procurement performance context', '10000000-0000-4000-8000-000000000001'
+    from public.profiles profile
+    join lateral (select id from public.suppliers where organization_id=profile.organization_id order by id limit 1) supplier on true
+    where profile.id='20000000-0000-4000-8000-000000000002'
+  $$,
+  'procurement users can add supplier performance reviews'
+);
+select is(
+  (select created_by from public.supplier_performance_reviews where id='f1000000-0000-4000-8000-000000000002'),
+  '20000000-0000-4000-8000-000000000002'::uuid,
+  'supplier performance reviews stamp the authenticated author instead of trusting the payload'
+);
+select is(
+  (select count(*)::bigint from public.audit_log where entity_type='supplier_performance_review' and entity_id='f1000000-0000-4000-8000-000000000002'),
+  1::bigint,
+  'supplier performance review changes enter the workspace audit'
 );
 reset role;
 
