@@ -191,9 +191,10 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
   role administration remain planned.
 - Supplier Relationship Readiness reporting is shipped; it exposes owner,
   review-date, risk, attribute, and linkage gaps from the current supplier model.
-- The dashboard attention queue is shipped for urgent supplier risk and overdue
-  review items, alongside overdue and upcoming project deadlines. Automated
-  reminders remain planned.
+- The dashboard attention queue is shipped for urgent relationship-level risk,
+  unresolved High/Critical risk-register issues, and overdue review items,
+  alongside overdue and upcoming project deadlines. Automated reminders remain
+  planned.
 - Supplier Portfolio Value reporting is shipped for awarded spend, spend and
   savings concentration, preferred/diverse attributes, risk, estimated and
   executed savings, and optional realized savings.

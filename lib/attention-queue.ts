@@ -11,6 +11,8 @@ export type AttentionSupplier = {
   status: string | null
   risk: string | null
   nextReviewDate: string | null
+  criticalRiskIssues?: number
+  highRiskIssues?: number
 }
 
 export type AttentionItem = {
@@ -32,6 +34,10 @@ export type AttentionQueue = {
 
 const INACTIVE_PROJECT_STATUSES = new Set(['Cancelled', 'Complete'])
 const INACTIVE_SUPPLIER_STATUSES = new Set(['Inactive'])
+
+function issueReason(count: number, severity: 'critical' | 'high'): string {
+  return `${count} unresolved ${severity} risk ${count === 1 ? 'issue' : 'issues'}`
+}
 
 function addDays(dateKey: string, days: number): string {
   const date = new Date(`${dateKey}T00:00:00Z`)
@@ -81,6 +87,8 @@ export function buildAttentionQueue(
     if (INACTIVE_SUPPLIER_STATUSES.has(supplier.status || '')) continue
     const reasons: string[] = []
     if (supplier.risk === 'High') reasons.push('High risk')
+    if (supplier.criticalRiskIssues) reasons.push(issueReason(supplier.criticalRiskIssues, 'critical'))
+    if (supplier.highRiskIssues) reasons.push(issueReason(supplier.highRiskIssues, 'high'))
     if (supplier.nextReviewDate && supplier.nextReviewDate < asOfDate) reasons.push('Review overdue')
     if (reasons.length === 0) continue
 
@@ -91,7 +99,7 @@ export function buildAttentionQueue(
       href: `/suppliers/${supplier.id}`,
       reasons,
       date: reasons.includes('Review overdue') ? supplier.nextReviewDate : null,
-      priority: supplier.risk === 'High' ? 1 : 1.5,
+      priority: supplier.criticalRiskIssues ? 0.5 : supplier.risk === 'High' || supplier.highRiskIssues ? 1 : 1.5,
     })
   }
 

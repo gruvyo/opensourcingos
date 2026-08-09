@@ -98,6 +98,11 @@ type SupplierAttentionRow = {
   next_review_date?: string | null
 }
 
+type SupplierRiskAttentionRow = {
+  supplier_id: string
+  severity: string
+}
+
 function relationName(relation: unknown, key: string, fallback: string): string {
   const row = getFirst<Record<string, unknown>>(relation)
   const value = row?.[key]
@@ -206,6 +211,7 @@ export default async function DashboardPage({
     { data: periodRows, error: periodsError },
     { data: realizationPeriods, error: realizationError },
     { data: supplierRows, error: suppliersError },
+    { data: supplierRiskRows, error: supplierRisksError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
@@ -256,6 +262,12 @@ export default async function DashboardPage({
         .order('id', { ascending: true })
         .range(from, to)
     )),
+    fetchPortfolioRows('Supplier risks', (from, to) => (
+      supabase.from('supplier_risks').select('id, supplier_id, severity', { count: 'exact' })
+        .neq('risk_status', 'Resolved')
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
     supabase.from('organization_settings').select('savings_realization_enabled, timezone').maybeSingle(),
   ])
 
@@ -264,6 +276,7 @@ export default async function DashboardPage({
     || periodsError?.message
     || realizationError?.message
     || suppliersError?.message
+    || supplierRisksError?.message
     || settingsError?.message
     || null
 
@@ -271,6 +284,14 @@ export default async function DashboardPage({
   const calcList = (savingsCalcs || []) as CalculationRow[]
   const realizationList = (realizationPeriods || []) as DashboardRealizationPeriod[]
   const supplierAttentionList = (supplierRows || []) as SupplierAttentionRow[]
+  const riskIssueCounts = new Map<string, { critical: number; high: number }>()
+  for (const risk of (supplierRiskRows || []) as SupplierRiskAttentionRow[]) {
+    if (risk.severity !== 'Critical' && risk.severity !== 'High') continue
+    const count = riskIssueCounts.get(risk.supplier_id) || { critical: 0, high: 0 }
+    if (risk.severity === 'Critical') count.critical += 1
+    else count.high += 1
+    riskIssueCounts.set(risk.supplier_id, count)
+  }
   const asOfDate = dateKeyInTimeZone(new Date(), settings?.timezone || 'America/Chicago')
   const attentionQueue = buildAttentionQueue(
     eventList.map(event => ({
@@ -279,13 +300,18 @@ export default async function DashboardPage({
       status: event.event_status || null,
       dueDate: event.project_due_date || null,
     })),
-    supplierAttentionList.map(supplier => ({
-      id: supplier.id,
-      name: supplier.supplier_name || null,
-      status: supplier.supplier_status || null,
-      risk: supplier.risk_rating || null,
-      nextReviewDate: supplier.next_review_date || null,
-    })),
+    supplierAttentionList.map(supplier => {
+      const issueCounts = riskIssueCounts.get(supplier.id)
+      return {
+        id: supplier.id,
+        name: supplier.supplier_name || null,
+        status: supplier.supplier_status || null,
+        risk: supplier.risk_rating || null,
+        nextReviewDate: supplier.next_review_date || null,
+        criticalRiskIssues: issueCounts?.critical || 0,
+        highRiskIssues: issueCounts?.high || 0,
+      }
+    }),
     asOfDate,
   )
 
