@@ -4,9 +4,11 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { SupplierForm, type SupplierFormValues } from '@/components/supplier-form'
 import { SupplierContacts, type SupplierContact } from '@/components/supplier-contacts'
+import { SupplierNotes, type SupplierNote } from '@/components/supplier-notes'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
+import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 import { formatCurrency, formatDate, formatReduction } from '@/lib/utils'
 
 type PageProps = { params: Promise<{ supplierId: string }> }
@@ -31,11 +33,12 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     ? await supabase.from('profiles').select('organization_id, role').eq('id', authData.user.id).maybeSingle()
     : { data: null }
 
-  const [{ data: supplier, error: supplierError }, { data: owners }, { data: currencySettings }, { data: contacts, error: contactsError }] = await Promise.all([
+  const [{ data: supplier, error: supplierError }, { data: owners }, { data: currencySettings }, { data: contacts, error: contactsError }, { data: notes, error: notesError }] = await Promise.all([
     supabase.from('suppliers').select('*').eq('id', supplierId).maybeSingle(),
     profile?.organization_id ? supabase.from('profiles').select('id, full_name, email').eq('organization_id', profile.organization_id).order('full_name') : Promise.resolve({ data: [] }),
-    profile?.organization_id ? supabase.from('organization_settings').select('currency_code, savings_realization_enabled').eq('organization_id', profile.organization_id).maybeSingle() : Promise.resolve({ data: null }),
+    profile?.organization_id ? supabase.from('organization_settings').select('currency_code, savings_realization_enabled, timezone').eq('organization_id', profile.organization_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from('supplier_contacts').select('id, contact_name, job_title, email, phone, is_primary').eq('supplier_id', supplierId).order('is_primary', { ascending: false }).order('contact_name'),
+    supabase.from('supplier_notes').select('id, occurred_on, body, created_at, author:profiles!supplier_notes_created_by_fkey(full_name, email)').eq('supplier_id', supplierId).order('occurred_on', { ascending: false }).order('created_at', { ascending: false }),
   ])
 
   if (supplierError || !supplier) notFound()
@@ -54,7 +57,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     supabase.from('audit_log').select('id, action, actor_id, before_data, after_data, created_at').eq('entity_type', 'supplier').eq('entity_id', supplierId).order('created_at', { ascending: false }).limit(20),
   ])
 
-  const loadError = contactsError?.message || eventsError?.message || calculationsError?.message || periodsError?.message || auditError?.message
+  const loadError = contactsError?.message || notesError?.message || eventsError?.message || calculationsError?.message || periodsError?.message || auditError?.message
   const calculationRows = (calculations || []) as Array<Record<string, unknown>>
   const periodRows = (periods || []) as Array<Record<string, unknown>>
   const eventMap = new Map(events.map(event => [event.id, event.event_name]))
@@ -105,6 +108,10 @@ export default async function SupplierProfilePage({ params }: PageProps) {
 
           <Card className="overflow-hidden">
             <SupplierContacts supplierId={supplierId} contacts={(contacts || []) as SupplierContact[]} canEdit={canEdit} />
+          </Card>
+
+          <Card className="overflow-hidden">
+            <SupplierNotes supplierId={supplierId} notes={(notes || []) as SupplierNote[]} canEdit={canEdit} today={dateKeyInTimeZone(new Date(), currencySettings?.timezone || 'UTC')} />
           </Card>
 
           <Card className="overflow-hidden">

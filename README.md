@@ -203,8 +203,10 @@ Current priorities are:
 2. Complete workspace governance with broader module and optional-field
    controls, membership administration, and
    workspace-managed selection lists.
-3. Expand dashboards, collaboration workflows, and supplier performance, risk,
-   certification, duplicate-management, and reporting capabilities.
+3. Expand dashboards, collaboration workflows, and supplier performance,
+   certification, duplicate-management, and reporting capabilities. Supplier
+   profiles already include named contacts and append-only relationship notes
+   for dated review context and risk evidence.
 
 ## Contributing
 

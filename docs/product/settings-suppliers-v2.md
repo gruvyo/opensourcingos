@@ -200,6 +200,9 @@ indexes on `organization_id`, and tests proving cross-workspace isolation.
 - Named supplier contacts are shipped with role/title, email, phone, one
   primary-contact designation, role-aware maintenance, tenant isolation, and
   workspace audit history.
+- Dated supplier relationship notes are shipped as an append-only timeline for
+  review context, risk evidence, and follow-up. Workspace members can read the
+  timeline; administrators and procurement users can add entries.
 - Supplier performance reviews, certifications, and risk evidence.
 - Duplicate detection and audited supplier merge.
 - Broader diverse-spend and preferred-supplier target reporting remains planned.
