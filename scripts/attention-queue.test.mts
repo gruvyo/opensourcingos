@@ -26,9 +26,29 @@ test('combines supplier alerts into one actionable row', () => {
   ], '2026-08-08')
 
   assert.equal(queue.supplierAttention, 2)
-  assert.deepEqual(queue.items[0].reasons, ['High risk', 'Review overdue'])
+  assert.deepEqual(queue.items[0].reasons, ['High risk', 'Relationship review overdue'])
   assert.equal(queue.items.some(item => item.title === 'Missing setup'), false)
   assert.equal(queue.items.some(item => item.title === 'Inactive risk'), false)
+})
+
+test('keeps relationship and performance review plans distinct', () => {
+  const queue = buildAttentionQueue([], [
+    {
+      id: 'reviews',
+      name: 'Two review plans',
+      status: 'Active',
+      risk: 'Low',
+      nextReviewDate: '2026-08-02',
+      performanceNextReviewDate: '2026-08-01',
+    },
+  ], '2026-08-08')
+
+  assert.equal(queue.supplierAttention, 1)
+  assert.deepEqual(queue.items[0].reasons, [
+    'Relationship review overdue',
+    'Performance review overdue',
+  ])
+  assert.equal(queue.items[0].date, '2026-08-01')
 })
 
 test('sorts overdue projects before supplier alerts and upcoming deadlines', () => {
