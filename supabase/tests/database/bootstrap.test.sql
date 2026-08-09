@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(239);
+select plan(252);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -48,13 +48,61 @@ select is(
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
   ),
-  23::bigint,
-  'all 23 public application tables exist'
+  24::bigint,
+  'all 24 public application tables exist'
 );
 
 select ok(
   to_regclass('public.supplier_contacts') is not null,
   'supplier_contacts exists'
+);
+
+select ok(
+  to_regclass('public.supplier_notes') is not null,
+  'supplier_notes exists'
+);
+
+select ok(
+  exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'supplier_notes'
+      and column_name = 'occurred_on' and is_nullable = 'NO'
+  ) and exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'supplier_notes'
+      and column_name = 'body' and is_nullable = 'NO'
+  ),
+  'supplier notes require an activity date and body'
+);
+
+select ok(
+  (select relrowsecurity and relforcerowsecurity from pg_catalog.pg_class where oid = 'public.supplier_notes'::regclass),
+  'supplier notes enforce row-level security'
+);
+
+select ok(
+  has_table_privilege('authenticated', 'public.supplier_notes', 'SELECT')
+  and has_table_privilege('authenticated', 'public.supplier_notes', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.supplier_notes', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.supplier_notes', 'DELETE'),
+  'supplier notes are append only for authenticated users'
+);
+
+select ok(
+  not (select p.prosecdef from pg_catalog.pg_proc p where p.oid = 'public.stamp_supplier_note_actor()'::regprocedure),
+  'supplier-note actor stamping runs with invoker privileges'
+);
+
+select ok(
+  (select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%' from pg_catalog.pg_proc p where p.oid = 'public.stamp_supplier_note_actor()'::regprocedure),
+  'supplier-note actor stamping has a fixed search path'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.stamp_supplier_note_actor()', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.stamp_supplier_note_actor()', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.stamp_supplier_note_actor()', 'EXECUTE'),
+  'supplier-note actor stamping is callable only by the trigger owner path'
 );
 
 select ok(
@@ -2897,6 +2945,9 @@ join lateral (
 ) as supplier on true
 where profile.id = '10000000-0000-4000-8000-000000000001';
 
+update public.profiles set role = 'viewer'
+where id = '20000000-0000-4000-8000-000000000002';
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
 select is(
@@ -2985,6 +3036,110 @@ select is(
   'supplier contacts stamp the authenticated author instead of trusting the payload'
 );
 reset role;
+
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+insert into public.supplier_notes (
+  id, organization_id, supplier_id, occurred_on, body
+)
+select
+  'd1000000-0000-4000-8000-000000000001',
+  profile.organization_id,
+  supplier.id,
+  date '2026-08-08',
+  'Private relationship context'
+from public.profiles as profile
+join lateral (
+  select id from public.suppliers
+  where organization_id = profile.organization_id
+  order by id
+  limit 1
+) as supplier on true
+where profile.id = '10000000-0000-4000-8000-000000000001';
+
+update public.profiles set role = 'viewer'
+where id = '20000000-0000-4000-8000-000000000002';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select is(
+  (select count(*)::bigint from public.supplier_notes where id = 'd1000000-0000-4000-8000-000000000001'),
+  0::bigint,
+  'one workspace cannot read another workspace supplier note'
+);
+
+select throws_ok(
+  $$
+    insert into public.supplier_notes (organization_id, supplier_id, occurred_on, body)
+    select profile.organization_id, supplier.id, date '2026-08-08', 'Viewer note'
+    from public.profiles as profile
+    join lateral (
+      select id from public.suppliers where organization_id = profile.organization_id order by id limit 1
+    ) as supplier on true
+    where profile.id = '20000000-0000-4000-8000-000000000002'
+  $$,
+  '42501',
+  'new row violates row-level security policy for table "supplier_notes"',
+  'viewers cannot add supplier notes'
+);
+reset role;
+
+update public.profiles set role = 'procurement_user'
+where id = '20000000-0000-4000-8000-000000000002';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select lives_ok(
+  $$
+    insert into public.supplier_notes (id, organization_id, supplier_id, occurred_on, body, created_by)
+    select
+      'd1000000-0000-4000-8000-000000000002',
+      profile.organization_id,
+      supplier.id,
+      date '2026-08-08',
+      'Procurement relationship note',
+      '10000000-0000-4000-8000-000000000001'
+    from public.profiles as profile
+    join lateral (
+      select id from public.suppliers where organization_id = profile.organization_id order by id limit 1
+    ) as supplier on true
+    where profile.id = '20000000-0000-4000-8000-000000000002'
+  $$,
+  'procurement users can add supplier notes'
+);
+
+select is(
+  (select count(*)::bigint from public.supplier_notes where id = 'd1000000-0000-4000-8000-000000000002'),
+  1::bigint,
+  'procurement users can read the supplier note they added'
+);
+
+select is(
+  (select created_by from public.supplier_notes where id = 'd1000000-0000-4000-8000-000000000002'),
+  '20000000-0000-4000-8000-000000000002'::uuid,
+  'supplier notes stamp the authenticated author instead of trusting the payload'
+);
+reset role;
+
+select throws_ok(
+  $$
+    insert into public.supplier_notes (organization_id, supplier_id, occurred_on, body)
+    select
+      blair.organization_id,
+      supplier.id,
+      date '2026-08-08',
+      'Cross-workspace note'
+    from public.profiles blair
+    cross join lateral (
+      select id from public.suppliers
+      where organization_id = (select organization_id from public.profiles where id = '10000000-0000-4000-8000-000000000001')
+      order by id limit 1
+    ) supplier
+    where blair.id = '20000000-0000-4000-8000-000000000002'
+  $$,
+  '23503',
+  null,
+  'supplier notes cannot pair a supplier with another workspace'
+);
 
 select is(
   (
