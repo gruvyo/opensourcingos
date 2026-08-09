@@ -44,8 +44,9 @@ it?
   year boundaries.
 - Separates forecast savings from contracted and realized results.
 - Produces dashboard, supplier, project, savings, and fiscal-year reporting.
-- Prioritizes overdue and upcoming project deadlines plus urgent supplier risk
-  and review items in a dashboard attention queue.
+- Prioritizes overdue and upcoming project deadlines, relationship-level risk,
+  unresolved High/Critical risk-register issues, and overdue supplier reviews
+  in a dashboard attention queue.
 - Produces an exportable supplier relationship-readiness report covering owner,
   review planning, risk coverage, attributes, and project/award linkage.
 - Produces an exportable supplier portfolio-value report covering awarded spend,

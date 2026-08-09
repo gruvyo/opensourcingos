@@ -43,3 +43,24 @@ test('sorts overdue projects before supplier alerts and upcoming deadlines', () 
 
   assert.deepEqual(queue.items.map(item => item.id), ['project:late', 'supplier:risk', 'project:soon'])
 })
+
+test('surfaces unresolved structured risk issues without changing the relationship rating', () => {
+  const queue = buildAttentionQueue([], [
+    {
+      id: 'structured',
+      name: 'Structured risk supplier',
+      status: 'Active',
+      risk: 'Low',
+      nextReviewDate: null,
+      criticalRiskIssues: 1,
+      highRiskIssues: 2,
+    },
+  ], '2026-08-08')
+
+  assert.equal(queue.supplierAttention, 1)
+  assert.deepEqual(queue.items[0].reasons, [
+    '1 unresolved critical risk issue',
+    '2 unresolved high risk issues',
+  ])
+  assert.equal(queue.items[0].priority, 0.5)
+})
