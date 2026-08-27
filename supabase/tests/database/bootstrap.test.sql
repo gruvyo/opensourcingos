@@ -3702,11 +3702,11 @@ select is(
       on n.oid = d.defaclnamespace and n.nspname = 'public'
     cross join lateral pg_catalog.aclexplode(d.defaclacl) a
     left join pg_catalog.pg_roles g on g.oid = a.grantee
-    where d.defaclrole::regrole::text in ('postgres', 'supabase_admin')
+    where d.defaclrole::regrole::text = 'postgres'
       and coalesce(g.rolname, 'PUBLIC') in ('PUBLIC', 'anon', 'authenticated')
   ),
   0::bigint,
-  'future public objects are private until a migration grants access explicitly'
+  'future public objects created by application migrations are private until explicitly granted'
 );
 
 select is(

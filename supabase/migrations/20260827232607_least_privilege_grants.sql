@@ -125,21 +125,16 @@ grant execute on function public.update_workspace_settings_v9(
   boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean
 ) to authenticated;
 
--- Future public objects are private until a reviewed migration opts them into
--- the Data API. Cover both owners that currently carry public-schema defaults
--- in hosted Supabase projects.
+-- Future public objects created by application migrations are private until a
+-- reviewed migration opts them into the Data API. Supabase documents these
+-- customer-managed defaults for `postgres`; defaults owned by
+-- `supabase_admin` are platform-managed and cannot be changed by a customer
+-- migration.
 alter default privileges for role postgres in schema public
   revoke all on tables from public, anon, authenticated;
 alter default privileges for role postgres in schema public
   revoke all on sequences from public, anon, authenticated;
 alter default privileges for role postgres in schema public
-  revoke execute on functions from public, anon, authenticated;
-
-alter default privileges for role supabase_admin in schema public
-  revoke all on tables from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke all on sequences from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema public
   revoke execute on functions from public, anon, authenticated;
 
 commit;
