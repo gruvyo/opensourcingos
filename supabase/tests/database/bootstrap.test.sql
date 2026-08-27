@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(291);
+select plan(305);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -646,12 +646,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings RPC'
+  'signed-in users cannot invoke the retired Support-era settings RPC'
 );
 
 select ok(
@@ -680,12 +680,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings(text,text,text,text,text,integer,text,text,boolean,numeric)',
     'EXECUTE'
   ),
-  'signed-in deployed clients can invoke the compatibility RPC'
+  'signed-in users cannot invoke the retired compatibility settings RPC'
 );
 
 insert into public.sourcing_events (
@@ -863,12 +863,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings_v2(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings v2 RPC'
+  'signed-in users cannot invoke the retired workspace settings v2 RPC'
 );
 
 select ok(
@@ -1126,12 +1126,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings_v3(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings v3 RPC'
+  'signed-in users cannot invoke the retired workspace settings v3 RPC'
 );
 
 select ok(
@@ -1418,12 +1418,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings_v4(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings v4 RPC'
+  'signed-in users cannot invoke the retired workspace settings v4 RPC'
 );
 
 select ok(
@@ -1715,12 +1715,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings_v5(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings v5 RPC'
+  'signed-in users cannot invoke the retired workspace settings v5 RPC'
 );
 
 select ok(
@@ -2012,12 +2012,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings_v6(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings v6 RPC'
+  'signed-in users cannot invoke the retired workspace settings v6 RPC'
 );
 
 select ok(
@@ -2309,12 +2309,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings_v7(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings v7 RPC'
+  'signed-in users cannot invoke the retired workspace settings v7 RPC'
 );
 
 select ok(
@@ -2463,12 +2463,12 @@ select ok(
 );
 
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'authenticated',
     'public.update_workspace_settings_v8(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)',
     'EXECUTE'
   ),
-  'signed-in users can invoke the workspace settings v8 RPC'
+  'signed-in users cannot invoke the retired workspace settings v8 RPC'
 );
 
 select ok(
@@ -3512,6 +3512,244 @@ select ok(
   ),
   'a demo-clone failure cannot prevent signup'
 );
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relkind = 'r'
+      and has_table_privilege(
+        'anon',
+        c.oid,
+        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN'
+      )
+  ),
+  0::bigint,
+  'anonymous users have no privileges on public application tables'
+);
+
+select is(
+  (
+    with expected(table_name, privilege_type) as (
+      select unnest(array[
+        'audit_log', 'award_lines', 'awards', 'baseline_lines', 'baselines',
+        'business_units', 'categories', 'cost_centers', 'event_scope_lines',
+        'organization_settings', 'organizations', 'profiles',
+        'project_choice_options', 'project_updates', 'realization_periods',
+        'savings_calculation_lines', 'savings_calculations', 'savings_periods',
+        'sourcing_events', 'supplier_certifications', 'supplier_contacts',
+        'supplier_notes', 'supplier_offer_lines', 'supplier_offers',
+        'supplier_performance_reviews', 'supplier_risks', 'suppliers'
+      ]::text[]), 'SELECT'::text
+      union all
+      select unnest(array[
+        'baseline_lines', 'baselines', 'business_units', 'categories',
+        'cost_centers', 'event_scope_lines', 'project_choice_options',
+        'project_updates', 'realization_periods', 'savings_calculations',
+        'savings_periods', 'sourcing_events', 'supplier_certifications',
+        'supplier_contacts', 'supplier_notes', 'supplier_offer_lines',
+        'supplier_offers', 'supplier_performance_reviews', 'supplier_risks',
+        'suppliers'
+      ]::text[]), 'INSERT'::text
+      union all
+      select unnest(array[
+        'baseline_lines', 'baselines', 'business_units', 'categories',
+        'cost_centers', 'event_scope_lines', 'project_choice_options',
+        'realization_periods', 'savings_calculations', 'savings_periods',
+        'sourcing_events', 'supplier_certifications', 'supplier_contacts',
+        'supplier_offer_lines', 'supplier_offers',
+        'supplier_performance_reviews', 'supplier_risks', 'suppliers'
+      ]::text[]), 'UPDATE'::text
+      union all
+      select unnest(array[
+        'baseline_lines', 'baselines', 'event_scope_lines',
+        'realization_periods', 'savings_periods', 'sourcing_events',
+        'supplier_certifications', 'supplier_contacts',
+        'supplier_offer_lines', 'supplier_offers',
+        'supplier_performance_reviews', 'supplier_risks', 'suppliers'
+      ]::text[]), 'DELETE'::text
+    ), actual as (
+      select table_name::text, privilege_type::text
+      from information_schema.role_table_grants
+      where table_schema = 'public' and grantee = 'authenticated'
+    ), differences as (
+      (select * from actual except select * from expected)
+      union all
+      (select * from expected except select * from actual)
+    )
+    select count(*)::bigint from differences
+  ),
+  0::bigint,
+  'authenticated table privileges exactly match the reviewed application manifest'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'
+      and not has_table_privilege('authenticated', c.oid, 'SELECT')
+  ),
+  0::bigint,
+  'authenticated users retain read access to all application tables'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'
+      and has_table_privilege(
+        'authenticated', c.oid, 'TRUNCATE,REFERENCES,TRIGGER,MAINTAIN'
+      )
+  ),
+  0::bigint,
+  'authenticated users have no schema-management or destructive bulk privileges'
+);
+
+select ok(
+  not has_table_privilege('authenticated', 'public.audit_log', 'INSERT,UPDATE,DELETE')
+  and not has_table_privilege('authenticated', 'public.organization_settings', 'INSERT,UPDATE,DELETE')
+  and not has_table_privilege('authenticated', 'public.organizations', 'INSERT,UPDATE,DELETE')
+  and not has_table_privilege('authenticated', 'public.profiles', 'INSERT,UPDATE,DELETE'),
+  'identity, settings, and audit tables are read-only through direct Data API access'
+);
+
+select ok(
+  has_table_privilege('authenticated', 'public.project_updates', 'SELECT,INSERT')
+  and not has_table_privilege('authenticated', 'public.project_updates', 'UPDATE,DELETE')
+  and has_table_privilege('authenticated', 'public.supplier_notes', 'SELECT,INSERT')
+  and not has_table_privilege('authenticated', 'public.supplier_notes', 'UPDATE,DELETE'),
+  'project updates and supplier notes remain append-only'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and has_function_privilege('anon', p.oid, 'EXECUTE')
+  ),
+  0::bigint,
+  'anonymous users cannot execute public application functions'
+);
+
+select is(
+  (
+    with actual as (
+      select p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' as signature
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and has_function_privilege('authenticated', p.oid, 'EXECUTE')
+    ), expected(signature) as (
+      values
+        ('current_org_id()'),
+        ('mark_savings_schedule_executed(p_savings_calculation_id uuid, p_execution_note text)'),
+        ('update_workspace_settings_v9(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean, p_project_incumbent_suppliers_enabled boolean, p_savings_realization_enabled boolean)')
+    ), differences as (
+      (select * from actual except select * from expected)
+      union all
+      (select * from expected except select * from actual)
+    )
+    select count(*)::bigint from differences
+  ),
+  0::bigint,
+  'authenticated users can execute exactly the reviewed RPC allowlist'
+);
+
+select ok(
+  (
+    select p.prosecdef
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v9(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'the settings RPC uses definer rights instead of direct table grants'
+);
+
+select ok(
+  (
+    select array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%'
+    from pg_catalog.pg_proc p
+    where p.oid = 'public.update_workspace_settings_v9(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
+  ),
+  'the definer settings RPC keeps a fixed search path'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    cross join (values ('anon'), ('authenticated')) r(role_name)
+    where n.nspname = 'public' and c.relkind = 'S'
+      and has_sequence_privilege(r.role_name, c.oid, 'USAGE,SELECT,UPDATE')
+  ),
+  0::bigint,
+  'Data API roles have no public sequence privileges'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_default_acl d
+    join pg_catalog.pg_namespace n
+      on n.oid = d.defaclnamespace and n.nspname = 'public'
+    cross join lateral pg_catalog.aclexplode(d.defaclacl) a
+    left join pg_catalog.pg_roles g on g.oid = a.grantee
+    where d.defaclrole::regrole::text in ('postgres', 'supabase_admin')
+      and coalesce(g.rolname, 'PUBLIC') in ('PUBLIC', 'anon', 'authenticated')
+  ),
+  0::bigint,
+  'future public objects are private until a migration grants access explicitly'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'
+      and not has_table_privilege('service_role', c.oid, 'SELECT')
+  ),
+  0::bigint,
+  'service-role table access is preserved'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+select lives_ok(
+  $$
+    select public.update_workspace_settings_v9(
+      'Alex Workspace',
+      'Alex Example',
+      'USD',
+      'en-US',
+      'America/Chicago',
+      1,
+      'MMM D, YYYY',
+      'monthly',
+      true,
+      1000,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    )
+  $$,
+  'the admin settings workflow still works without direct write grants'
+);
+reset role;
 
 select * from finish();
 rollback;
