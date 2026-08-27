@@ -3444,10 +3444,11 @@ select is(
 );
 
 set local role anon;
-select is(
-  (select count(*)::bigint from public.organizations),
-  0::bigint,
-  'anonymous access sees no workspace rows'
+select throws_ok(
+  $$ select count(*) from public.organizations $$,
+  '42501',
+  'permission denied for table organizations',
+  'anonymous access cannot read workspace rows'
 );
 reset role;
 
