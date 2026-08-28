@@ -173,7 +173,15 @@ insert into public.sourcing_events (
   id, organization_id, event_name, event_type, event_status, project_type
 )
 select event_id, profile.organization_id, event_name,
-       'Contract Renewal', 'Pipeline', project_type
+       case
+         when project_type = 'Support' then 'Vendor Performance or Service Issue'
+         else 'Contract Renewal'
+       end,
+       case
+         when project_type = 'Support' then 'Not Started'
+         else 'Pipeline'
+       end,
+       project_type
 from (values
   ('c2000000-0000-4000-8000-000000000001'::uuid, 'c1000000-0000-4000-8000-000000000001'::uuid, 'Admin matrix project', 'Sourcing'),
   ('c2000000-0000-4000-8000-000000000002'::uuid, 'c1000000-0000-4000-8000-000000000002'::uuid, 'Procurement matrix project', 'Sourcing'),

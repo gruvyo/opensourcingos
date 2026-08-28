@@ -255,22 +255,21 @@ select is(
   'a failed correction rolls back every estimated and executed write'
 );
 
-insert into public.realization_periods (
-  id, organization_id, event_id, savings_calculation_id, savings_period_id,
-  period_name, period_start_date, period_end_date,
-  baseline_amount, projected_savings, actual_amount, realized_savings,
-  leakage_amount, realization_status
-)
-values (
-  'b5000000-0000-4000-8000-000000000001',
-  (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
-  'b2000000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-000000000001',
-  'b4000000-0000-4000-8000-000000000001', 'Aug 2026', '2026-08-01', '2026-08-31',
-  500, 160, 400, 100, 60, 'Partially Realized'
-);
+do $$
+begin
+  perform public.sync_realization_periods('b2000000-0000-4000-8000-000000000001');
+end
+$$;
+update public.realization_periods
+set actual_amount = 400, realized_savings = 100,
+    leakage_amount = 60, realization_status = 'Partially Realized'
+where savings_period_id = 'b4000000-0000-4000-8000-000000000001';
 
 select lives_ok(
-  $$ select public.set_finance_validation('b5000000-0000-4000-8000-000000000001', true) $$,
+  $$ select public.set_finance_validation(
+       (select id from public.realization_periods
+        where savings_period_id = 'b4000000-0000-4000-8000-000000000001'), true
+     ) $$,
   'finance validation setup uses the protected admin RPC'
 );
 
@@ -291,7 +290,8 @@ select ok(
      and leakage_amount = 70 and realization_status = 'Partially Realized'
      and not finance_validated and finance_validated_by is null
      and finance_validation_date is null and comparison_rebased_at is not null
-   from public.realization_periods where id = 'b5000000-0000-4000-8000-000000000001'),
+   from public.realization_periods
+   where savings_period_id = 'b4000000-0000-4000-8000-000000000001'),
   'correction preserves entered evidence, recomputes comparators, and supersedes validation'
 );
 select throws_ok(
@@ -309,7 +309,8 @@ select throws_ok(
 );
 select ok(
   (select savings_period_id = 'b4000000-0000-4000-8000-000000000001' and actual_amount = 400
-   from public.realization_periods where id = 'b5000000-0000-4000-8000-000000000001'),
+   from public.realization_periods
+   where savings_period_id = 'b4000000-0000-4000-8000-000000000001'),
   'a rejected shape change never deletes, orphans, or reassigns realization evidence'
 );
 select throws_ok(
@@ -327,19 +328,11 @@ select lives_ok(
   $$ select public.mark_savings_schedule_executed('b3000000-0000-4000-8000-000000000002', 'Execute before shell sync') $$,
   'a second admin schedule can be executed for reversal testing'
 );
-insert into public.realization_periods (
-  id, organization_id, event_id, savings_calculation_id, savings_period_id,
-  period_name, period_start_date, period_end_date,
-  baseline_amount, projected_savings, actual_amount, realized_savings,
-  leakage_amount, realization_status
-)
-values (
-  'b5000000-0000-4000-8000-000000000002',
-  (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
-  'b2000000-0000-4000-8000-000000000002', 'b3000000-0000-4000-8000-000000000002',
-  'b4000000-0000-4000-8000-000000000003', 'Aug 2026', '2026-08-01', '2026-08-31',
-  500, 150, null, null, null, 'Pending'
-);
+do $$
+begin
+  perform public.sync_realization_periods('b2000000-0000-4000-8000-000000000002');
+end
+$$;
 
 select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000002', true);
 select throws_ok(
@@ -362,7 +355,10 @@ select ok(
    from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000002')
   and (select executed_total_savings_amount is null
        from public.savings_periods where id = 'b4000000-0000-4000-8000-000000000003')
-  and not exists (select 1 from public.realization_periods where id = 'b5000000-0000-4000-8000-000000000002')
+  and not exists (
+    select 1 from public.realization_periods
+    where savings_period_id = 'b4000000-0000-4000-8000-000000000003'
+  )
   and (select savings_disposition is null from public.sourcing_events where id = 'b2000000-0000-4000-8000-000000000002'),
   'reversal removes empty shells and returns every coupled surface to an estimated state'
 );
