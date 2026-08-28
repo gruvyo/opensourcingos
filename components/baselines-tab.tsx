@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import type { Tables, TablesInsert } from '@/lib/database.types'
+import { LoadErrorState } from '@/components/load-error-state'
+import { resolveLoadedRows } from '@/lib/load-state'
 
 type Baseline = {
   id: string
@@ -90,6 +92,9 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [baselinesLoadError, setBaselinesLoadError] = useState<string | null>(null)
+  const [baselineLineErrors, setBaselineLineErrors] = useState<Record<string, string>>({})
+  const [baselineLinesLoading, setBaselineLinesLoading] = useState<Record<string, boolean>>({})
   const [baselineToDelete, setBaselineToDelete] = useState<Baseline | null>(null)
   const supabase = createClient()
   const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
@@ -117,12 +122,23 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
   }
 
   const fetchBaselines = useCallback(async () => {
-    const { data } = await supabase
+    setLoading(true)
+    const result = await supabase
       .from('baselines')
       .select('*')
       .eq('event_id', eventId)
       .order('created_at', { ascending: true })
-    setBaselines(data || [])
+    const resolved = resolveLoadedRows<Baseline>('Baselines', {
+      data: result.data as Baseline[] | null,
+      error: result.error,
+    })
+    if (resolved.status === 'error') {
+      setBaselinesLoadError(resolved.message)
+      setLoading(false)
+      return
+    }
+    setBaselinesLoadError(null)
+    setBaselines(resolved.rows)
     setLoading(false)
   }, [eventId, supabase])
 
@@ -132,7 +148,13 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
 
   const fetchBaselineLines = async (baselineId: string) => {
     if (baselineLines[baselineId]) return
-    const { data } = await supabase
+    setBaselineLinesLoading(current => ({ ...current, [baselineId]: true }))
+    setBaselineLineErrors(current => {
+      const next = { ...current }
+      delete next[baselineId]
+      return next
+    })
+    const result = await supabase
       .from('baseline_lines')
       .select(`
         *,
@@ -140,7 +162,17 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
       `)
       .eq('baseline_id', baselineId)
       .order('line_number', { ascending: true })
-    setBaselineLines(prev => ({ ...prev, [baselineId]: data || [] }))
+    const resolved = resolveLoadedRows<BaselineLine>('Baseline lines', {
+      data: result.data as BaselineLine[] | null,
+      error: result.error,
+    })
+    if (resolved.status === 'error') {
+      setBaselineLineErrors(current => ({ ...current, [baselineId]: resolved.message }))
+      setBaselineLinesLoading(current => ({ ...current, [baselineId]: false }))
+      return
+    }
+    setBaselineLines(prev => ({ ...prev, [baselineId]: resolved.rows }))
+    setBaselineLinesLoading(current => ({ ...current, [baselineId]: false }))
   }
 
   const toggleExpand = (baselineId: string) => {
@@ -150,6 +182,10 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
       setExpandedId(baselineId)
       fetchBaselineLines(baselineId)
     }
+  }
+
+  const handleBaselineLinesChanged = (baselineId: string, lines: BaselineLine[]) => {
+    setBaselineLines(current => ({ ...current, [baselineId]: lines }))
   }
 
 
@@ -166,6 +202,10 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
 
   if (loading) {
     return <div className="p-8 text-center text-sm text-[var(--text-3)]">Loading baselines...</div>
+  }
+
+  if (baselinesLoadError) {
+    return <LoadErrorState title="Baselines are unavailable" message={baselinesLoadError} onRetry={fetchBaselines} />
   }
 
   return (
@@ -414,17 +454,28 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
                     />}
 
                     {/* Baseline Lines Table */}
-                    <BaselineLinesTable
-                      key={`${baseline.id}:${lines.map(line => line.id).join(',')}`}
-                      baselineId={baseline.id}
-                      eventId={eventId}
-                      scopeLines={scopeLines}
-                      lines={lines}
-                      onLinesChanged={() => fetchBaselineLines(baseline.id)}
-                      isLocked={baseline.baseline_lock_status !== 'Draft'}
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                    />
+                    {baselineLinesLoading[baseline.id] ? (
+                      <div className="p-6 text-center text-sm text-[var(--text-3)]">Loading baseline lines...</div>
+                    ) : baselineLineErrors[baseline.id] ? (
+                      <LoadErrorState
+                        compact
+                        title="Baseline lines are unavailable"
+                        message={baselineLineErrors[baseline.id]}
+                        onRetry={() => fetchBaselineLines(baseline.id)}
+                      />
+                    ) : (
+                      <BaselineLinesTable
+                        key={`${baseline.id}:${lines.map(line => line.id).join(',')}`}
+                        baselineId={baseline.id}
+                        eventId={eventId}
+                        scopeLines={scopeLines}
+                        lines={lines}
+                        onLinesChanged={freshLines => handleBaselineLinesChanged(baseline.id, freshLines)}
+                        isLocked={baseline.baseline_lock_status !== 'Draft'}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                      />
+                    )}
                   </div>
                 )}
               </Card>
@@ -725,7 +776,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
   eventId: string
   scopeLines: ScopeLine[]
   lines: BaselineLine[]
-  onLinesChanged: () => void
+  onLinesChanged: (lines: BaselineLine[]) => void
   isLocked: boolean
   canEdit: boolean
   canDelete: boolean
@@ -772,10 +823,15 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       .eq('baseline_id', baselineId)
       .order('line_number', { ascending: true })
 
-    if (fetchError) { setError(fetchError.message); return }
+    const resolved = resolveLoadedRows<BaselineLine>('Baseline lines', {
+      data: freshLines as BaselineLine[] | null,
+      error: fetchError,
+    })
+    if (resolved.status === 'error') { setError(resolved.message); return }
 
-    const freshRows = freshLines || []
+    const freshRows = resolved.rows
     setLines(freshRows)
+    onLinesChanged(freshRows)
     await updateBaselineTotal(freshRows)
   }
 
@@ -837,7 +893,6 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       baseline_term_months: '12', baseline_recurring_amount: '', baseline_one_time_amount: '',
     })
     setShowAddLine(false)
-    onLinesChanged()
     await refreshLinesAndTotal()
   }
 
@@ -845,7 +900,6 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     setError(null)
     const { error: deleteError } = await supabase.from('baseline_lines').delete().eq('id', lineId)
     if (deleteError) { setError(deleteError.message); return }
-    onLinesChanged()
     await refreshLinesAndTotal()
   }
 

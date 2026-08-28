@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import { validateFinalAnchor } from '@/lib/final-anchor'
+import { resolveLoadedRows } from '@/lib/load-state'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) }))
 
@@ -399,10 +400,21 @@ export function ScheduleTab({
   /** After a row edit the published figure is stale — rewrite it from the rows. */
   const republish = async () => {
     if (!calc) return
-    const { data } = await supabase.from('savings_periods').select('*')
+    const result = await supabase.from('savings_periods').select('*')
       .eq('savings_calculation_id', calc.id).order('period_number', { ascending: true })
-    const current = toSchedulePeriods(data || [])
-    if (!current.length) return
+    const resolved = resolveLoadedRows<SavedScheduleRow>('The saved schedule', {
+      data: result.data,
+      error: result.error,
+    })
+    if (resolved.status === 'error') {
+      setError(`${resolved.message} The edited row was saved, but published totals were not rewritten; try the save again before relying on dashboard figures.`)
+      return
+    }
+    const current = toSchedulePeriods(resolved.rows)
+    if (!current.length) {
+      setError('The edited row was saved, but the schedule reload returned no periods, so published totals were not rewritten. Reload the page before continuing.')
+      return
+    }
     const res = await supabase.from('savings_calculations')
       .update(publishable(current, startMonth, startYear, dealMonths)).eq('id', calc.id)
     if (res.error) setError(res.error.message)
