@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -76,6 +77,7 @@ export function EditProjectModal({
   onClose: () => void
   onSaved: () => void
 }) {
+  const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -305,7 +307,8 @@ export function EditProjectModal({
     }
 
     setLoading(false)
-    window.location.href = '/events'
+    router.push('/events')
+    router.refresh()
   }
 
   const labelClass = 'mb-1 block text-xs font-medium text-[var(--text-2)]'
