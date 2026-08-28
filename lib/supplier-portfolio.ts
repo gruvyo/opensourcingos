@@ -1,4 +1,5 @@
 import { num, reportedSavings, type SavingsCalcRow } from './savings/index.ts'
+import { canonicalCalculationsByEvent, type CalculationDataQuality } from './calculation-integrity.ts'
 
 export type SupplierPortfolioEvent = {
   id: string
@@ -8,6 +9,7 @@ export type SupplierPortfolioEvent = {
 export type SupplierPortfolioCalculation = SavingsCalcRow & {
   event_id: string | null
   baseline_total_amount?: number | null
+  created_at?: string | null
 }
 
 export type SupplierPortfolioRealization = {
@@ -29,13 +31,19 @@ export type SupplierPortfolioValue = {
   realizationRate: number | null
 }
 
+export type SupplierPortfolioResult = {
+  values: Map<string, SupplierPortfolioValue>
+  dataQuality: CalculationDataQuality
+}
+
 export function supplierPortfolioValues(
   events: SupplierPortfolioEvent[],
   calculations: SupplierPortfolioCalculation[],
   realizationPeriods: SupplierPortfolioRealization[],
-): Map<string, SupplierPortfolioValue> {
+): SupplierPortfolioResult {
   const supplierByEvent = new Map(events.map(event => [event.id, event.awardedSupplierId]))
   const values = new Map<string, SupplierPortfolioValue>()
+  const canonical = canonicalCalculationsByEvent(calculations)
 
   const getValue = (supplierId: string) => {
     const current = values.get(supplierId) ?? {
@@ -59,7 +67,7 @@ export function supplierPortfolioValues(
     getValue(event.awardedSupplierId).awards += 1
   }
 
-  for (const calculation of calculations) {
+  for (const calculation of canonical.calculations) {
     if (!calculation.event_id) continue
     const supplierId = supplierByEvent.get(calculation.event_id)
     if (!supplierId) continue
@@ -93,5 +101,5 @@ export function supplierPortfolioValues(
     value.realizationRate = projected > 0 ? (value.realizedSavings / projected) * 100 : null
   }
 
-  return values
+  return { values, dataQuality: canonical.dataQuality }
 }
