@@ -1226,6 +1226,7 @@ export type Database = {
           execution_note: string | null
           gross_savings_amount: number | null
           id: string
+          legacy_execution_actor_missing: boolean
           net_savings_amount: number | null
           opening_proposal_amount: number | null
           organization_id: string | null
@@ -1258,6 +1259,7 @@ export type Database = {
           execution_note?: string | null
           gross_savings_amount?: number | null
           id?: string
+          legacy_execution_actor_missing?: boolean
           net_savings_amount?: number | null
           opening_proposal_amount?: number | null
           organization_id?: string | null
@@ -1290,6 +1292,7 @@ export type Database = {
           execution_note?: string | null
           gross_savings_amount?: number | null
           id?: string
+          legacy_execution_actor_missing?: boolean
           net_savings_amount?: number | null
           opening_proposal_amount?: number | null
           organization_id?: string | null

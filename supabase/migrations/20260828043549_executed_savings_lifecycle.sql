@@ -66,8 +66,24 @@ alter table public.realization_periods
     references public.savings_periods(id)
     on delete restrict;
 
+-- Some pre-control executions belong to orphaned workspaces whose user
+-- profiles no longer exist. Preserve that truthful absence explicitly rather
+-- than inventing an actor or deleting financial history. New executions can
+-- never set this marker and still require a real profile actor.
+alter table public.savings_calculations
+  add column legacy_execution_actor_missing boolean not null default false;
+
+update public.savings_calculations
+set legacy_execution_actor_missing = true
+where calculation_status = 'executed'
+  and executed_by is null;
+
+comment on column public.savings_calculations.legacy_execution_actor_missing is
+  'True only for actorless executions preserved from before execution provenance controls existed.';
+
 -- The original check permitted an executed row with no actor. It also left a
--- lifecycle note on an estimated row possible. Tighten both sides.
+-- lifecycle note on an estimated row possible. Tighten both sides while
+-- grandfathering only the actorless legacy rows marked above.
 alter table public.savings_calculations
   drop constraint chk_savings_execution_metadata,
   add constraint chk_savings_execution_metadata check (
@@ -76,12 +92,17 @@ alter table public.savings_calculations
       and executed_at is null
       and executed_by is null
       and execution_note is null
+      and not legacy_execution_actor_missing
     )
     or
     (
       calculation_status = 'executed'
       and executed_at is not null
-      and executed_by is not null
+      and (
+        (executed_by is not null and not legacy_execution_actor_missing)
+        or
+        (executed_by is null and legacy_execution_actor_missing)
+      )
     )
   );
 
@@ -101,6 +122,7 @@ declare
   v_executed_at timestamptz;
   v_executed_by uuid;
   v_execution_note text;
+  v_legacy_actor_missing boolean;
 begin
   if tg_table_name = 'savings_calculations' then
     v_calculation_id := case when tg_op = 'DELETE' then old.id else new.id end;
@@ -111,8 +133,18 @@ begin
     end;
   end if;
 
-  select calculation_status, executed_at, executed_by, execution_note
-  into v_status, v_executed_at, v_executed_by, v_execution_note
+  select
+    calculation_status,
+    executed_at,
+    executed_by,
+    execution_note,
+    legacy_execution_actor_missing
+  into
+    v_status,
+    v_executed_at,
+    v_executed_by,
+    v_execution_note,
+    v_legacy_actor_missing
   from public.savings_calculations
   where id = v_calculation_id;
 
@@ -123,7 +155,8 @@ begin
   end if;
 
   if v_status = 'executed' then
-    if v_executed_at is null or v_executed_by is null then
+    if v_executed_at is null
+      or (v_executed_by is null and not v_legacy_actor_missing) then
       raise exception 'executed savings require an execution time and actor';
     end if;
 
@@ -147,7 +180,10 @@ begin
       raise exception 'every executed schedule period requires a complete snapshot';
     end if;
   elsif v_status = 'estimated' then
-    if v_executed_at is not null or v_executed_by is not null or v_execution_note is not null then
+    if v_executed_at is not null
+      or v_executed_by is not null
+      or v_execution_note is not null
+      or v_legacy_actor_missing then
       raise exception 'estimated savings cannot retain execution metadata';
     end if;
 
@@ -1181,6 +1217,7 @@ begin
     executed_at = null,
     executed_by = null,
     execution_note = null,
+    legacy_execution_actor_missing = false,
     updated_by = v_user,
     updated_at = now()
   where id = p_calc_id

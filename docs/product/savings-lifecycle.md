@@ -39,6 +39,11 @@ invariance, and month-based fiscal-year allocation.
 The Schedule owns the explicit **Mark as executed** action. The action requires
 an existing schedule, records who and when, and preserves the estimated values.
 
+Actorless executions created before these controls remain preserved when their
+workspace no longer has any profile that can truthfully own the decision. They
+carry an internal, read-only legacy-provenance marker. The marker cannot be set
+through the application; every new execution still requires a real actor.
+
 When a sourcing project is moved to **Complete**, the user must resolve any
 estimated-only schedule before the project closes:
 
