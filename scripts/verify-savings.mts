@@ -92,6 +92,14 @@ section('1. Chain invariant (reference deal, HANDOFF section 2)')
     near(`${name}: total`, c.total, 900_000)
     near(`${name}: total === reduction + avoidance`, c.total, (c.reduction ?? 0) + c.avoidance, 1e-6)
   }
+
+  // This sign boundary is mirrored by qa_r2_money_integrity.test.sql. Keep
+  // both application and database contracts explicit: a negotiated opening
+  // below the approved baseline is negative avoidance, never a zero clamp.
+  const signedBoundary = chainSavings({ baseline: 1_000, opening: 900, final: 900 })
+  near('opening below baseline: reduction', signedBoundary.reduction, 100)
+  near('opening below baseline: avoidance', signedBoundary.avoidance, -100)
+  near('opening below baseline: total', signedBoundary.total, 0)
 }
 
 // ---------------------------------------------------------------------

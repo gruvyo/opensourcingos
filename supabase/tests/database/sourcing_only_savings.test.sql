@@ -81,12 +81,13 @@ select set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000001
 select lives_ok(
   $$ insert into public.savings_calculations (
        id, organization_id, event_id, calculation_name, savings_type,
-       gross_savings_amount
+       baseline_total_amount, award_total_amount, cost_reduction_amount,
+       gross_savings_amount, net_savings_amount
      ) values (
        'd3000000-0000-4000-8000-000000000001',
        (select organization_id from public.profiles where id = auth.uid()),
        'd2000000-0000-4000-8000-000000000001',
-       'Allowed Sourcing calculation', 'Cost Reduction', 100
+       'Allowed Sourcing calculation', 'Cost Reduction', 100, 0, 100, 100, 100
      ) $$,
   'an administrator can create savings for a Sourcing Project'
 );

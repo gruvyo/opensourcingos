@@ -54,11 +54,13 @@ values
 
 insert into public.savings_calculations (
   id, organization_id, event_id, calculation_name, savings_type,
-  calculation_status, gross_savings_amount
+  calculation_status, baseline_total_amount, opening_proposal_amount,
+  award_total_amount, cost_reduction_amount, cost_avoidance_amount,
+  gross_savings_amount, net_savings_amount
 )
 values
-  ('a6000000-0000-4000-8000-000000000001', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'), 'a2000000-0000-4000-8000-000000000001', 'Prior schedule', 'Cost Reduction', 'estimated', 25),
-  ('a6000000-0000-4000-8000-000000000002', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000002'), 'a2000000-0000-4000-8000-000000000002', 'Viewer schedule', 'Cost Reduction', 'estimated', 10);
+  ('a6000000-0000-4000-8000-000000000001', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'), 'a2000000-0000-4000-8000-000000000001', 'Prior schedule', 'Cost Reduction', 'estimated', 100, 125, 100, 0, 25, 25, 25),
+  ('a6000000-0000-4000-8000-000000000002', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000002'), 'a2000000-0000-4000-8000-000000000002', 'Viewer schedule', 'Cost Reduction', 'estimated', 100, 110, 100, 0, 10, 10, 10);
 
 insert into public.savings_periods (
   id, organization_id, event_id, savings_calculation_id,

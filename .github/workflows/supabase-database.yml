@@ -2,13 +2,6 @@ name: Supabase database
 
 on:
   pull_request:
-    paths:
-      - 'supabase/**'
-      - 'lib/database.types.ts'
-      - 'scripts/generate-database-types.sh'
-      - 'scripts/generate-database-schema.sh'
-      - 'package.json'
-      - '.github/workflows/supabase-database.yml'
   push:
     branches:
       - main
