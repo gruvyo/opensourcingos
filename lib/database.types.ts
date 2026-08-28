@@ -2307,10 +2307,7 @@ export type Database = {
         }
         Returns: undefined
       }
-      select_baseline: {
-        Args: { p_baseline_id: string }
-        Returns: undefined
-      }
+      select_baseline: { Args: { p_baseline_id: string }; Returns: undefined }
       set_offer_role: {
         Args: { p_offer_id: string; p_role?: string }
         Returns: undefined
