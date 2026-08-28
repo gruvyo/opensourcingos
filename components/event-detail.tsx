@@ -163,6 +163,8 @@ export function EventDetail({
 }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEditModal, setShowEditModal] = useState(false)
+  const canEditMoney = currentProfile.role === 'admin' || currentProfile.role === 'procurement_user'
+  const canDeleteMoney = currentProfile.role === 'admin'
 
   const isSupport = event.project_type === 'Support'
   const TABS = isSupport
@@ -196,10 +198,12 @@ export function EventDetail({
             <span className={clsx('inline-flex rounded-full px-3 py-1 text-sm font-medium', statusColor(event.event_status))}>
               {event.event_status}
             </span>
-            <Button variant="secondary" size="sm" onClick={() => setShowEditModal(true)}>
-              <Pencil className="h-3.5 w-3.5" />
-              Edit
-            </Button>
+            {canEditMoney && (
+              <Button variant="secondary" size="sm" onClick={() => setShowEditModal(true)}>
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
         {event.event_description && (
@@ -245,12 +249,12 @@ export function EventDetail({
         )}
         {/* The hidden Scope tab needs a wider query before its navigation entry is restored. */}
         {!isSupport && activeTab === 'scope' && (
-          <ScopeLinesTab eventId={event.id} scopeLines={scopeLines as DormantScopeLine[]} />
+          <ScopeLinesTab eventId={event.id} scopeLines={scopeLines as DormantScopeLine[]} currentUserRole={currentProfile.role} />
         )}
-        {!isSupport && activeTab === 'baselines' && <BaselinesTab eventId={event.id} scopeLines={scopeLines} />}
-        {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} />}
+        {!isSupport && activeTab === 'baselines' && <BaselinesTab eventId={event.id} scopeLines={scopeLines} currentUserRole={currentProfile.role} />}
+        {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} currentUserRole={currentProfile.role} />}
         {!isSupport && activeTab === 'awards' && <AwardsTab />}
-        {!isSupport && activeTab === 'calculations' && <CalculationsTab eventId={event.id} />}
+        {!isSupport && activeTab === 'calculations' && <CalculationsTab eventId={event.id} currentUserRole={currentProfile.role} />}
         {!isSupport && activeTab === 'schedule' && (
           <ScheduleTab
             eventId={event.id}
@@ -278,6 +282,7 @@ export function EventDetail({
           projectCategoriesEnabled={projectCategoriesEnabled}
           projectBusinessUnitsEnabled={projectBusinessUnitsEnabled}
           projectIncumbentSuppliersEnabled={projectIncumbentSuppliersEnabled}
+          canDelete={canDeleteMoney}
           onClose={() => setShowEditModal(false)}
           onSaved={() => { setShowEditModal(false); window.location.reload(); }}
         />

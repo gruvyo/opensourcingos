@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
+import { syncRealizationPeriodsAtomically } from '@/lib/atomic-money-writers'
 import type { Tables } from '@/lib/database.types'
 
 type RealizationPeriod = Omit<
@@ -56,6 +57,8 @@ export function RealizationTab({
   const [error, setError] = useState<string | null>(null)
   const [periodToDelete, setPeriodToDelete] = useState<RealizationPeriod | null>(null)
   const supabase = createClient()
+  const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
+  const canDelete = currentUserRole === 'admin'
 
   const fetchPeriods = useCallback(async (failureMessage = 'Realization data could not be refreshed') => {
     const { data, error: loadError } = await supabase
@@ -253,54 +256,9 @@ export function RealizationTab({
   const syncExecutedSchedule = async () => {
     setBusy(true)
     setError(null)
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      setError(`Realization period could not be added: ${userError?.message || 'Not logged in'}`)
-      setBusy(false)
-      return
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single()
-    if (profileError || !profile?.organization_id) {
-      setError(`Realization period could not be added: ${profileError?.message || 'Workspace not found'}`)
-      setBusy(false)
-      return
-    }
-
-    const existingScheduleIds = new Set(periods.map(period => period.savings_period_id).filter(Boolean))
-    const missingRows = scheduleRows.filter(row => !existingScheduleIds.has(row.id))
-    if (missingRows.length === 0) { setBusy(false); return }
-
-    const payload = missingRows.map(row => {
-      const start = new Date(Date.UTC(row.period_year, row.period_month - 1, 1))
-      const end = new Date(start)
-      end.setUTCMonth(end.getUTCMonth() + Math.max(1, Math.round(Number(row.period_months))))
-      end.setUTCDate(end.getUTCDate() - 1)
-      return {
-        organization_id: profile.organization_id,
-        event_id: eventId,
-        savings_calculation_id: row.savings_calculation_id,
-        savings_period_id: row.id,
-        period_name: start.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }),
-        period_start_date: start.toISOString().slice(0, 10),
-        period_end_date: end.toISOString().slice(0, 10),
-        baseline_amount: Number(row.executed_baseline_amount ?? 0),
-        projected_savings: Number(row.executed_total_savings_amount ?? 0),
-        actual_amount: null,
-        realized_savings: null,
-        leakage_amount: null,
-        realization_status: 'Pending',
-        created_by: user.id,
-      }
-    })
-
-    const { error: insertError } = await supabase.from('realization_periods').insert(payload)
-    if (insertError) {
-      setError(`Savings Realization periods could not be created: ${insertError.message}`)
+    const { error: syncError } = await syncRealizationPeriodsAtomically(supabase, eventId)
+    if (syncError) {
+      setError(`Savings Realization periods could not be created: ${syncError.message}`)
       setBusy(false)
       return
     }
@@ -333,10 +291,12 @@ export function RealizationTab({
           <h2 className="text-lg font-semibold text-[var(--text)]">Savings Realization</h2>
           <p className="text-sm text-[var(--text-2)]">Compare executed savings with actual results on the same schedule</p>
         </div>
-        <Button disabled={busy || scheduleRows.length === 0 || periods.length === scheduleRows.length} onClick={syncExecutedSchedule} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create tracking periods
-        </Button>
+        {canEdit && (
+          <Button disabled={busy || scheduleRows.length === 0 || periods.length === scheduleRows.length} onClick={syncExecutedSchedule} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create tracking periods
+          </Button>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -423,7 +383,7 @@ export function RealizationTab({
                         type="number"
                         step="0.01"
         defaultValue={period.actual_amount ?? ''}
-                        disabled={busy}
+                        disabled={busy || !canEdit}
                         onBlur={async (e) => {
                           const input = e.currentTarget
                           const saved = await updateActualAmount(period.id, input.value)
@@ -439,7 +399,7 @@ export function RealizationTab({
                         type="number"
                         step="0.01"
                         defaultValue={period.realized_savings ?? ''}
-                        disabled={busy}
+                        disabled={busy || !canEdit}
                         onBlur={async event => {
                           const input = event.currentTarget
                           const saved = await updateRealizedSavings(period.id, input.value)
@@ -458,7 +418,7 @@ export function RealizationTab({
                       <Select
                         aria-label={`Status for ${period.period_name}`}
                         value={period.realization_status}
-                        disabled={busy}
+                        disabled={busy || !canEdit}
                         onChange={(e) => updateStatus(period.id, e.target.value)}
                         className={clsx('w-auto rounded-full border-0 px-2.5 py-1 text-xs font-medium',
                           REALIZATION_STATUS_COLORS[period.realization_status]
@@ -491,12 +451,15 @@ export function RealizationTab({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button type="button" onClick={() => setPeriodToDelete(period)}
-                        disabled={busy}
-                        aria-label={`Delete realization period ${period.period_name}`}
-                        className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canDelete && (
+                        <button type="button" onClick={() => setPeriodToDelete(period)}
+                          disabled={busy || period.finance_validated}
+                          title={period.finance_validated ? 'Remove finance validation before deleting this period' : undefined}
+                          aria-label={`Delete realization period ${period.period_name}`}
+                          className="text-[var(--text-3)] enabled:hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:enabled:hover:text-red-400">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

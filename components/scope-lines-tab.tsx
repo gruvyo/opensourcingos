@@ -30,13 +30,15 @@ const UOM_OPTIONS = [
   'Unit', 'Seat', 'Subscription', 'Transaction', 'Gigabyte', 'Terabyte'
 ]
 
-export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: string; scopeLines: ScopeLine[] }) {
+export function ScopeLinesTab({ eventId, scopeLines: initialLines, currentUserRole }: { eventId: string; scopeLines: ScopeLine[]; currentUserRole: string | null }) {
   const [scopeLines, setScopeLines] = useState(initialLines)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lineToDelete, setLineToDelete] = useState<ScopeLine | null>(null)
   const supabase = createClient()
+  const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
+  const canDelete = currentUserRole === 'admin'
 
   const [newLine, setNewLine] = useState({
     item_service_name: '',
@@ -140,10 +142,10 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
           <h2 className="text-lg font-semibold text-[var(--text)]">Scope Lines</h2>
           <p className="text-sm text-[var(--text-2)]">Define what is being sourced, line by line</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
+        {canEdit && <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4" />
           Add Scope Line
-        </Button>
+        </Button>}
       </div>
 
       {error && (
@@ -152,7 +154,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
         </div>
       )}
 
-      {showForm && (
+      {canEdit && showForm && (
         <form onSubmit={handleAdd} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
           <h3 className="mb-4 font-medium text-[var(--text)]">New Scope Line</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -275,11 +277,11 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button type="button" onClick={() => setLineToDelete(line)}
+                    {canDelete && <button type="button" onClick={() => setLineToDelete(line)}
                       aria-label={`Delete scope line ${line.line_number}: ${line.item_service_name}`}
                       className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </button>}
                   </td>
                 </tr>
               ))
@@ -293,7 +295,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
           {scopeLines.length} scope line{scopeLines.length !== 1 ? 's' : ''}
         </p>
       )}
-      {lineToDelete && (
+      {canDelete && lineToDelete && (
         <ConfirmDialog
           title="Delete this scope line?"
           description={`This permanently removes scope line ${lineToDelete.line_number}, ${lineToDelete.item_service_name}. This cannot be undone.`}

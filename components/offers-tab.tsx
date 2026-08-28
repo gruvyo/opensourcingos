@@ -62,10 +62,12 @@ export function OffersTab({
   eventId,
   scopeLines,
   suppliers,
+  currentUserRole,
 }: {
   eventId: string
   scopeLines: ScopeLine[]
   suppliers: Supplier[]
+  currentUserRole: string | null
 }) {
   const [offers, setOffers] = useState<Offer[]>([])
   const [loading, setLoading] = useState(true)
@@ -79,6 +81,8 @@ export function OffersTab({
   const [actionError, setActionError] = useState<string | null>(null)
   const [offerToDelete, setOfferToDelete] = useState<Offer | null>(null)
   const supabase = createClient()
+  const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
+  const canDelete = currentUserRole === 'admin'
   // The `suppliers` prop is a server-render snapshot from page load. A supplier
   // created inline must show up in the next dropdown without a page refresh, so
   // combine that snapshot with the latest on-demand refresh. Deriving the list
@@ -203,10 +207,10 @@ export function OffersTab({
               {showCompare ? 'Hide Comparison' : 'Compare Offers'}
             </button>
           )}
-          <Button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
+          {canEdit && <Button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Add Offer
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -225,7 +229,7 @@ export function OffersTab({
       )}
 
       {/* Add Offer Form */}
-      {showForm && (
+      {canEdit && showForm && (
         <AddOfferForm
           eventId={eventId}
           suppliers={supplierList}
@@ -235,7 +239,7 @@ export function OffersTab({
         />
       )}
 
-      {editingOffer && (
+      {canEdit && editingOffer && (
         <AddOfferForm
           eventId={eventId}
           suppliers={supplierList}
@@ -318,12 +322,14 @@ export function OffersTab({
                           className="w-36 py-1 text-right text-sm" />
                         <Button type="button" size="sm" onClick={() => saveOfferTotal(offer.id)}>Save</Button>
                       </div>
-                    ) : (
+                    ) : canEdit ? (
                       <button type="button" title="Click to edit"
                         onClick={() => { setEditingTotalId(offer.id); setEditTotalValue(String(offer.offer_total_amount ?? '')) }}
                         className="text-lg font-bold text-[var(--text)] underline decoration-dotted underline-offset-4 hover:text-[var(--brand-ink)]">
                         {formatCurrency(offer.offer_total_amount)}
                       </button>
+                    ) : (
+                      <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(offer.offer_total_amount)}</p>
                     )}
                     {(() => {
                       const r = termRates(offer.offer_total_amount, offer.offer_term_months)
@@ -340,6 +346,7 @@ export function OffersTab({
                   <button
                     type="button"
                     onClick={() => toggleCompliance(offer)}
+                    disabled={!canEdit}
                     className={clsx(
                       'flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
                       offer.compliant_bid_flag
@@ -352,16 +359,16 @@ export function OffersTab({
                   </button>
 
                   {/* Delete */}
-                  <button type="button" onClick={() => setEditingOffer(offer)}
+                  {canEdit && <button type="button" onClick={() => setEditingOffer(offer)}
                     aria-label={`Edit offer from ${offer.supplier?.supplier_name || 'unknown supplier'}`}
                     className="text-[var(--text-3)] hover:text-[var(--brand-ink)]">
                     <Pencil className="h-4 w-4" />
-                  </button>
-                  <button type="button" onClick={() => setOfferToDelete(offer)}
+                  </button>}
+                  {canDelete && <button type="button" onClick={() => setOfferToDelete(offer)}
                     aria-label={`Delete offer from ${offer.supplier?.supplier_name || 'unknown supplier'}`}
                     className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                     <Trash2 className="h-4 w-4" />
-                  </button>
+                  </button>}
                 </div>
 
                 {/* Expanded View */}
@@ -377,6 +384,7 @@ export function OffersTab({
                       ]).map(({ role, label, hint }) => (
                         <button type="button" key={role} title={hint}
                           onClick={() => setRole(offer.id, offer.offer_role === role ? null : role)}
+                          disabled={!canEdit}
                           className={clsx(
                             'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                             offer.offer_role === role
@@ -398,6 +406,8 @@ export function OffersTab({
                       scopeLines={scopeLines}
                       lines={lines}
                       onLinesChanged={(freshLines) => handleOfferLinesChanged(offer.id, freshLines)}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
                     />
                   </div>
                 )}
@@ -406,7 +416,7 @@ export function OffersTab({
           })}
         </div>
       )}
-      {offerToDelete && (
+      {canDelete && offerToDelete && (
         <ConfirmDialog
           title="Delete this supplier offer?"
           description={`This removes the offer from ${offerToDelete.supplier?.supplier_name || 'this supplier'} and all of its line detail. This cannot be undone.`}
@@ -544,7 +554,6 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
         ...payload,
         organization_id: profile?.organization_id,
         event_id: eventId,
-        created_by: user.id,
       })
 
     if (insertError) {
@@ -669,12 +678,14 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
 // ============================================
 // Offer Lines Table
 // ============================================
-function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }: {
+function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged, canEdit, canDelete }: {
   offerId: string
   eventId: string
   scopeLines: ScopeLine[]
   lines: OfferLine[]
   onLinesChanged: (lines: OfferLine[]) => void
+  canEdit: boolean
+  canDelete: boolean
 }) {
   const supabase = createClient()
   const [lineError, setLineError] = useState<string | null>(null)
@@ -791,10 +802,10 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">
         <h4 className="text-sm font-medium text-[var(--text-2)]">Offer Lines</h4>
-        <button type="button" onClick={() => setShowAddLine(!showAddLine)}
+        {canEdit && <button type="button" onClick={() => setShowAddLine(!showAddLine)}
           className="flex items-center gap-1 rounded bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
           <Plus className="h-3 w-3" /> Add Line
-        </button>
+        </button>}
       </div>
 
       {lineError && (
@@ -806,7 +817,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
         </div>
       )}
 
-      {showAddLine && (
+      {canEdit && showAddLine && (
         <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 dark:border-indigo-800 bg-[var(--surface)] p-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="md:col-span-3">
@@ -929,11 +940,11 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
                     </span>
                   </td>
                   <td className="px-2 py-2 text-right">
-                    <button type="button" onClick={() => setLineToDelete(line)}
+                    {canDelete && <button type="button" onClick={() => setLineToDelete(line)}
                       aria-label={`Delete offer line ${line.line_number}`}
                       className="text-[var(--text-3)] hover:text-red-600 dark:text-red-400">
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </button>}
                   </td>
                 </tr>
               ))}
@@ -953,7 +964,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged }
           </p>
         </div>
       )}
-      {lineToDelete && (
+      {canDelete && lineToDelete && (
         <ConfirmDialog
           title="Delete this offer line?"
           description={`This permanently removes offer line ${lineToDelete.line_number}. This cannot be undone.`}

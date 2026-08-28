@@ -2408,6 +2408,10 @@ export type Database = {
         Args: { p_owner: string; p_source: string; p_target: string }
         Returns: number
       }
+      complete_sourcing_project: {
+        Args: { p_disposition: string; p_event_id: string; p_reason?: string }
+        Returns: undefined
+      }
       confirm_business_equivalency: {
         Args: { p_confirmed: boolean; p_scope_line_id: string }
         Returns: undefined
@@ -2456,6 +2460,10 @@ export type Database = {
       set_offer_role: {
         Args: { p_offer_id: string; p_role?: string }
         Returns: undefined
+      }
+      sync_realization_periods: {
+        Args: { p_event_id: string }
+        Returns: number
       }
       update_workspace_settings:
         | {

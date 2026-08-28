@@ -2,9 +2,17 @@ import { createClient } from '@/lib/supabase/server'
 import { EventForm } from '@/components/event-form'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { redirect } from 'next/navigation'
 
 export default async function NewEventPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    : { data: null }
+  if (profile?.role !== 'admin' && profile?.role !== 'procurement_user') {
+    redirect('/events')
+  }
 
   const [
     { data: categories, error: categoriesError },

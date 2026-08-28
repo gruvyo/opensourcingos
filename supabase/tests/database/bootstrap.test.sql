@@ -3640,8 +3640,10 @@ select is(
       ]::text[]), 'UPDATE'::text
       union all
       select unnest(array[
-        'baseline_lines', 'baselines', 'event_scope_lines',
-        'realization_periods', 'sourcing_events',
+        'award_lines', 'awards', 'baseline_lines', 'baselines',
+        'event_scope_lines', 'realization_periods',
+        'savings_calculation_lines', 'savings_calculations',
+        'sourcing_events',
         'supplier_certifications', 'supplier_contacts',
         'supplier_offer_lines', 'supplier_offers',
         'supplier_performance_reviews', 'supplier_risks', 'suppliers'
@@ -3725,6 +3727,7 @@ select is(
         and has_function_privilege('authenticated', p.oid, 'EXECUTE')
     ), expected(signature) as (
       values
+        ('complete_sourcing_project(p_event_id uuid, p_disposition text, p_reason text)'),
         ('confirm_business_equivalency(p_scope_line_id uuid, p_confirmed boolean)'),
         ('current_org_id()'),
         ('correct_savings_execution(p_calc_id uuid, p_note text, p_calculation jsonb, p_periods jsonb)'),
@@ -3735,6 +3738,7 @@ select is(
         ('set_finance_validation(p_realization_period_id uuid, p_validated boolean)'),
         ('set_hard_reduction_override(p_baseline_id uuid, p_enabled boolean, p_reason text)'),
         ('set_offer_role(p_offer_id uuid, p_role text)'),
+        ('sync_realization_periods(p_event_id uuid)'),
         ('update_workspace_settings_v9(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean, p_project_incumbent_suppliers_enabled boolean, p_savings_realization_enabled boolean)')
     ), differences as (
       (select * from actual except select * from expected)
@@ -3770,6 +3774,7 @@ select ok(
    from pg_catalog.pg_proc p
    where p.oid in (
      'public.select_baseline(uuid)'::regprocedure,
+     'public.complete_sourcing_project(uuid,text,text)'::regprocedure,
      'public.set_offer_role(uuid,text)'::regprocedure,
      'public.replace_savings_schedule(uuid,integer,integer,text,jsonb)'::regprocedure,
      'public.mark_savings_schedule_executed(uuid,text)'::regprocedure,
@@ -3777,7 +3782,8 @@ select ok(
      'public.reverse_savings_execution(uuid,text,text)'::regprocedure,
      'public.set_hard_reduction_override(uuid,boolean,text)'::regprocedure,
      'public.confirm_business_equivalency(uuid,boolean)'::regprocedure,
-     'public.set_finance_validation(uuid,boolean)'::regprocedure
+     'public.set_finance_validation(uuid,boolean)'::regprocedure,
+     'public.sync_realization_periods(uuid)'::regprocedure
    )),
   'money-writer RPCs use definer rights with a fixed search path'
 );
@@ -3798,12 +3804,21 @@ select ok(
   and not has_column_privilege('authenticated', 'public.realization_periods', 'finance_validated', 'INSERT')
   and not has_column_privilege('authenticated', 'public.realization_periods', 'finance_validated', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.realization_periods', 'finance_validated_by', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.sourcing_events', 'savings_disposition', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.sourcing_events', 'savings_disposition_by', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.baselines', 'baseline_approved_by', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.baselines', 'baseline_approval_date', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.awards', 'award_approved_by', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.awards', 'award_approval_date', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.savings_calculations', 'calculation_status', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.savings_calculations', 'executed_by', 'INSERT')
   and not has_column_privilege('authenticated', 'public.event_scope_lines', 'created_by', 'INSERT')
   and not has_column_privilege('authenticated', 'public.event_scope_lines', 'updated_by', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.baseline_lines', 'created_by', 'INSERT')
   and not has_column_privilege('authenticated', 'public.supplier_offer_lines', 'updated_by', 'UPDATE')
   and not has_table_privilege('authenticated', 'public.savings_periods', 'INSERT')
   and not has_table_privilege('authenticated', 'public.savings_periods', 'DELETE')
+  and not has_table_privilege('authenticated', 'public.realization_periods', 'INSERT')
   and has_column_privilege('authenticated', 'public.baselines', 'baseline_total_amount', 'UPDATE')
   and has_column_privilege('authenticated', 'public.supplier_offers', 'offer_total_amount', 'UPDATE')
   and has_column_privilege('authenticated', 'public.savings_periods', 'final_amount', 'UPDATE'),

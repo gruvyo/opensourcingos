@@ -53,7 +53,7 @@ type CalculationOffer = Pick<Tables<'supplier_offers'>,
  * this tab shows the resulting arithmetic and saves it as the project's one
  * savings record (which is what every dashboard and report reads).
  */
-export function CalculationsTab({ eventId }: { eventId: string }) {
+export function CalculationsTab({ eventId, currentUserRole }: { eventId: string; currentUserRole: string | null }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -68,6 +68,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
 
   const [basis, setBasis] = useState<RateBasis>('perYear')
   const [refreshKey, setRefreshKey] = useState(0)
+  const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
 
   useEffect(() => {
     let cancelled = false
@@ -238,7 +239,6 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
       savings_percentage: reportableSavingsPct(termChain.total, quality.isHard ? baselineOverTerm : null),
       net_savings_amount: termChain.total,
       recognition_notes: `Derived from the selected anchors over the ${dealMonths}-month deal term.`,
-      updated_by: user.id,
     }
 
     const res = existing
@@ -248,7 +248,6 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
             ...payload,
             event_id: eventId,
             organization_id: profile?.organization_id,
-            created_by: user.id,
           })
 
     setSaving(false)
@@ -454,9 +453,9 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                   <Check className="h-3.5 w-3.5" /> Saved
                 </span>
               )}
-              <Button onClick={save} disabled={saving || !!loadError || existing?.calculation_status === 'executed'}>
+              {canEdit && <Button onClick={save} disabled={saving || !!loadError || existing?.calculation_status === 'executed'}>
                 {saving ? 'Saving...' : existing ? 'Update savings record' : 'Save savings record'}
-              </Button>
+              </Button>}
             </div>
             <p className="mt-2 text-right text-[11px] text-[var(--text-3)]">
               Saving publishes the <strong>whole {dealMonths}-month term</strong> to the dashboard,

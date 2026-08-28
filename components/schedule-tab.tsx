@@ -238,7 +238,8 @@ export function ScheduleTab({
   const savedTotals = scheduleTotals(saved)
   const executedTotal = rows.reduce((sum, row) => sum + Number(row.executed_total_savings_amount ?? 0), 0)
   const isExecuted = calc?.calculation_status === 'executed'
-  const canCorrect = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
+  const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
+  const canCorrect = canEdit
   const canReverse = currentUserRole === 'admin'
   const savedByYear = useMemo(() => scheduleByYear(saved), [saved])
   const editedCount = rows.filter(r => r.is_edited).length
@@ -322,7 +323,6 @@ export function ScheduleTab({
     }
 
     setBusy(true); setError(null)
-    const { data: { user } } = await supabase.auth.getUser()
     const res = await supabase.from('savings_periods').update({
       baseline_amount: toAnchor(draft.baseline),
       opening_amount: toAnchor(draft.opening),
@@ -331,8 +331,6 @@ export function ScheduleTab({
       cost_avoidance_amount: draftChain.avoidance,
       total_savings_amount: draftChain.total,
       is_edited: true,
-      updated_by: user?.id ?? null,
-      updated_at: new Date().toISOString(),
     }).eq('id', r.id)
     setBusy(false)
     if (res.error) { setError(res.error.message); return }
@@ -363,7 +361,7 @@ export function ScheduleTab({
     const res = await supabase.from('savings_periods').update({
       baseline_amount: g.baseline, opening_amount: g.opening, final_amount: g.final,
       cost_reduction_amount: g.reduction, cost_avoidance_amount: g.avoidance,
-      total_savings_amount: g.total, is_edited: false, updated_at: new Date().toISOString(),
+      total_savings_amount: g.total, is_edited: false,
     }).eq('id', r.id)
     setBusy(false)
     if (res.error) { setError(res.error.message); return }
@@ -566,7 +564,7 @@ export function ScheduleTab({
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {!isExecuted && saved.length > 0 && (
+                {canEdit && !isExecuted && saved.length > 0 && (
                   <Button onClick={() => setShowExecuteConfirm(true)} disabled={busy}>
                     Mark schedule executed
                   </Button>
@@ -658,18 +656,18 @@ export function ScheduleTab({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Start month</label>
-                <Select aria-label="Start month" value={startMonth} onChange={e => setStartMonth(Number(e.target.value))} disabled={isExecuted} className="mt-1">
+                <Select aria-label="Start month" value={startMonth} onChange={e => setStartMonth(Number(e.target.value))} disabled={isExecuted || !canEdit} className="mt-1">
                   {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </Select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Start year</label>
-                <Input aria-label="Start year" type="number" min={2000} max={2100} value={startYear} disabled={isExecuted}
+                <Input aria-label="Start year" type="number" min={2000} max={2100} value={startYear} disabled={isExecuted || !canEdit}
                   onChange={e => setStartYear(Number(e.target.value))} className="mt-1" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Period type</label>
-                <Select aria-label="Period type" value={periodType} onChange={e => changeType(e.target.value as PeriodType)} disabled={isExecuted} className="mt-1">
+                <Select aria-label="Period type" value={periodType} onChange={e => changeType(e.target.value as PeriodType)} disabled={isExecuted || !canEdit} className="mt-1">
                   {PERIOD_TYPES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </Select>
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">
@@ -685,7 +683,7 @@ export function ScheduleTab({
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--text-2)]">Period count</label>
-                <Input aria-label="Period count" type="number" min={1} max={600} value={periodCount} disabled={isExecuted}
+                <Input aria-label="Period count" type="number" min={1} max={600} value={periodCount} disabled={isExecuted || !canEdit}
                   onChange={e => setPeriodCount(Number(e.target.value))} className="mt-1" />
                 <p className="mt-1 text-[11px] text-[var(--text-3)]">
                   {defaultPeriodCount(periodType, dealMonths)} covers the {dealMonths}-month deal.
@@ -720,7 +718,7 @@ export function ScheduleTab({
               </div>
               <Button
                 onClick={() => editedCount > 0 ? setShowRegenerateConfirm(true) : void generate()}
-                disabled={busy || isExecuted}
+                disabled={busy || isExecuted || !canEdit}
               >
                 {busy ? 'Working...' : saved.length ? 'Regenerate schedule' : 'Generate schedule'}
               </Button>
@@ -896,12 +894,12 @@ export function ScheduleTab({
                                 </td>
                                 <td className="py-2">
                                   <div className="flex justify-end gap-1">
-                                    <Button size="sm" variant="ghost" onClick={() => startEdit(r)} disabled={isExecuted && !correctionMode}
+                                    <Button size="sm" variant="ghost" onClick={() => startEdit(r)} disabled={!canEdit || (isExecuted && !correctionMode)}
                                       title="Edit this period" aria-label="Edit this period">
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
                                     {r.is_edited && (
-                                      <Button size="sm" variant="ghost" disabled={busy || (isExecuted && !correctionMode)}
+                                      <Button size="sm" variant="ghost" disabled={busy || !canEdit || (isExecuted && !correctionMode)}
                                         onClick={() => resetRow(r)} title="Reset to the generated figures"
                                         aria-label="Reset to the generated figures">
                                         <RotateCcw className="h-3.5 w-3.5" />
