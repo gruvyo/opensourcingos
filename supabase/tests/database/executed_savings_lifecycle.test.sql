@@ -159,7 +159,10 @@ select lives_ok(
   'an administrator can execute an estimated schedule exactly once'
 );
 select ok(
-  (select calculation_status = 'executed' and executed_at is not null and executed_by = 'b1000000-0000-4000-8000-000000000001'
+  (select calculation_status = 'executed'
+      and executed_at is not null
+      and executed_by = 'b1000000-0000-4000-8000-000000000001'
+      and not legacy_execution_actor_missing
    from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000001')
   and (select bool_and(executed_total_savings_amount = total_savings_amount)
        from public.savings_periods where savings_calculation_id = 'b3000000-0000-4000-8000-000000000001')
@@ -348,7 +351,11 @@ select lives_ok(
   'an administrator can reverse a premature execution with only empty shells'
 );
 select ok(
-  (select calculation_status = 'estimated' and executed_at is null and executed_by is null and execution_note is null
+  (select calculation_status = 'estimated'
+      and executed_at is null
+      and executed_by is null
+      and execution_note is null
+      and not legacy_execution_actor_missing
    from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000002')
   and (select executed_total_savings_amount is null
        from public.savings_periods where id = 'b4000000-0000-4000-8000-000000000003')
