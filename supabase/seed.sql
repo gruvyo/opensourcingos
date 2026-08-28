@@ -8,6 +8,27 @@ values (
   true
 );
 
+-- The public demo has one non-login actor so its executed savings provenance
+-- remains complete without creating a real tenant workspace through the normal
+-- auth.users signup trigger.
+set session_replication_role = replica;
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  '00000000-0000-4000-8000-000000000002',
+  'demo-system-actor@example.invalid',
+  '{"full_name":"Demo System Actor"}'
+);
+set session_replication_role = origin;
+
+insert into public.profiles (id, organization_id, email, full_name, role)
+values (
+  '00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  'demo-system-actor@example.invalid',
+  'Demo System Actor',
+  'admin'
+);
+
 insert into public.organization_settings (
   organization_id,
   currency_code,
@@ -122,7 +143,8 @@ insert into public.sourcing_events (
   project_type,
   savings_disposition,
   savings_disposition_reason,
-  savings_disposition_at
+  savings_disposition_at,
+  savings_disposition_by
 )
 values (
   '00000000-0000-4000-8000-000000000021',
@@ -143,7 +165,8 @@ values (
   'Sourcing',
   'executed',
   'Fictional demo schedule is an executed commercial result.',
-  '2026-07-01T00:00:00Z'
+  '2026-07-01T00:00:00Z',
+  '00000000-0000-4000-8000-000000000002'
 );
 
 insert into public.project_updates (
@@ -241,6 +264,7 @@ insert into public.savings_calculations (
   net_savings_amount,
   calculation_status,
   executed_at,
+  executed_by,
   execution_note,
   savings_start_date,
   savings_end_date,
@@ -266,6 +290,7 @@ values (
   900000,
   'executed',
   '2026-07-01T00:00:00Z',
+  '00000000-0000-4000-8000-000000000002',
   'Fictional demo schedule is an executed commercial result.',
   '2026-08-01',
   '2029-07-31',
