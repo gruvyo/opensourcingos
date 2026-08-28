@@ -26,6 +26,7 @@ runs every pgTAP file below against a disposable database.
 | U-CI | Pull requests cannot bypass tests, verification, lint, types, build, database rebuild, generated types, or schema drift | `.github/workflows/application-quality.yml`; `.github/workflows/supabase-database.yml` |
 | U-GITIGNORE | Bare and environment-specific Next.js secret files cannot be accidentally committed; the public template remains available | `scripts/env-gitignore.test.mjs` |
 | U-HEADERS | Every route is protected against framing and receives CSP, MIME, referrer, permissions, and transport headers | `scripts/security-headers.test.mts`; production response-header check after deployment |
+| U-URLSCHEME | Supplier and evidence links render only absolute HTTP(S) URLs; direct writes cannot store an unsafe supplier website | `scripts/safe-external-url.test.mts`; `supabase/tests/database/url_scheme_checks.test.sql` |
 
 Hardening units not yet merged must add their evidence to this map in the same
 pull request. A test name alone is not sufficient: the test must exercise the
