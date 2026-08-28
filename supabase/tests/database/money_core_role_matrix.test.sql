@@ -242,8 +242,12 @@ select is(
 );
 
 select throws_ok(
-  $$ insert into public.sourcing_events (organization_id, event_name, project_type)
-     values ((select organization_id from public.profiles where id = auth.uid()), 'Viewer insert', 'Sourcing') $$,
+  $$ insert into public.sourcing_events (
+       organization_id, event_name, event_type, event_status, project_type
+     ) values (
+       (select organization_id from public.profiles where id = auth.uid()),
+       'Viewer insert', 'Contract Renewal', 'Pipeline', 'Sourcing'
+     ) $$,
   '42501', null,
   'a viewer cannot insert money-core records'
 );
