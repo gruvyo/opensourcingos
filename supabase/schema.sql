@@ -5430,10 +5430,6 @@ CREATE OR REPLACE TRIGGER "sourcing_events_enforce_support_project_setting" BEFO
 
 
 
-CREATE OR REPLACE TRIGGER "sourcing_events_executed_savings_delete_guard" BEFORE DELETE ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
-
-
-
 CREATE OR REPLACE TRIGGER "sourcing_events_realization_retention_guard" BEFORE DELETE ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_realization_history_delete"();
 
 
@@ -5443,6 +5439,10 @@ CREATE CONSTRAINT TRIGGER "sourcing_events_savings_completion_invariant" AFTER I
 
 
 CREATE OR REPLACE TRIGGER "sourcing_events_savings_disposition_audit" AFTER DELETE OR UPDATE OF "savings_disposition", "savings_disposition_reason", "savings_disposition_at", "savings_disposition_by" ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."capture_workspace_audit"();
+
+
+
+CREATE OR REPLACE TRIGGER "sourcing_events_savings_execution_delete_guard" BEFORE DELETE ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
 
 
 

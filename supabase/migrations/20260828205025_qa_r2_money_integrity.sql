@@ -128,7 +128,7 @@ begin
 end
 $$;
 
-create trigger sourcing_events_executed_savings_delete_guard
+create trigger sourcing_events_savings_execution_delete_guard
 before delete on public.sourcing_events
 for each row execute function public.prevent_executed_savings_parent_delete();
 
