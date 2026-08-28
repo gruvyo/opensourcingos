@@ -407,6 +407,17 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                       {period.savings_calculation && (
                         <div className="text-xs text-[var(--text-3)]">{period.savings_calculation.calculation_name}</div>
                       )}
+                      {period.comparison_rebased_at && (
+                        <div className={clsx(
+                          'mt-1 text-[11px]',
+                          period.finance_validated
+                            ? 'text-[var(--text-3)]'
+                            : 'font-medium text-amber-700 dark:text-amber-300',
+                        )}>
+                          Re-based by an executed-savings correction on {formatDate(period.comparison_rebased_at)}
+                          {!period.finance_validated && ' · Finance revalidation required'}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-[var(--text-2)]">
                       {formatCurrency(period.baseline_amount)}

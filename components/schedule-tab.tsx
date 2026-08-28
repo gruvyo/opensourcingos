@@ -52,13 +52,27 @@ const toAnchor = (v: string): number | null => (v.trim() === '' ? null : Number(
  * always derived, so no row can carry a savings figure that does not follow
  * from the chain.
  */
-export function ScheduleTab({ eventId }: { eventId: string }) {
+export function ScheduleTab({
+  eventId,
+  eventStatus,
+  currentUserRole,
+}: {
+  eventId: string
+  eventStatus: string
+  currentUserRole: string | null
+}) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false)
+  const [showReverseConfirm, setShowReverseConfirm] = useState(false)
+  const [correctionMode, setCorrectionMode] = useState(false)
+  const [correctionNote, setCorrectionNote] = useState('')
+  const [reversalMode, setReversalMode] = useState(false)
+  const [reversalNote, setReversalNote] = useState('')
+  const [rowsBeforeCorrection, setRowsBeforeCorrection] = useState<SavedScheduleRow[]>([])
 
   const [baseline, setBaseline] = useState<ScheduleBaseline | null>(null)
   const [opening, setOpening] = useState<ScheduleOffer | null>(null)
@@ -224,6 +238,8 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   const savedTotals = scheduleTotals(saved)
   const executedTotal = rows.reduce((sum, row) => sum + Number(row.executed_total_savings_amount ?? 0), 0)
   const isExecuted = calc?.calculation_status === 'executed'
+  const canCorrect = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
+  const canReverse = currentUserRole === 'admin'
   const savedByYear = useMemo(() => scheduleByYear(saved), [saved])
   const editedCount = rows.filter(r => r.is_edited).length
   const drift = saved.length ? savedTotals.total - dealChain.total : 0
@@ -276,7 +292,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   // Per-row editing. Only the three anchors; the split is always derived.
   // -------------------------------------------------------------------
   const startEdit = (r: SavedScheduleRow) => {
-    if (isExecuted) return
+    if (isExecuted && !correctionMode) return
     setEditingId(r.id)
     setDraft({
       baseline: r.baseline_amount === null || r.baseline_amount === undefined ? '' : String(r.baseline_amount),
@@ -290,6 +306,21 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   })
 
   const saveRow = async (r: SavedScheduleRow) => {
+    if (correctionMode) {
+      setRows(current => current.map(row => row.id === r.id ? {
+        ...row,
+        baseline_amount: toAnchor(draft.baseline),
+        opening_amount: toAnchor(draft.opening),
+        final_amount: Number(draft.final) || 0,
+        cost_reduction_amount: draftChain.reduction,
+        cost_avoidance_amount: draftChain.avoidance,
+        total_savings_amount: draftChain.total,
+        is_edited: true,
+      } : row))
+      setEditingId(null)
+      return
+    }
+
     setBusy(true); setError(null)
     const { data: { user } } = await supabase.auth.getUser()
     const res = await supabase.from('savings_periods').update({
@@ -314,6 +345,20 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
   const resetRow = async (r: SavedScheduleRow) => {
     const g = preview[Number(r.period_number) - 1]
     if (!g) { setError('That period is outside the current schedule settings — regenerate instead.'); return }
+    if (correctionMode) {
+      setRows(current => current.map(row => row.id === r.id ? {
+        ...row,
+        baseline_amount: g.baseline,
+        opening_amount: g.opening,
+        final_amount: g.final,
+        cost_reduction_amount: g.reduction,
+        cost_avoidance_amount: g.avoidance,
+        total_savings_amount: g.total,
+        is_edited: false,
+      } : row))
+      return
+    }
+
     setBusy(true); setError(null)
     const res = await supabase.from('savings_periods').update({
       baseline_amount: g.baseline, opening_amount: g.opening, final_amount: g.final,
@@ -347,6 +392,96 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
     })
     setBusy(false)
     if (executeError) { setError(executeError.message); return }
+    await load()
+  }
+
+  const startCorrection = () => {
+    setRowsBeforeCorrection(rows.map(row => ({ ...row })))
+    setCorrectionNote('')
+    setReversalMode(false)
+    setCorrectionMode(true)
+    setError(null)
+  }
+
+  const cancelCorrection = () => {
+    setRows(rowsBeforeCorrection)
+    setRowsBeforeCorrection([])
+    setCorrectionNote('')
+    setEditingId(null)
+    setCorrectionMode(false)
+  }
+
+  const submitCorrection = async () => {
+    if (!calc || correctionNote.trim() === '') {
+      setError('Explain why the executed record is being corrected.')
+      return
+    }
+
+    const correctedSchedule = toSchedulePeriods(rows)
+    const correctedHeader = {
+      ...publishable(correctedSchedule, startMonth, startYear, dealMonths),
+      schedule_start_month: startMonth,
+      schedule_start_year: startYear,
+      schedule_period_type: periodType,
+      schedule_period_count: rows.length,
+    }
+    const correctedPeriods = rows.map(row => ({
+      id: row.id,
+      period_number: row.period_number,
+      period_month: row.period_month,
+      period_year: row.period_year,
+      period_months: row.period_months,
+      baseline_amount: row.baseline_amount,
+      opening_amount: row.opening_amount,
+      final_amount: row.final_amount,
+      cost_reduction_amount: row.cost_reduction_amount,
+      cost_avoidance_amount: row.cost_avoidance_amount,
+      total_savings_amount: row.total_savings_amount,
+      is_edited: row.is_edited,
+      notes: row.notes,
+    }))
+
+    setBusy(true)
+    setError(null)
+    const { error: correctionError } = await supabase.rpc('correct_savings_execution', {
+      p_calc_id: calc.id,
+      p_note: correctionNote.trim(),
+      p_calculation: correctedHeader,
+      p_periods: correctedPeriods,
+    })
+    setBusy(false)
+    if (correctionError) {
+      setError(correctionError.message)
+      return
+    }
+
+    setCorrectionMode(false)
+    setCorrectionNote('')
+    setRowsBeforeCorrection([])
+    await load()
+  }
+
+  const reverseExecution = async () => {
+    if (!calc || reversalNote.trim() === '') {
+      setError('Explain why the execution is being reversed.')
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+    const { error: reversalError } = await supabase.rpc('reverse_savings_execution', {
+      p_calc_id: calc.id,
+      p_note: reversalNote.trim(),
+      p_disposition_action: eventStatus === 'Complete' ? 'no_executed_savings' : 'clear',
+    })
+    setBusy(false)
+    if (reversalError) {
+      setError(reversalError.message)
+      return
+    }
+
+    setReversalMode(false)
+    setReversalNote('')
     await load()
   }
 
@@ -430,13 +565,92 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                   </p>
                 </div>
               </div>
-              {!isExecuted && saved.length > 0 && (
-                <Button onClick={() => setShowExecuteConfirm(true)} disabled={busy}>
-                  Mark schedule executed
-                </Button>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {!isExecuted && saved.length > 0 && (
+                  <Button onClick={() => setShowExecuteConfirm(true)} disabled={busy}>
+                    Mark schedule executed
+                  </Button>
+                )}
+                {isExecuted && canCorrect && !correctionMode && !reversalMode && (
+                  <Button variant="secondary" onClick={startCorrection} disabled={busy}>
+                    Correct executed record
+                  </Button>
+                )}
+                {isExecuted && canReverse && !correctionMode && !reversalMode && (
+                  <Button variant="secondary" onClick={() => { setReversalMode(true); setError(null) }} disabled={busy}>
+                    Reverse accidental execution
+                  </Button>
+                )}
+              </div>
             </div>
           </Card>
+
+          {correctionMode && (
+            <Card className="mb-4 border-amber-300 p-4 dark:border-amber-700">
+              <h3 className="text-sm font-semibold text-[var(--text)]">Correct the executed record</h3>
+              <p className="mt-1 text-xs text-[var(--text-2)]">
+                Edit the affected period values below, then explain the correction. The database
+                keeps the prior figures in the audit history and re-bases any realization comparison.
+              </p>
+              <label className="mt-3 block text-xs font-medium text-[var(--text-2)]">
+                Correction explanation *
+                <textarea
+                  value={correctionNote}
+                  onChange={event => setCorrectionNote(event.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  className="mt-1 w-full resize-y rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                  placeholder="Explain what was wrong and why these corrected figures are defensible."
+                />
+              </label>
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="secondary" onClick={cancelCorrection} disabled={busy}>Cancel correction</Button>
+                <Button onClick={submitCorrection} disabled={busy || correctionNote.trim() === '' || editingId !== null}>
+                  {busy ? 'Saving correction...' : 'Save audited correction'}
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {reversalMode && (
+            <Card className="mb-4 border-red-300 p-4 dark:border-red-800">
+              <h3 className="text-sm font-semibold text-[var(--text)]">Reverse an accidental execution</h3>
+              <p className="mt-1 text-xs text-[var(--text-2)]">
+                Use this only when the schedule was marked executed too early. If actual or
+                Finance-validated realization evidence exists, the database will refuse the reversal
+                and require a correction instead.
+              </p>
+              <label className="mt-3 block text-xs font-medium text-[var(--text-2)]">
+                Reversal explanation *
+                <textarea
+                  value={reversalNote}
+                  onChange={event => setReversalNote(event.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  className="mt-1 w-full resize-y rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--brand)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                  placeholder="Explain why the execution was premature."
+                />
+              </label>
+              {eventStatus === 'Complete' && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  This completed project will be recorded as “no executed savings.” The explanation
+                  must contain at least 10 characters.
+                </p>
+              )}
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => { setReversalMode(false); setReversalNote('') }} disabled={busy}>
+                  Cancel reversal
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => setShowReverseConfirm(true)}
+                  disabled={busy || reversalNote.trim() === '' || (eventStatus === 'Complete' && reversalNote.trim().length < 10)}
+                >
+                  Review reversal
+                </Button>
+              </div>
+            </Card>
+          )}
 
           {/* ---- Settings ------------------------------------------------ */}
           <Card className="mb-4 p-4">
@@ -682,12 +896,12 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
                                 </td>
                                 <td className="py-2">
                                   <div className="flex justify-end gap-1">
-                                    <Button size="sm" variant="ghost" onClick={() => startEdit(r)} disabled={isExecuted}
+                                    <Button size="sm" variant="ghost" onClick={() => startEdit(r)} disabled={isExecuted && !correctionMode}
                                       title="Edit this period" aria-label="Edit this period">
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
                                     {r.is_edited && (
-                                      <Button size="sm" variant="ghost" disabled={busy || isExecuted}
+                                      <Button size="sm" variant="ghost" disabled={busy || (isExecuted && !correctionMode)}
                                         onClick={() => resetRow(r)} title="Reset to the generated figures"
                                         aria-label="Reset to the generated figures">
                                         <RotateCcw className="h-3.5 w-3.5" />
@@ -747,6 +961,16 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
           pendingLabel="Marking executed..."
           onConfirm={executeSchedule}
           onCancel={() => setShowExecuteConfirm(false)}
+        />
+      )}
+      {showReverseConfirm && (
+        <ConfirmDialog
+          title="Reverse this execution?"
+          description="This removes the executed snapshot and returns the schedule to Estimated. The reason and the prior values remain in the audit history. A reversal is permanently refused once realization evidence exists."
+          confirmLabel="Reverse execution"
+          pendingLabel="Reversing execution..."
+          onConfirm={reverseExecution}
+          onCancel={() => setShowReverseConfirm(false)}
         />
       )}
     </div>

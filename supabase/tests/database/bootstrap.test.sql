@@ -3585,7 +3585,7 @@ select is(
       select unnest(array[
         'baseline_lines', 'business_units', 'categories',
         'cost_centers', 'event_scope_lines', 'project_choice_options',
-        'project_updates', 'realization_periods', 'savings_calculations',
+        'project_updates', 'realization_periods',
         'supplier_certifications',
         'supplier_contacts', 'supplier_notes', 'supplier_offer_lines',
         'supplier_performance_reviews', 'supplier_risks',
@@ -3595,7 +3595,7 @@ select is(
       select unnest(array[
         'baseline_lines', 'business_units', 'categories',
         'cost_centers', 'event_scope_lines', 'project_choice_options',
-        'realization_periods', 'savings_calculations',
+        'realization_periods',
         'supplier_certifications', 'supplier_contacts',
         'supplier_offer_lines',
         'supplier_performance_reviews', 'supplier_risks', 'suppliers'
@@ -3688,8 +3688,10 @@ select is(
     ), expected(signature) as (
       values
         ('current_org_id()'),
+        ('correct_savings_execution(p_calc_id uuid, p_note text, p_calculation jsonb, p_periods jsonb)'),
         ('mark_savings_schedule_executed(p_savings_calculation_id uuid, p_execution_note text)'),
         ('replace_savings_schedule(p_savings_calculation_id uuid, p_schedule_start_month integer, p_schedule_start_year integer, p_schedule_period_type text, p_periods jsonb)'),
+        ('reverse_savings_execution(p_calc_id uuid, p_note text, p_disposition_action text)'),
         ('select_baseline(p_baseline_id uuid)'),
         ('set_offer_role(p_offer_id uuid, p_role text)'),
         ('update_workspace_settings_v9(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean, p_project_incumbent_suppliers_enabled boolean, p_savings_realization_enabled boolean)')
@@ -3729,7 +3731,9 @@ select ok(
      'public.select_baseline(uuid)'::regprocedure,
      'public.set_offer_role(uuid,text)'::regprocedure,
      'public.replace_savings_schedule(uuid,integer,integer,text,jsonb)'::regprocedure,
-     'public.mark_savings_schedule_executed(uuid,text)'::regprocedure
+     'public.mark_savings_schedule_executed(uuid,text)'::regprocedure,
+     'public.correct_savings_execution(uuid,text,jsonb,jsonb)'::regprocedure,
+     'public.reverse_savings_execution(uuid,text,text)'::regprocedure
    )),
   'money-writer RPCs use definer rights with a fixed search path'
 );

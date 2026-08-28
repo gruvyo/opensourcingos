@@ -98,6 +98,7 @@ type CurrentProfile = {
   id: string
   full_name: string | null
   email: string | null
+  role: string | null
 }
 
 const SOURCING_TABS = [
@@ -250,7 +251,13 @@ export function EventDetail({
         {!isSupport && activeTab === 'offers' && <OffersTab eventId={event.id} scopeLines={scopeLines} suppliers={suppliers} />}
         {!isSupport && activeTab === 'awards' && <AwardsTab />}
         {!isSupport && activeTab === 'calculations' && <CalculationsTab eventId={event.id} />}
-        {!isSupport && activeTab === 'schedule' && <ScheduleTab eventId={event.id} />}
+        {!isSupport && activeTab === 'schedule' && (
+          <ScheduleTab
+            eventId={event.id}
+            eventStatus={event.event_status}
+            currentUserRole={currentProfile.role}
+          />
+        )}
         {!isSupport && activeTab === 'realization' && <RealizationTab eventId={event.id} />}
 
       </div>

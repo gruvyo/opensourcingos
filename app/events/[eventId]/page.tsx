@@ -69,7 +69,7 @@ export default async function EventDetailPage({
       .eq('event_id', eventId)
       .order('created_at', { ascending: false }),
     supabase.from('profiles')
-      .select('id, full_name, email')
+      .select('id, full_name, email, role')
       .eq('id', user.id)
       .single(),
     supabase.from('organization_settings')

@@ -223,14 +223,12 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     // is no baseline -- see reportableSavingsPct.
     const baselineOverTerm = overTerm(bRates, !!baseline)
     const payload: TablesInsert<'savings_calculations'> = {
-      event_id: eventId,
       baseline_id: baseline?.id ?? null,
       calculation_name: `${dealMonths}-month deal savings`,
       // Derived, never chosen. A negotiation produces BOTH legs; the label just
       // records which one carried the deal. The dashboard splits on the two
       // amount columns, not on this.
       savings_type: (termChain.reduction ?? 0) >= termChain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
-      calculation_status: existing?.calculation_status === 'executed' ? 'executed' : 'estimated',
       baseline_total_amount: overTerm(bRates, !!baseline),
       opening_proposal_amount: overTerm(oRates, !!opening),
       award_total_amount: overTerm(fRates, !!final) ?? 0,
@@ -246,7 +244,12 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     const res = existing
       ? await supabase.from('savings_calculations').update(payload).eq('id', existing.id)
       : await supabase.from('savings_calculations')
-          .insert({ ...payload, organization_id: profile?.organization_id, created_by: user.id })
+          .insert({
+            ...payload,
+            event_id: eventId,
+            organization_id: profile?.organization_id,
+            created_by: user.id,
+          })
 
     setSaving(false)
     if (res.error) {
