@@ -1302,6 +1302,78 @@ with check (
   )
 );
 
+-- Demo cloning remaps all actor provenance to the new workspace owner. The
+-- execution lifecycle added these two actor columns after clone_org_data was
+-- introduced, so include them when cloning under the complete-metadata rule.
+create or replace function public.clone_org_data(p_source uuid, p_target uuid, p_owner uuid)
+returns integer
+language plpgsql security definer
+set search_path to 'pg_catalog', 'public'
+as $_$
+declare
+  v_tables text[] := array[
+    'categories', 'business_units', 'cost_centers', 'suppliers',
+    'project_choice_options',
+    'sourcing_events', 'project_updates', 'event_scope_lines',
+    'baselines', 'baseline_lines',
+    'supplier_offers', 'supplier_offer_lines',
+    'savings_calculations', 'savings_periods'
+  ];
+  v_person_cols text[] := array[
+    'created_by', 'updated_by', 'procurement_owner_id',
+    'hard_reduction_override_by', 'finance_validated_by'
+  ];
+  v_conditional_person_cols text[] := array['executed_by', 'savings_disposition_by'];
+  t text;
+  v_cols text;
+  v_total integer := 0;
+  v_count integer;
+begin
+  create temp table _idmap (old uuid primary key, new uuid not null) on commit drop;
+
+  foreach t in array v_tables loop
+    execute format(
+      'insert into _idmap (old, new) select id, gen_random_uuid() from public.%I where organization_id = $1',
+      t) using p_source;
+  end loop;
+
+  foreach t in array v_tables loop
+    select string_agg(
+      case
+        when c.column_name = 'id'
+          then '(select m.new from _idmap m where m.old = s.id)'
+        when c.column_name = 'organization_id'
+          then '$2'
+        when c.column_name = any(v_conditional_person_cols)
+          then format('case when s.%I is null then null else $3 end', c.column_name)
+        when c.column_name = any(v_person_cols)
+          then '$3'
+        when c.data_type = 'uuid'
+          then format('(select m.new from _idmap m where m.old = s.%I)', c.column_name)
+        else format('s.%I', c.column_name)
+      end,
+      ', ' order by c.ordinal_position)
+    into v_cols
+    from information_schema.columns c
+    where c.table_schema = 'public' and c.table_name = t;
+
+    execute format(
+      'insert into public.%I select %s from public.%I s where s.organization_id = $1',
+      t, v_cols, t) using p_source, p_target, p_owner;
+
+    get diagnostics v_count = row_count;
+    v_total := v_total + v_count;
+  end loop;
+
+  drop table _idmap;
+  return v_total;
+end
+$_$;
+
+revoke all on function public.clone_org_data(uuid, uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.clone_org_data(uuid, uuid, uuid) to service_role;
+
 revoke all on function public.mark_savings_schedule_executed(uuid, text)
   from public, anon, authenticated;
 revoke all on function public.correct_savings_execution(uuid, text, jsonb, jsonb)

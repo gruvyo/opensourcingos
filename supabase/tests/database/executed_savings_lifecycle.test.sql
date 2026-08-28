@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(37);
+select plan(39);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -15,6 +15,40 @@ update public.profiles set role = 'procurement_user'
 where id = 'b1000000-0000-4000-8000-000000000002';
 update public.profiles set role = 'viewer'
 where id = 'b1000000-0000-4000-8000-000000000003';
+
+select is(
+  (
+    select count(*)::integer
+    from public.savings_calculations calculation
+    join public.profiles profile on profile.organization_id = calculation.organization_id
+    where profile.id in (
+      'b1000000-0000-4000-8000-000000000001',
+      'b1000000-0000-4000-8000-000000000002',
+      'b1000000-0000-4000-8000-000000000003'
+    )
+      and calculation.calculation_status = 'executed'
+      and calculation.executed_by = profile.id
+  ),
+  3,
+  'demo cloning attributes each copied execution to the new workspace owner'
+);
+
+select is(
+  (
+    select count(*)::integer
+    from public.sourcing_events event
+    join public.profiles profile on profile.organization_id = event.organization_id
+    where profile.id in (
+      'b1000000-0000-4000-8000-000000000001',
+      'b1000000-0000-4000-8000-000000000002',
+      'b1000000-0000-4000-8000-000000000003'
+    )
+      and event.savings_disposition = 'executed'
+      and event.savings_disposition_by = profile.id
+  ),
+  3,
+  'demo cloning attributes each copied disposition to the new workspace owner'
+);
 
 insert into public.organization_settings (organization_id, savings_realization_enabled)
 values (
