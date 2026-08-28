@@ -29,6 +29,7 @@ runs every pgTAP file below against a disposable database.
 | U-URLSCHEME | Supplier and evidence links render only absolute HTTP(S) URLs; direct writes cannot store an unsafe supplier website | `scripts/safe-external-url.test.mts`; `supabase/tests/database/url_scheme_checks.test.sql` |
 | U-CSV | User-controlled CSV cells cannot execute spreadsheet formulas; exact negative monetary exports remain numeric text | `scripts/csv.test.mts` |
 | U-TZ-CLASSIFY | Realized-versus-accrued classification compares date-only starts with today in the workspace timezone | `scripts/realization-timezone.test.mts` |
+| U-TZ-PERSIST | Schedule end dates persist the user's local calendar date without a UTC day shift | `scripts/schedule-date-persistence.test.mts` |
 
 Hardening units not yet merged must add their evidence to this map in the same
 pull request. A test name alone is not sufficient: the test must exercise the

@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import { validateFinalAnchor } from '@/lib/final-anchor'
 import { resolveLoadedRows } from '@/lib/load-state'
+import { localDateKey } from '@/lib/date-key'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) }))
 
@@ -1075,7 +1076,7 @@ function publishable(rows: SchedulePeriod[], startMonth: number, startYear: numb
     savings_type: (t.reduction ?? 0) >= t.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
     savings_percentage: reportableSavingsPct(t.total, t.baseline),
     savings_start_date: `${startYear}-${String(startMonth).padStart(2, '0')}-01`,
-    savings_end_date: endDate.toISOString().slice(0, 10),
+    savings_end_date: localDateKey(endDate),
     calculation_name: `${rows.length}-period savings schedule`,
     recognition_notes: `Published from the savings schedule: ${rows.length} periods covering ${Math.round(t.months)} of ${dealMonths} deal months.`,
   }
