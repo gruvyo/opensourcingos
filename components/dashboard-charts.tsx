@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
-import { formatCurrency } from '@/lib/utils'
+import { formatDashboardCurrency } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
@@ -23,7 +23,7 @@ const TOOLTIP_STYLE = {
 }
 
 function currencyFormatter(value: unknown): string {
-  return formatCurrency(Number(value) || 0)
+  return formatDashboardCurrency(Number(value) || 0)
 }
 
 function compactFormatter(value: unknown): string {

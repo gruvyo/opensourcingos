@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { clsx } from 'clsx'
-import { formatCurrency, formatReduction } from '@/lib/utils'
+import { formatDashboardCurrency, formatDashboardReduction } from '@/lib/utils'
 import { yearOverYear, type PortfolioByYear } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { TrendingUp, TrendingDown, Minus, Info } from 'lucide-react'
@@ -69,9 +69,9 @@ export function FiscalYearPanel({
         <>
           {selected && (
             <div className="mb-4 grid grid-cols-1 gap-4 rounded-lg bg-[var(--surface-2)] p-4 sm:grid-cols-3">
-              <Figure label={`FY${selected.year} Cost Reduction`} value={formatReduction(selected.reduction)} />
-              <Figure label={`FY${selected.year} Cost Avoidance`} value={formatCurrency(selected.avoidance)} />
-              <Figure label={`FY${selected.year} Total`} value={formatCurrency(selected.total)} accent />
+              <Figure label={`FY${selected.year} Cost Reduction`} value={formatDashboardReduction(selected.reduction)} />
+              <Figure label={`FY${selected.year} Cost Avoidance`} value={formatDashboardCurrency(selected.avoidance)} />
+              <Figure label={`FY${selected.year} Total`} value={formatDashboardCurrency(selected.total)} accent />
             </div>
           )}
 
@@ -105,17 +105,17 @@ export function FiscalYearPanel({
                         {r.year}
                       </th>
                       <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-3)]">{bucket.months}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{formatReduction(r.reduction)}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(r.avoidance)}</td>
-                      <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatCurrency(r.total)}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{formatDashboardReduction(r.reduction)}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{formatDashboardCurrency(r.avoidance)}</td>
+                      <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatDashboardCurrency(r.total)}</td>
                       <td className="py-2 pr-3 text-right"><Movement delta={r.delta} pct={r.pct} /></td>
                       <td className="py-2 text-right">
                         {allExact ? (
                           <span className="text-xs text-[var(--text-3)]">exact</span>
                         ) : (
                           <span className="text-xs text-amber-600 dark:text-amber-400"
-                            title={`${formatCurrency(bucket.exact)} from schedules, ${formatCurrency(bucket.estimated)} estimated from dates`}>
-                            {formatCurrency(bucket.estimated)} estimated
+                            title={`${formatDashboardCurrency(bucket.exact)} from schedules, ${formatDashboardCurrency(bucket.estimated)} estimated from dates`}>
+                            {formatDashboardCurrency(bucket.estimated)} estimated
                           </span>
                         )}
                       </td>
@@ -176,7 +176,7 @@ function Movement({ delta, pct }: { delta: number | null; pct: number | null }) 
     <span className={clsx('inline-flex items-center justify-end gap-1 text-xs tabular-nums',
       flat ? 'text-[var(--text-3)]' : up ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
       <Icon className="h-3 w-3" aria-hidden="true" />
-      {up ? '+' : ''}{formatCurrency(delta)}
+      {up ? '+' : ''}{formatDashboardCurrency(delta)}
       {pct !== null && <span className="opacity-70">({up ? '+' : ''}{pct.toFixed(1)}%)</span>}
     </span>
   )
@@ -186,10 +186,10 @@ function Movement({ delta, pct }: { delta: number | null; pct: number | null }) 
 function Provenance({ data }: { data: PortfolioByYear }) {
   const parts: string[] = []
   if (data.scheduledProjects) {
-    parts.push(`${data.scheduledProjects} project${data.scheduledProjects === 1 ? '' : 's'} from a generated schedule (${formatCurrency(data.exactTotal)}, exact to the month)`)
+    parts.push(`${data.scheduledProjects} project${data.scheduledProjects === 1 ? '' : 's'} from a generated schedule (${formatDashboardCurrency(data.exactTotal)}, exact to the month)`)
   }
   if (data.estimatedProjects) {
-    parts.push(`${data.estimatedProjects} spread evenly across its savings dates (${formatCurrency(data.estimatedTotal)})`)
+    parts.push(`${data.estimatedProjects} spread evenly across its savings dates (${formatDashboardCurrency(data.estimatedTotal)})`)
   }
   return (
     <div className="mt-3 flex items-start gap-2 text-xs text-[var(--text-3)]">
@@ -198,7 +198,7 @@ function Provenance({ data }: { data: PortfolioByYear }) {
         {parts.length > 0 && <p>{parts.join('; ')}.</p>}
         {data.unscheduledProjects > 0 && (
           <p className="mt-1 text-amber-600 dark:text-amber-400">
-            {formatCurrency(data.unscheduled)} across {data.unscheduledProjects} project
+            {formatDashboardCurrency(data.unscheduled)} across {data.unscheduledProjects} project
             {data.unscheduledProjects === 1 ? '' : 's'} could not be placed in any year — no savings
             start and end dates. That money is missing from this table, not from the portfolio.
           </p>

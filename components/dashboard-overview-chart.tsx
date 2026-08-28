@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatCurrency } from '@/lib/utils'
+import { formatDashboardCurrency } from '@/lib/utils'
 
 export type DashboardTrendPoint = {
   year: number
@@ -26,7 +26,7 @@ function compactCurrency(value: number): string {
   const amount = Number(value) || 0
   if (Math.abs(amount) >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}m`
   if (Math.abs(amount) >= 1_000) return `$${(amount / 1_000).toFixed(0)}k`
-  return formatCurrency(amount)
+  return formatDashboardCurrency(amount)
 }
 
 export function DashboardOverviewChart({
@@ -57,7 +57,7 @@ export function DashboardOverviewChart({
           />
           <YAxis tick={AXIS_TICK} stroke={AXIS_STROKE} tickFormatter={compactCurrency} />
           <Tooltip
-            formatter={value => formatCurrency(Number(value) || 0)}
+            formatter={value => formatDashboardCurrency(Number(value) || 0)}
             labelFormatter={year => `Fiscal year ${year}`}
             contentStyle={{
               background: 'var(--surface)',

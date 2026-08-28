@@ -6,6 +6,7 @@ import { replaceSavingsScheduleAtomically } from '@/lib/atomic-money-writers'
 import type { Tables } from '@/lib/database.types'
 import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X, BadgeCheck } from 'lucide-react'
 import { formatCurrency, formatReduction as money } from '@/lib/utils'
+import { roundMoney } from '@/lib/money'
 import {
   chainSavings, baselineQuality,
   termRates, generateSchedule, scheduleTotals, scheduleByYear,
@@ -40,7 +41,7 @@ type ScheduleCalculation = Tables<'savings_calculations'>
 type SavedScheduleRow = Tables<'savings_periods'>
 
 /** Money as typed: '' means the anchor is not captured, never zero. */
-const toAnchor = (v: string): number | null => (v.trim() === '' ? null : Number(v))
+const toAnchor = (v: string): number | null => (v.trim() === '' ? null : roundMoney(Number(v)))
 
 /**
  * The savings schedule. The chain gives one number for the whole deal; nobody
@@ -228,11 +229,17 @@ export function ScheduleTab({
   // this — it is the same chain, just not sliced up.
   // rates already reflect the baseline's quality, so the plain chain is right
   // here -- running chainWithBaselineQuality again would demote it twice.
-  const dealChain = chainSavings({
-    baseline: rates.baselinePerMonth === null ? null : rates.baselinePerMonth * dealMonths,
-    opening: rates.openingPerMonth === null ? null : rates.openingPerMonth * dealMonths,
-    final: rates.finalPerMonth * dealMonths,
-  })
+  const dealAnchors = {
+    baseline: rates.baselinePerMonth === null ? null : roundMoney(rates.baselinePerMonth * dealMonths),
+    opening: rates.openingPerMonth === null ? null : roundMoney(rates.openingPerMonth * dealMonths),
+    final: roundMoney(rates.finalPerMonth * dealMonths),
+  }
+  const rawDealChain = chainSavings(dealAnchors)
+  const dealChain = {
+    reduction: rawDealChain.reduction === null ? null : roundMoney(rawDealChain.reduction),
+    avoidance: roundMoney(rawDealChain.avoidance),
+    total: roundMoney(rawDealChain.total),
+  }
 
   const saved = useMemo(() => toSchedulePeriods(rows), [rows])
   const savedTotals = scheduleTotals(saved)
@@ -303,7 +310,7 @@ export function ScheduleTab({
   }
 
   const draftChain = chainSavings({
-    baseline: toAnchor(draft.baseline), opening: toAnchor(draft.opening), final: Number(draft.final) || 0,
+    baseline: toAnchor(draft.baseline), opening: toAnchor(draft.opening), final: roundMoney(Number(draft.final) || 0),
   })
 
   const saveRow = async (r: SavedScheduleRow) => {
@@ -312,10 +319,10 @@ export function ScheduleTab({
         ...row,
         baseline_amount: toAnchor(draft.baseline),
         opening_amount: toAnchor(draft.opening),
-        final_amount: Number(draft.final) || 0,
-        cost_reduction_amount: draftChain.reduction,
-        cost_avoidance_amount: draftChain.avoidance,
-        total_savings_amount: draftChain.total,
+        final_amount: roundMoney(Number(draft.final) || 0),
+        cost_reduction_amount: draftChain.reduction === null ? null : roundMoney(draftChain.reduction),
+        cost_avoidance_amount: roundMoney(draftChain.avoidance),
+        total_savings_amount: roundMoney(draftChain.total),
         is_edited: true,
       } : row))
       setEditingId(null)
@@ -326,10 +333,10 @@ export function ScheduleTab({
     const res = await supabase.from('savings_periods').update({
       baseline_amount: toAnchor(draft.baseline),
       opening_amount: toAnchor(draft.opening),
-      final_amount: Number(draft.final) || 0,
-      cost_reduction_amount: draftChain.reduction,
-      cost_avoidance_amount: draftChain.avoidance,
-      total_savings_amount: draftChain.total,
+      final_amount: roundMoney(Number(draft.final) || 0),
+      cost_reduction_amount: draftChain.reduction === null ? null : roundMoney(draftChain.reduction),
+      cost_avoidance_amount: roundMoney(draftChain.avoidance),
+      total_savings_amount: roundMoney(draftChain.total),
       is_edited: true,
     }).eq('id', r.id)
     setBusy(false)

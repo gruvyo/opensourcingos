@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { MONEY_DECIMAL_PLACES } from '@/lib/money'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -14,9 +15,33 @@ export function formatCurrency(
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currencyCode || 'USD',
+    minimumFractionDigits: MONEY_DECIMAL_PLACES,
+    maximumFractionDigits: MONEY_DECIMAL_PLACES,
+  }).format(value)
+}
+
+/** Compact whole-dollar presentation reserved for dashboard summaries. */
+export function formatDashboardCurrency(
+  amount: number | null | undefined,
+  currencyCode: string = 'USD',
+): string {
+  const value = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode || 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+export function formatDashboardReduction(
+  amount: number | null | undefined,
+  currencyCode: string = 'USD',
+): string {
+  if (amount === null || amount === undefined || !Number.isFinite(amount)) return 'n/a'
+  return amount < 0
+    ? `(${formatDashboardCurrency(Math.abs(amount), currencyCode)})`
+    : formatDashboardCurrency(amount, currencyCode)
 }
 
 /**
