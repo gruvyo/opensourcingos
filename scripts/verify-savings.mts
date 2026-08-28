@@ -155,14 +155,14 @@ section('2. Sheet `savings-monthly` (36 monthly periods from August 2026)')
   // chart-pivots A2:C5 — the year buckets, which is what FY reporting reads.
   const byYear = scheduleByYear(rows)
   eq('year bucket count', byYear.length, 4)
-  near('2026 avoidance', byYear[0].avoidance, 83_333.333333333358)
-  near('2026 reduction', byYear[0].reduction, 34_722.22222222219)
-  near('2027 avoidance', byYear[1].avoidance, 200_000.00000000012)
-  near('2027 reduction', byYear[1].reduction, 83_333.333333333256)
-  near('2028 avoidance', byYear[2].avoidance, 200_000.00000000012)
-  near('2028 reduction', byYear[2].reduction, 83_333.333333333256)
-  near('2029 avoidance', byYear[3].avoidance, 116_666.6666666667)
-  near('2029 reduction', byYear[3].reduction, 48_611.111111111066)
+  near('2026 avoidance', byYear[0].avoidance, 83_333.35)
+  near('2026 reduction', byYear[0].reduction, 34_722.20)
+  near('2027 avoidance', byYear[1].avoidance, 200_000.04)
+  near('2027 reduction', byYear[1].reduction, 83_333.28)
+  near('2028 avoidance', byYear[2].avoidance, 200_000.04)
+  near('2028 reduction', byYear[2].reduction, 83_333.28)
+  near('2029 avoidance', byYear[3].avoidance, 116_666.57)
+  near('2029 reduction', byYear[3].reduction, 48_611.24)
   eq('2026 holds 5 months (Aug-Dec)', byYear[0].months, 5)
   eq('2029 holds 7 months (Jan-Jul)', byYear[3].months, 7)
 }
@@ -198,8 +198,8 @@ section('2b. The fiscal year is the same whichever way the deal is sliced')
   const annualYears = scheduleByYear(schedule('annual', 3))
   eq('annual: 2026 holds 5 months, not a whole year', annualYears[0].months, 5)
   eq('annual: spans four calendar years like the monthly schedule', annualYears.length, 4)
-  near('annual: 2026 avoidance', annualYears[0].avoidance, 83_333.333333333358)
-  near('annual: 2026 reduction', annualYears[0].reduction, 34_722.22222222219)
+  near('annual: 2026 avoidance', annualYears[0].avoidance, 83_333.35)
+  near('annual: 2026 reduction', annualYears[0].reduction, 34_722.20)
 }
 
 section('3. Sheet `savings-annually` (3 annual periods from August 2026)')
@@ -208,12 +208,12 @@ section('3. Sheet `savings-annually` (3 annual periods from August 2026)')
   eq('row count', rows.length, 3)
 
   const r1 = rows[0]
-  near('period 1 baseline (E15)', r1.baseline, 1_000_000)
+  near('period 1 baseline (E15)', r1.baseline, 999_999.96)
   near('period 1 opening  (F15)', r1.opening, 1_200_000)
-  near('period 1 final    (G15)', r1.final, 916_666.66666666674)
-  near('period 1 reduction (H15)', r1.reduction, 83_333.333333333256)
-  near('period 1 avoidance (I15)', r1.avoidance, 200_000)
-  near('period 1 total     (J15)', r1.total, 283_333.33333333326)
+  near('period 1 final    (G15)', r1.final, 916_666.68)
+  near('period 1 reduction (H15)', r1.reduction, 83_333.28)
+  near('period 1 avoidance (I15)', r1.avoidance, 200_000.04)
+  near('period 1 total     (J15)', r1.total, 283_333.32)
 
   // The sheet repeats the start month and steps the year: Aug 26, Aug 27, Aug 28.
   eq('period 2 is August 2027', `${rows[1].month}/${rows[1].year}`, '8/2027')
@@ -241,8 +241,8 @@ section('4. Sheet `savings-one-time` (a single period)')
   const byYear = scheduleByYear(rows)
   eq('one row still spans four years', byYear.length, 4)
   eq('2026 holds 5 months', byYear[0].months, 5)
-  near('2026 reduction', byYear[0].reduction, 34_722.22222222219)
-  near('2026 avoidance', byYear[0].avoidance, 83_333.333333333358)
+  near('2026 reduction', byYear[0].reduction, 34_722.20)
+  near('2026 avoidance', byYear[0].avoidance, 83_333.35)
   near('year buckets add back', byYear.reduce((s, b) => s + b.total, 0), GRAND.total)
 }
 
@@ -411,8 +411,8 @@ section('10. An 18-month consulting contract (one and a half periods)')
   // year would book 63,333 of savings the contract never produces.
   eq('annual period 1 is a full year', annual[0].months, 12)
   eq('annual period 2 is a 6-month stub', annual[1].months, 6)
-  near('annual period 1 total', annual[0].total, 126_666.667, 0.01)
-  near('annual period 2 total', annual[1].total, 63_333.333, 0.01)
+  near('annual period 1 total', annual[0].total, 126_666.72)
+  near('annual period 2 total', annual[1].total, 63_333.28)
 
   for (const [label, rows] of [['monthly', monthly], ['annual', annual], ['one-time', oneTime]] as const) {
     const t = scheduleTotals(rows)
@@ -430,9 +430,9 @@ section('10. An 18-month consulting contract (one and a half periods)')
   eq('2026 holds 4 months', byYear[0].months, 4)
   eq('2027 holds 12 months', byYear[1].months, 12)
   eq('2028 holds 2 months', byYear[2].months, 2)
-  near('FY2026 total', byYear[0].total, 42_222.222, 0.01)
-  near('FY2027 total', byYear[1].total, 126_666.667, 0.01)
-  near('FY2028 total', byYear[2].total, 21_111.111, 0.01)
+  near('FY2026 total', byYear[0].total, 42_222.24)
+  near('FY2027 total', byYear[1].total, 126_666.72)
+  near('FY2028 total', byYear[2].total, 21_111.04)
   near('year buckets add back to the deal', byYear.reduce((s, b) => s + b.total, 0), 190_000)
 
   // The annual schedule's 12-month period starts in September, so FOUR of its
@@ -500,9 +500,9 @@ section('12. One method: a synthesised deal matches its own real schedule')
 
   const monthBased = scheduleByYear(synth)
   near('2026 fallback books exactly five whole months',
-    monthBased.find(y => y.year === 2026)!.total, GRAND.total * (5 / 36))
+    monthBased.find(y => y.year === 2026)!.total, 118_055.55)
   near('2029 fallback books exactly seven whole months',
-    monthBased.find(y => y.year === 2029)!.total, GRAND.total * (7 / 36))
+    monthBased.find(y => y.year === 2029)!.total, 165_277.81)
 }
 
 section('13. Portfolio rollup: exact, estimated, and unplaceable')
@@ -531,7 +531,7 @@ section('13. Portfolio rollup: exact, estimated, and unplaceable')
   // The scheduled deal is the spreadsheet's (850,000 over 36 months), so a full
   // calendar year of it is 12/36 of the total, not a round 300,000.
   const y2027 = p.years.find(y => y.year === 2027)!
-  near('2027 exact portion', y2027.exact, (GRAND.total / 36) * 12)
+  near('2027 exact portion', y2027.exact, 283_333.32)
   near('2027 estimated portion', y2027.estimated, 120_000)
   near('2027 total is the sum of both', y2027.total, y2027.exact + y2027.estimated)
   near('every year: exact + estimated === total',

@@ -10,6 +10,8 @@
 // Methodology reference: ASSESSMENT.md, Appendix A.
 // =====================================================================
 
+import { allocateMoney, centsToMoney, moneyToCents, roundMoney } from '../money.ts'
+
 // ---- Loose row shapes (match the DB columns; tolerate nulls) ----------
 
 /**
@@ -328,6 +330,8 @@ export interface SchedulePeriod {
   reduction: number | null
   avoidance: number
   total: number
+  /** False for generated rows; true means fiscal allocation must honor this row independently. */
+  isEdited?: boolean
 }
 
 const MONTH_NAMES = [
@@ -365,31 +369,55 @@ export function generateSchedule(spec: ScheduleSpec, rates: ScheduleRates): Sche
   const dealMonths = Math.max(0, Math.round(num(spec.dealMonths)))
   const step = periodMonths(spec.periodType, dealMonths)
   const count = Math.max(0, Math.round(num(spec.periodCount)))
-  const rows: SchedulePeriod[] = []
+  const rowShape: Array<{ periodNumber: number; month: number; year: number; months: number }> = []
 
   for (let i = 0; i < count; i++) {
     const { month, year } = addMonths(spec.startMonth, spec.startYear, i * step)
     const months = Math.max(0, Math.min(step, dealMonths - i * step))
+    rowShape.push({ periodNumber: i + 1, month, year, months })
+  }
 
-    const baseline = rates.baselinePerMonth === null ? null : rates.baselinePerMonth * months
-    const opening = rates.openingPerMonth === null ? null : rates.openingPerMonth * months
-    const final = num(rates.finalPerMonth) * months
+  const bookedMonths = rowShape.reduce((sum, row) => sum + row.months, 0)
+  const allocateAnchor = (rate: number | null) => {
+    if (rate === null) return rowShape.map(() => null)
+
+    // Allocate a canonical monthly cent ledger first, then aggregate those
+    // cents into the chosen row shape. Monthly, Annual, and One-Time schedules
+    // therefore produce identical fiscal-year cents.
+    const monthly = allocateMoney(
+      Array.from({ length: bookedMonths }, () => rate),
+      { target: rate * bookedMonths, sinkIndex: Math.max(0, bookedMonths - 1) },
+    )
+    let offset = 0
+    return rowShape.map(row => {
+      const span = Math.max(0, Math.round(row.months))
+      const cents = monthly.slice(offset, offset + span)
+        .reduce<number>((sum, value) => sum + moneyToCents(value ?? 0), 0)
+      offset += span
+      return centsToMoney(cents)
+    })
+  }
+
+  const baselines = allocateAnchor(rates.baselinePerMonth)
+  const openings = allocateAnchor(rates.openingPerMonth)
+  const finals = allocateAnchor(num(rates.finalPerMonth))
+
+  return rowShape.map((shape, index) => {
+    const baseline = baselines[index]
+    const opening = openings[index]
+    const final = finals[index] ?? 0
     const chain = chainSavings({ baseline, opening, final })
-
-    rows.push({
-      periodNumber: i + 1,
-      month,
-      year,
-      months,
+    return {
+      ...shape,
       baseline,
       opening,
       final,
-      reduction: chain.reduction,
-      avoidance: chain.avoidance,
-      total: chain.total,
-    })
-  }
-  return rows
+      reduction: chain.reduction === null ? null : roundMoney(chain.reduction),
+      avoidance: roundMoney(chain.avoidance),
+      total: roundMoney(chain.total),
+      isEdited: false,
+    }
+  })
 }
 
 /** A row as it comes back from the database (numbers may arrive as strings). */
@@ -410,6 +438,7 @@ export interface SchedulePeriodRow {
   executed_cost_reduction_amount?: number | string | null
   executed_cost_avoidance_amount?: number | string | null
   executed_total_savings_amount?: number | string | null
+  is_edited?: boolean | null
 }
 
 export interface ScheduleTotals {
@@ -433,15 +462,15 @@ export function scheduleTotals(rows: SchedulePeriod[]): ScheduleTotals {
     periodCount: rows.length, months: 0,
   }
   for (const r of rows) {
-    t.baseline += num(r.baseline)
-    t.opening += num(r.opening)
-    t.final += num(r.final)
-    t.avoidance += num(r.avoidance)
-    t.total += num(r.total)
+    t.baseline = roundMoney(t.baseline + num(r.baseline))
+    t.opening = roundMoney(t.opening + num(r.opening))
+    t.final = roundMoney(t.final + num(r.final))
+    t.avoidance = roundMoney(t.avoidance + num(r.avoidance))
+    t.total = roundMoney(t.total + num(r.total))
     t.months += num(r.months)
     // Stays null only while every row is null, so "no baseline anywhere" reads
     // as not-applicable while a single grounded row makes the sum meaningful.
-    if (r.reduction !== null) t.reduction = num(t.reduction) + r.reduction
+    if (r.reduction !== null) t.reduction = roundMoney(num(t.reduction) + r.reduction)
   }
   return t
 }
@@ -482,6 +511,24 @@ export function scheduleByYear(rows: SchedulePeriod[]): ScheduleYearBucket[] {
     return b
   }
 
+  const totalMonths = rows.reduce((sum, row) => sum + Math.max(0, Math.round(num(row.months))), 0)
+  const hasAnchorLedger = rows.some(row => row.baseline !== null || row.opening !== null || row.final !== 0)
+  const useCanonicalLedger = totalMonths > 0 && hasAnchorLedger && rows.every(row => row.isEdited === false)
+  const canonicalAnchor = (pick: (row: SchedulePeriod) => number | null) => {
+    if (!useCanonicalLedger) return null
+    const values = rows.map(pick)
+    if (values.every(value => value === null)) return Array<number | null>(totalMonths).fill(null)
+    const total = values.reduce<number>((sum, value) => sum + num(value), 0)
+    return allocateMoney(Array.from({ length: totalMonths }, () => total / totalMonths), {
+      target: total,
+      sinkIndex: totalMonths - 1,
+    })
+  }
+  const canonicalBaselines = canonicalAnchor(row => row.baseline)
+  const canonicalOpenings = canonicalAnchor(row => row.opening)
+  const canonicalFinals = canonicalAnchor(row => row.final)
+  let canonicalOffset = 0
+
   for (const r of rows) {
     const span = Math.max(0, Math.round(num(r.months)))
 
@@ -490,28 +537,50 @@ export function scheduleByYear(rows: SchedulePeriod[]): ScheduleYearBucket[] {
     // rather than dividing by zero or dropping it silently.
     if (span === 0) {
       const b = ensure(Math.round(num(r.year)))
-      if (r.reduction !== null) b.reduction = num(b.reduction) + r.reduction
-      b.avoidance += num(r.avoidance)
-      b.total += num(r.total)
+      if (r.reduction !== null) b.reduction = roundMoney(num(b.reduction) + r.reduction)
+      b.avoidance = roundMoney(b.avoidance + num(r.avoidance))
+      b.total = roundMoney(b.total + num(r.total))
       continue
     }
 
-    // Per-month rates for THIS period, then one month at a time into its own
-    // calendar year. Whatever the row carries — generated or hand-edited — is
-    // what gets spread; the split is never recomputed here.
-    const perMonth = {
-      reduction: r.reduction === null ? null : r.reduction / span,
-      avoidance: num(r.avoidance) / span,
-      total: num(r.total) / span,
-    }
+    // Recreate the row's monthly anchor ledger in integer cents and derive the
+    // savings chain from those anchors. The three savings legs can therefore
+    // never land in different fiscal-year pennies.
+    const allocateMonths = (value: number | null) => value === null
+      ? Array<number | null>(span).fill(null)
+      : allocateMoney(Array.from({ length: span }, () => value / span), {
+          target: value,
+          sinkIndex: span - 1,
+        })
+    const baselines = canonicalBaselines?.slice(canonicalOffset, canonicalOffset + span)
+      ?? allocateMonths(r.baseline)
+    const openings = canonicalOpenings?.slice(canonicalOffset, canonicalOffset + span)
+      ?? allocateMonths(r.opening)
+    const finals = canonicalFinals?.slice(canonicalOffset, canonicalOffset + span)
+      ?? allocateMonths(r.final)
+    canonicalOffset += span
+
+    const rowHasAnchors = r.baseline !== null || r.opening !== null || r.final !== 0
+    const reductions = rowHasAnchors ? null : allocateMonths(r.reduction)
+    const avoidances = rowHasAnchors ? null : allocateMonths(r.avoidance)
+    const totals = rowHasAnchors ? null : allocateMonths(r.total)
     for (let k = 0; k < span; k++) {
       const { year } = addMonths(r.month, r.year, k)
       const b = ensure(year)
+      const chain = rowHasAnchors ? chainSavings({
+        baseline: baselines[k],
+        opening: openings[k],
+        final: finals[k] ?? 0,
+      }) : {
+        reduction: reductions?.[k] ?? null,
+        avoidance: avoidances?.[k] ?? 0,
+        total: totals?.[k] ?? 0,
+      }
       // Stays null while every period contributing to this year is null, so a
       // year with no baseline reads "n/a" rather than a misleading zero.
-      if (perMonth.reduction !== null) b.reduction = num(b.reduction) + perMonth.reduction
-      b.avoidance += perMonth.avoidance
-      b.total += perMonth.total
+      if (chain.reduction !== null) b.reduction = roundMoney(num(b.reduction) + chain.reduction)
+      b.avoidance = roundMoney(b.avoidance + chain.avoidance)
+      b.total = roundMoney(b.total + chain.total)
       b.months += 1
     }
   }
@@ -532,6 +601,7 @@ export function toSchedulePeriods(rows: SchedulePeriodRow[]): SchedulePeriod[] {
     reduction: nullable(r.cost_reduction_amount),
     avoidance: num(r.cost_avoidance_amount),
     total: num(r.total_savings_amount),
+    isEdited: Boolean(r.is_edited),
   }))
 }
 
@@ -551,6 +621,7 @@ export function toExecutedSchedulePeriods(rows: SchedulePeriodRow[]): SchedulePe
       reduction: nullable(row.executed_cost_reduction_amount),
       avoidance: num(row.executed_cost_avoidance_amount),
       total: num(row.executed_total_savings_amount),
+      isEdited: Boolean(row.is_edited),
     }))
 }
 
@@ -960,11 +1031,20 @@ export function calcToPeriods(c: SavingsCalcRow): SchedulePeriod[] {
   if (months <= 0) return []
   const start = new Date(String(c.savings_start_date).slice(0, 10) + 'T00:00:00')
 
-  const total = num(c.gross_savings_amount)
   const avoidance = num(c.cost_avoidance_amount)
   // null stays null all the way through — not applicable is not zero.
   const reduction = c.cost_reduction_amount === null || c.cost_reduction_amount === undefined
     ? null : num(c.cost_reduction_amount)
+  const reductions = reduction === null
+    ? Array<number | null>(months).fill(null)
+    : allocateMoney(Array.from({ length: months }, () => reduction / months), {
+        target: reduction,
+        sinkIndex: months - 1,
+      })
+  const avoidances = allocateMoney(Array.from({ length: months }, () => avoidance / months), {
+    target: avoidance,
+    sinkIndex: months - 1,
+  })
 
   const rows: SchedulePeriod[] = []
   for (let i = 0; i < months; i++) {
@@ -977,9 +1057,10 @@ export function calcToPeriods(c: SavingsCalcRow): SchedulePeriod[] {
       baseline: null,
       opening: null,
       final: 0,
-      reduction: reduction === null ? null : reduction / months,
-      avoidance: avoidance / months,
-      total: total / months,
+      reduction: reductions[i],
+      avoidance: avoidances[i] ?? 0,
+      total: roundMoney((reductions[i] ?? 0) + (avoidances[i] ?? 0)),
+      isEdited: false,
     })
   }
   return rows

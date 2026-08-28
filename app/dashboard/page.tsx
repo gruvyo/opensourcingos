@@ -29,7 +29,7 @@ import {
   type SchedulePeriod,
   type SchedulePeriodRow,
 } from '@/lib/savings'
-import { formatCurrency, statusColor } from '@/lib/utils'
+import { formatDashboardCurrency, statusColor } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { AttentionQueue } from '@/components/attention-queue'
 import { buildAttentionQueue } from '@/lib/attention-queue'
@@ -603,7 +603,7 @@ function TopSuppliersTable({ suppliers }: { suppliers: SupplierSummary[] }) {
           {suppliers.map(supplier => (
             <tr key={supplier.id} className="transition-colors hover:bg-[var(--surface-2)]">
               <th scope="row" className="px-5 py-3 text-left font-medium text-[var(--text)] sm:px-6">{supplier.name}</th>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatCurrency(supplier.savings)}</td>
+              <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatDashboardCurrency(supplier.savings)}</td>
               <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{supplier.share.toFixed(1)}%</td>
               <td className="px-5 py-3 text-right tabular-nums text-[var(--text-2)] sm:px-6">{supplier.projects}</td>
             </tr>
@@ -652,9 +652,9 @@ function ActiveEventsTable({ events }: { events: EventSummary[] }) {
                 </Link>
               </th>
               <td className="px-4 py-3 text-[var(--text-2)]">{event.category}</td>
-              <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{event.baseline > 0 ? formatCurrency(event.baseline) : '—'}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{event.baseline > 0 ? formatDashboardCurrency(event.baseline) : '—'}</td>
               <td className="px-4 py-3 text-right">
-                <p className="font-semibold tabular-nums text-[var(--text)]">{formatCurrency(event.savings)}</p>
+                <p className="font-semibold tabular-nums text-[var(--text)]">{formatDashboardCurrency(event.savings)}</p>
                 <p className="text-[11px] tabular-nums text-[var(--text-3)]">
                   {event.savingsPercent === null ? 'No baseline %' : `${event.savingsPercent.toFixed(1)}% of baseline`}
                 </p>

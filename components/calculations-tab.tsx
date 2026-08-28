@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Tables, TablesInsert } from '@/lib/database.types'
 import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { roundMoney } from '@/lib/money'
 import {
   chainWithBaselineQuality, baselineQuality, termRates,
   reportableSavingsPct, type RateBasis,
@@ -214,15 +215,22 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
     // never agree with it.
     const overTerm = (r: ReturnType<typeof termRates>, present: boolean) =>
       present && r.known ? r.perMonth * dealMonths : null
-    const termChain = chainWithBaselineQuality({
-      opening: overTerm(oRates, !!opening),
-      baseline: overTerm(bRates, !!baseline),
-      final: overTerm(fRates, !!final) ?? 0,
-    }, quality.isHard)
+    const exactAnchor = (value: number | null) => value === null ? null : roundMoney(value)
+    const termAnchors = {
+      opening: exactAnchor(overTerm(oRates, !!opening)),
+      baseline: exactAnchor(overTerm(bRates, !!baseline)),
+      final: roundMoney(overTerm(fRates, !!final) ?? 0),
+    }
+    const rawTermChain = chainWithBaselineQuality(termAnchors, quality.isHard)
+    const termChain = {
+      reduction: rawTermChain.reduction === null ? null : roundMoney(rawTermChain.reduction),
+      avoidance: roundMoney(rawTermChain.avoidance),
+      total: roundMoney(rawTermChain.total),
+    }
 
     // Denominator is BASELINE spend, never the opening ask. Null when there
     // is no baseline -- see reportableSavingsPct.
-    const baselineOverTerm = overTerm(bRates, !!baseline)
+    const baselineOverTerm = termAnchors.baseline
     const payload: TablesInsert<'savings_calculations'> = {
       baseline_id: baseline?.id ?? null,
       calculation_name: `${dealMonths}-month deal savings`,
@@ -230,9 +238,9 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
       // records which one carried the deal. The dashboard splits on the two
       // amount columns, not on this.
       savings_type: (termChain.reduction ?? 0) >= termChain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
-      baseline_total_amount: overTerm(bRates, !!baseline),
-      opening_proposal_amount: overTerm(oRates, !!opening),
-      award_total_amount: overTerm(fRates, !!final) ?? 0,
+      baseline_total_amount: termAnchors.baseline,
+      opening_proposal_amount: termAnchors.opening,
+      award_total_amount: termAnchors.final,
       gross_savings_amount: termChain.total,
       cost_reduction_amount: termChain.reduction,
       cost_avoidance_amount: termChain.avoidance,

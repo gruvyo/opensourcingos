@@ -1,4 +1,4 @@
-import { formatCurrency } from '@/lib/utils'
+import { formatDashboardCurrency } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { ArrowDownRight, ArrowUpRight, CircleDollarSign, Gauge, CalendarCheck } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -67,7 +67,7 @@ export function DashboardStats({ stats }: { stats: Stats }) {
   const cards: CardDef[] = [
     {
       label: 'Spend Addressed',
-      value: formatCurrency(stats.spendAddressed),
+      value: formatDashboardCurrency(stats.spendAddressed),
       icon: CircleDollarSign,
       iconClass: 'text-emerald-600 dark:text-emerald-300',
       iconBackground: 'bg-emerald-50 dark:bg-emerald-500/15',
@@ -75,7 +75,7 @@ export function DashboardStats({ stats }: { stats: Stats }) {
     },
     {
       label: 'Estimated Pipeline',
-      value: formatCurrency(stats.estimatedPipeline),
+      value: formatDashboardCurrency(stats.estimatedPipeline),
       icon: ArrowDownRight,
       iconClass: 'text-indigo-600 dark:text-indigo-300',
       iconBackground: 'bg-indigo-50 dark:bg-indigo-500/15',
@@ -83,7 +83,7 @@ export function DashboardStats({ stats }: { stats: Stats }) {
     },
     {
       label: 'Executed Savings',
-      value: formatCurrency(stats.executedSavings),
+      value: formatDashboardCurrency(stats.executedSavings),
       icon: ArrowUpRight,
       iconClass: 'text-violet-600 dark:text-violet-300',
       iconBackground: 'bg-violet-50 dark:bg-violet-500/15',
@@ -91,7 +91,7 @@ export function DashboardStats({ stats }: { stats: Stats }) {
     },
     {
       label: 'Accrued Executed',
-      value: formatCurrency(stats.accruedExecuted),
+      value: formatDashboardCurrency(stats.accruedExecuted),
       icon: CalendarCheck,
       iconClass: 'text-violet-600 dark:text-violet-300',
       iconBackground: 'bg-violet-50 dark:bg-violet-500/15',
@@ -101,7 +101,7 @@ export function DashboardStats({ stats }: { stats: Stats }) {
 
   if (stats.savingsRealizationEnabled) cards.push({
       label: 'Realization',
-      value: formatCurrency(stats.realizedSavings),
+      value: formatDashboardCurrency(stats.realizedSavings),
       icon: Gauge,
       iconClass: 'text-[var(--brand-ink)]',
       iconBackground: 'bg-[var(--brand-soft)]',

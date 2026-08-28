@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
 import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
+import { fixedMoney } from '@/lib/money'
 import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savings'
 import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
 import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
@@ -131,10 +132,16 @@ function csvCell(value: ReportValue): string {
   return `"${String(value ?? '').replace(/"/g, '""')}"`
 }
 
+function csvReportValue(value: ReportValue, column: ReportColumn): ReportValue {
+  return column.format === 'currency' || column.format === 'reduction'
+    ? fixedMoney(num(value))
+    : value
+}
+
 function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[]) {
   const csvRows = [
     columns.map(column => csvCell(column.label)).join(','),
-    ...rows.map(row => columns.map(column => csvCell(row[column.key])).join(',')),
+    ...rows.map(row => columns.map(column => csvCell(csvReportValue(row[column.key], column))).join(',')),
   ]
   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
