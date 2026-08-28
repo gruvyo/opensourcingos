@@ -1,0 +1,74 @@
+name: Application quality
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'config/**'
+      - 'lib/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'next.config.*'
+      - 'tsconfig.json'
+      - 'eslint.config.*'
+      - 'postcss.config.*'
+      - '.github/workflows/application-quality.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'config/**'
+      - 'lib/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'next.config.*'
+      - 'tsconfig.json'
+      - 'eslint.config.*'
+      - 'postcss.config.*'
+      - '.github/workflows/application-quality.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: application-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Tests, audit, lint, types, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci_test_value
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Block production dependency advisories
+        run: npm run audit:production
+
+      - name: Report full dependency-tree advisories
+        continue-on-error: true
+        run: npm audit --audit-level=moderate
+
+      - name: Run application quality gate
+        run: npm run check

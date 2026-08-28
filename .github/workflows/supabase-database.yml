@@ -6,6 +6,7 @@ on:
       - 'supabase/**'
       - 'lib/database.types.ts'
       - 'scripts/generate-database-types.sh'
+      - 'scripts/generate-database-schema.sh'
       - 'package.json'
       - '.github/workflows/supabase-database.yml'
   push:
@@ -15,6 +16,7 @@ on:
       - 'supabase/**'
       - 'lib/database.types.ts'
       - 'scripts/generate-database-types.sh'
+      - 'scripts/generate-database-schema.sh'
       - 'package.json'
       - '.github/workflows/supabase-database.yml'
 
@@ -48,6 +50,26 @@ jobs:
 
       - name: Generate database types
         run: npm run db:types
+
+      - name: Generate public schema snapshot
+        run: npm run db:schema
+
+      - name: Upload generated public schema snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-schema-snapshot
+          path: supabase/schema.sql
+          retention-days: 7
+
+      - name: Verify generated public schema snapshot is current
+        shell: bash
+        run: |
+          if [[ -n "$(git status --short -- supabase/schema.sql)" ]]; then
+            git diff --stat -- supabase/schema.sql
+            echo "supabase/schema.sql does not match a clean migration rebuild."
+            echo "Run npm run db:reset && npm run db:schema and commit the result."
+            exit 1
+          fi
 
       - name: Verify generated database types are current
         shell: bash
