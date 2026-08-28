@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { supplierPortfolioValues } from '../lib/supplier-portfolio.ts'
+import { supplierAttributionTotals, supplierPortfolioValues } from '../lib/supplier-portfolio.ts'
 import { calculationLoadError } from '../lib/calculation-integrity.ts'
 
 test('attributes spend and savings to awarded suppliers without double counting shares', () => {
@@ -105,4 +105,46 @@ test('turns a forced savings-record read failure into a save-blocking message', 
 
   assert.match(message || '', /savings record: forced read failure/)
   assert.match(message || '', /Saving is disabled/)
+})
+
+test('does not attribute the winner savings to a losing incumbent profile', () => {
+  const events = [
+    { id: 'lost-deal', awardedSupplierId: 'winner' },
+    { id: 'won-deal', awardedSupplierId: 'incumbent' },
+  ]
+  const calculations = [
+    { id: 'lost', event_id: 'lost-deal', calculation_status: 'executed', gross_savings_amount: 900 },
+    { id: 'won', event_id: 'won-deal', calculation_status: 'executed', gross_savings_amount: 125 },
+  ]
+  const realization = [
+    { event_id: 'lost-deal', projected_savings: 900, realized_savings: 700 },
+    { event_id: 'won-deal', projected_savings: 125, realized_savings: 100 },
+  ]
+
+  assert.deepEqual(
+    supplierAttributionTotals('incumbent', events, calculations, realization),
+    { negotiatedSavings: 125, realizedSavings: 100 },
+  )
+  assert.deepEqual(
+    supplierAttributionTotals('winner', events, calculations, realization),
+    { negotiatedSavings: 900, realizedSavings: 700 },
+  )
+})
+
+test('supplier profile totals match the portfolio award attribution', () => {
+  const events = [{ id: 'deal', awardedSupplierId: 'supplier-a' }]
+  const calculations = [
+    { id: 'calc', event_id: 'deal', calculation_status: 'estimated', gross_savings_amount: 42.25 },
+  ]
+  const realization = [{ event_id: 'deal', projected_savings: 42.25, realized_savings: 12.5 }]
+  const portfolio = supplierPortfolioValues(events, calculations, realization)
+    .values.get('supplier-a')
+
+  assert.deepEqual(
+    supplierAttributionTotals('supplier-a', events, calculations, realization),
+    {
+      negotiatedSavings: portfolio?.totalSavings,
+      realizedSavings: portfolio?.realizedSavings,
+    },
+  )
 })
