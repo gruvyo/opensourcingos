@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
 import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 import { formatCurrency, formatDate, formatReduction } from '@/lib/utils'
+import { supplierAttributionTotals } from '@/lib/supplier-portfolio'
 
 type PageProps = { params: Promise<{ supplierId: string }> }
 type EventRow = { id: string; event_name: string; event_status: string | null; project_type: string | null; awarded_supplier_id: string | null; event_start_date: string | null; contract_start_date: string | null }
@@ -22,10 +23,6 @@ function statusTone(status: string | null): BadgeTone {
   if (status === 'Cancelled' || status === 'Rejected') return 'danger'
   if (status === 'Hold') return 'warning'
   return 'info'
-}
-
-function sum(rows: Array<Record<string, unknown>>, key: string) {
-  return rows.reduce((total, row) => total + (Number(row[key]) || 0), 0)
 }
 
 export default async function SupplierProfilePage({ params }: PageProps) {
@@ -68,6 +65,19 @@ export default async function SupplierProfilePage({ params }: PageProps) {
   const loadError = contactsError?.message || certificationsError?.message || reviewsError?.message || risksError?.message || notesError?.message || eventsError?.message || calculationsError?.message || periodsError?.message || auditError?.message
   const calculationRows = (calculations || []) as Array<Record<string, unknown>>
   const periodRows = (periods || []) as Array<Record<string, unknown>>
+  const attributedMoney = supplierAttributionTotals(
+    supplierId,
+    events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
+    calculationRows.map(row => ({
+      ...row,
+      event_id: typeof row.event_id === 'string' ? row.event_id : null,
+    })),
+    periodRows.map(row => ({
+      event_id: typeof row.event_id === 'string' ? row.event_id : null,
+      projected_savings: Number(row.projected_savings) || 0,
+      realized_savings: Number(row.realized_savings) || 0,
+    })),
+  )
   const eventMap = new Map(events.map(event => [event.id, event.event_name]))
   const ownerMap = new Map((owners || []).map(owner => [owner.id, owner.full_name || owner.email || 'Workspace member']))
   const currency = currencySettings?.currency_code || 'USD'
@@ -103,8 +113,8 @@ export default async function SupplierProfilePage({ params }: PageProps) {
         {[
           { label: 'Linked projects', value: events.length, icon: Building2 },
           { label: 'Awards', value: events.filter(event => event.awarded_supplier_id === supplierId).length, icon: Landmark },
-          { label: 'Negotiated savings', value: formatCurrency(sum(calculationRows, 'gross_savings_amount'), currency), icon: PiggyBank },
-          ...(savingsRealizationEnabled ? [{ label: 'Realized savings', value: formatCurrency(sum(periodRows, 'realized_savings'), currency), icon: TrendingUp }] : []),
+          { label: 'Negotiated savings', value: formatCurrency(attributedMoney.negotiatedSavings, currency), icon: PiggyBank },
+          ...(savingsRealizationEnabled ? [{ label: 'Realized savings', value: formatCurrency(attributedMoney.realizedSavings, currency), icon: TrendingUp }] : []),
         ].map(item => <Card key={item.label} className="p-5"><item.icon className="h-5 w-5 text-[var(--brand-ink)]" aria-hidden="true" /><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">{item.label}</p><p className="mt-1 text-xl font-bold text-[var(--text)]">{item.value}</p></Card>)}
       </section>
 

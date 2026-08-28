@@ -36,6 +36,11 @@ export type SupplierPortfolioResult = {
   dataQuality: CalculationDataQuality
 }
 
+export type SupplierAttributionTotals = {
+  negotiatedSavings: number
+  realizedSavings: number
+}
+
 export function supplierPortfolioValues(
   events: SupplierPortfolioEvent[],
   calculations: SupplierPortfolioCalculation[],
@@ -102,4 +107,24 @@ export function supplierPortfolioValues(
   }
 
   return { values, dataQuality: canonical.dataQuality }
+}
+
+/**
+ * Supplier-profile money uses the same award relationship and canonical
+ * calculation selection as the portfolio. Incumbent relationships remain
+ * useful history, but never receive the winning supplier's commercial value.
+ */
+export function supplierAttributionTotals(
+  supplierId: string,
+  events: SupplierPortfolioEvent[],
+  calculations: SupplierPortfolioCalculation[],
+  realizationPeriods: SupplierPortfolioRealization[],
+): SupplierAttributionTotals {
+  const attributed = supplierPortfolioValues(events, calculations, realizationPeriods)
+    .values.get(supplierId)
+
+  return {
+    negotiatedSavings: attributed?.totalSavings ?? 0,
+    realizedSavings: attributed?.realizedSavings ?? 0,
+  }
 }
