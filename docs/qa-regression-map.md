@@ -31,6 +31,7 @@ runs every pgTAP file below against a disposable database.
 | U-TZ-CLASSIFY | Realized-versus-accrued classification compares date-only starts with today in the workspace timezone | `scripts/realization-timezone.test.mts` |
 | U-TZ-PERSIST | Schedule end dates persist the user's local calendar date without a UTC day shift | `scripts/schedule-date-persistence.test.mts` |
 | U-ATTENTION | Supplier lists, readiness reports, and the dashboard share one actionable attention definition | `scripts/supplier-readiness.test.mts`; `scripts/attention-queue.test.mts` |
+| U-CURRENCY | Reports use workspace currency and locale; CSV money headers identify the currency while cells retain exact numeric values | `scripts/report-currency.test.mts`; `scripts/csv.test.mts` |
 
 Hardening units not yet merged must add their evidence to this map in the same
 pull request. A test name alone is not sufficient: the test must exercise the

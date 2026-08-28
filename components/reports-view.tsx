@@ -5,8 +5,7 @@ import { AlertTriangle, Download, FileBarChart2, Filter, RotateCcw } from 'lucid
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
-import { formatCurrency, formatDate, formatReduction, statusColor } from '@/lib/utils'
-import { fixedMoney } from '@/lib/money'
+import { statusColor } from '@/lib/utils'
 import { csvCell } from '@/lib/csv'
 import { getFirst, num, type SavingsCalcRow } from '@/lib/savings'
 import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
@@ -26,6 +25,7 @@ import {
   type ReportSavingsTotals,
 } from '@/lib/report-savings'
 import { isTerminalStatus, type TerminalStatusOption } from '@/lib/terminal-status'
+import { formatReportValue, reportColumnLabel, reportCsvMoney, type ReportDisplayFormat } from '@/lib/report-format'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -93,7 +93,7 @@ type ReportId =
 
 type ReportValue = string | number | null
 type ReportRow = Record<string, ReportValue>
-type ColumnFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status' | 'percent' | 'score'
+type ColumnFormat = ReportDisplayFormat
 
 type ReportColumn = {
   key: string
@@ -140,12 +140,12 @@ function csvReportValue(value: ReportValue, column: ReportColumn, row: ReportRow
     const coverage = (column.annotationKey ? row[column.annotationKey] : 'complete') as ReductionCoverage
     return reportReductionExport(value === null ? null : num(value), coverage)
   }
-  return column.format === 'currency' ? fixedMoney(num(value)) : value
+  return column.format === 'currency' ? reportCsvMoney(value) : value
 }
 
-function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[]) {
+function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[], currencyCode: string) {
   const csvRows = [
-    columns.map(column => csvCell(column.label)).join(','),
+    columns.map(column => csvCell(reportColumnLabel(column.label, column.format, currencyCode))).join(','),
     ...rows.map(row => columns.map(column => csvCell(
       csvReportValue(row[column.key], column, row),
       column.format !== 'currency' && column.format !== 'reduction',
@@ -163,20 +163,6 @@ function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[
 
 function sortRows(rows: ReportRow[], key: string): ReportRow[] {
   return rows.sort((a, b) => num(b[key]) - num(a[key]) || String(a[key]).localeCompare(String(b[key])))
-}
-
-function formatValue(value: ReportValue, format: ColumnFormat = 'text', annotation?: ReportValue): string {
-  if (format === 'currency') return formatCurrency(num(value))
-  if (format === 'reduction') {
-    const formatted = formatReduction(value === null ? null : num(value))
-    return annotation === 'partial' ? `${formatted}*` : formatted
-  }
-  if (format === 'date') return formatDate(typeof value === 'string' ? value : null)
-  if (format === 'number') return num(value).toLocaleString('en-US')
-  if (format === 'score') return value === null ? '—' : `${num(value).toFixed(1)} / 5`
-  if (format === 'percent') return value === null ? '—' : `${num(value).toFixed(1)}%`
-  if (value === null || value === '') return '—'
-  return String(value)
 }
 
 function aggregateBy(
@@ -212,6 +198,8 @@ export function ReportsView({
   supplierRiskIssues,
   realizationPeriods,
   savingsRealizationEnabled,
+  currencyCode,
+  locale,
   asOfDate,
   terminalStatuses,
 }: {
@@ -222,6 +210,8 @@ export function ReportsView({
   supplierRiskIssues: SupplierRiskSummaryRow[]
   realizationPeriods: RealizationRow[]
   savingsRealizationEnabled: boolean
+  currencyCode: string
+  locale: string
   asOfDate: string
   terminalStatuses: TerminalStatusOption[]
 }) {
@@ -746,7 +736,7 @@ export function ReportsView({
             </div>
             <p className="mt-1 text-sm text-[var(--text-2)]">{report.description}</p>
           </div>
-          <Button onClick={() => downloadCSV(report.filename, report.columns, report.rows)} disabled={report.rows.length === 0}>
+          <Button onClick={() => downloadCSV(report.filename, report.columns, report.rows, currencyCode)} disabled={report.rows.length === 0}>
             <Download className="h-4 w-4" aria-hidden="true" />
             Export CSV
           </Button>
@@ -834,10 +824,12 @@ export function ReportsView({
               ) : report.rows.map((row, rowIndex) => (
                 <tr key={`${reportId}-${rowIndex}`} className="transition-colors hover:bg-[var(--surface-2)]">
                   {report.columns.map(column => {
-                    const formatted = formatValue(
+                    const formatted = formatReportValue(
                       row[column.key],
                       column.format,
                       column.annotationKey ? row[column.annotationKey] : undefined,
+                      currencyCode,
+                      locale,
                     )
                     const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number' || column.format === 'percent' || column.format === 'score'
                     return (

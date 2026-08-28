@@ -78,7 +78,7 @@ export default async function ReportsPage() {
     supabase.from('project_choice_options')
       .select('label, project_type, is_terminal')
       .eq('choice_type', 'event_status'),
-    supabase.from('organization_settings').select('timezone, savings_realization_enabled').maybeSingle(),
+    supabase.from('organization_settings').select('timezone, savings_realization_enabled, currency_code, locale').maybeSingle(),
   ])
 
   // A failed query here would render as an empty report, which is indistinguishable
@@ -112,6 +112,8 @@ export default async function ReportsPage() {
         supplierRiskIssues={supplierRisks || []}
         realizationPeriods={realizationPeriods || []}
         savingsRealizationEnabled={settings?.savings_realization_enabled ?? false}
+        currencyCode={settings?.currency_code || 'USD'}
+        locale={settings?.locale || 'en-US'}
         asOfDate={asOfDate}
         terminalStatuses={(terminalStatusRows || []) as TerminalStatusOption[]}
       />
