@@ -161,6 +161,14 @@ insert into public.organizations (id, name)
 values ('71000000-0000-4000-8000-000000000010', 'Non-template source');
 insert into public.organizations (id, name)
 values ('71000000-0000-4000-8000-000000000011', 'Direct clone target');
+set local session_replication_role = replica;
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  '71000000-0000-4000-8000-000000000012',
+  'direct-clone@example.test',
+  '{"full_name":"Direct Clone"}'
+);
+set local session_replication_role = origin;
 insert into public.profiles (id, email, full_name, organization_id, role)
 values (
   '71000000-0000-4000-8000-000000000012',
