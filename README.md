@@ -82,7 +82,7 @@ Reduction requires a baseline grounded in the organization's own spend unless
 an explicit override is recorded.
 
 All screens use [`lib/savings/index.ts`](lib/savings/index.ts) as the single
-source of truth. The executable methodology suite currently covers 351 checks.
+source of truth. The executable methodology suite currently covers 356 checks.
 
 ## Try the demo
 
@@ -147,8 +147,8 @@ modern `sb_publishable_...` key. Never place a secret or service-role key in a
 ## Database status
 
 [`supabase/schema.sql`](supabase/schema.sql) is a structure-only snapshot of the
-live `public` schema. It includes tables, functions, Row Level Security,
-policies, and grants. Reviewed forward migrations live under
+`public` schema produced by rebuilding every migration from scratch. It includes
+tables, functions, Row Level Security, policies, and grants. Reviewed forward migrations live under
 [`supabase/migrations`](supabase/migrations). See
 [`supabase/README.md`](supabase/README.md) before changing either.
 
@@ -164,7 +164,27 @@ must follow the production safeguards in [`supabase/README.md`](supabase/README.
 
 ## Verification
 
-Run the money-methodology suite:
+Run the complete application quality gate (unit tests, methodology verifier,
+lint, TypeScript, and a production build):
+
+```bash
+npm run check
+```
+
+Run the production dependency gate separately:
+
+```bash
+npm run audit:production
+```
+
+The dependency gate blocks moderate, high, and critical production advisories.
+A temporary exception must be recorded in
+[`config/dependency-audit-exceptions.json`](config/dependency-audit-exceptions.json)
+with the advisory ID, a justification, and an expiry date. Expired exceptions
+fail closed. The full dependency tree is also reported in CI but does not block
+application delivery.
+
+Run only the money-methodology suite:
 
 ```bash
 npm run verify
@@ -173,7 +193,7 @@ npm run verify
 Run TypeScript checking:
 
 ```bash
-npx tsc --noEmit
+npm run typecheck
 ```
 
 Run linting:
@@ -182,8 +202,10 @@ Run linting:
 npm run lint
 ```
 
-The methodology, TypeScript, and lint checks pass on `main`. Savings-related
-changes should always run the complete methodology suite before review.
+The full quality gate passes on `main`. The database workflow separately rebuilds
+every migration, runs pgTAP and security checks, regenerates types, and rejects
+schema-snapshot drift. See the
+[`QA regression map`](docs/qa-regression-map.md) for the finding-to-test inventory.
 
 ## Security model
 

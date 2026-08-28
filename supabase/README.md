@@ -10,8 +10,8 @@ This directory is the reproducible database definition for OpenSourcingOS.
   test environments. It contains no production export or confidential data.
 - `tests/database/` verifies signup, workspace isolation, Row Level Security,
   grants, privileged-function lockdown, and the reference savings chain.
-- `schema.sql` remains the generated, structure-only snapshot of the hosted
-  `public` schema. Do not edit it by hand.
+- `schema.sql` is the generated, structure-only snapshot of the `public` schema
+  produced by a clean local migration rebuild. Do not edit it by hand.
 
 ## Rebuild a clean local database
 
@@ -30,12 +30,17 @@ npm run db:test
 npm run db:lint
 npm run db:advisors
 npm run db:types
+npm run db:schema
 ```
 
 `db:types` regenerates `lib/database.types.ts` from the local `public` schema.
 The application imports these generated types for its database-backed records
 and mutations. CI rebuilds the database and verifies that the file stays current
 whenever the schema or database workflow changes.
+
+`db:schema` regenerates `supabase/schema.sql` from that same local database. CI
+rebuilds from scratch and rejects any difference, so the snapshot cannot silently
+drift from the committed migrations.
 
 `db:reset` destroys only the local database, replays every migration, and then
 loads the fictional seed. Never add `--linked` when working with production.
@@ -106,10 +111,11 @@ project before the history is reconciled.
   appropriate indexes, and cross-workspace tests.
 - Privileged functions need fixed search paths and minimal execute grants.
 - Every write path must surface database errors.
-- After an approved hosted schema change, refresh the snapshot with:
+- After changing a migration, refresh the snapshot from a clean local rebuild:
 
 ```bash
-supabase db dump --linked --schema public --file supabase/schema.sql
+npm run db:reset
+npm run db:schema
 ```
 
 Also follow [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
