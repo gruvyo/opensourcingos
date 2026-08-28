@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { MONEY_DECIMAL_PLACES } from '@/lib/money'
+import { MONEY_DECIMAL_PLACES } from './money.ts'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -9,10 +9,11 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCurrency(
   amount: number | null | undefined,
   currencyCode: string = 'USD',
+  locale: string = 'en-US',
 ): string {
   // Guard null/undefined AND NaN/Infinity (previously "NaN" could render).
   const value = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode || 'USD',
     minimumFractionDigits: MONEY_DECIMAL_PLACES,
@@ -60,15 +61,16 @@ export function formatDashboardReduction(
 export function formatReduction(
   amount: number | null | undefined,
   currencyCode: string = 'USD',
+  locale: string = 'en-US',
 ): string {
   if (amount === null || amount === undefined) return 'n/a'
   if (!Number.isFinite(amount)) return 'n/a'
   return amount < 0
-    ? `(${formatCurrency(Math.abs(amount), currencyCode)})`
-    : formatCurrency(amount, currencyCode)
+    ? `(${formatCurrency(Math.abs(amount), currencyCode, locale)})`
+    : formatCurrency(amount, currencyCode, locale)
 }
 
-export function formatDate(date: string | null | undefined): string {
+export function formatDate(date: string | null | undefined, locale: string = 'en-US'): string {
   if (!date) return '—'
   // A bare 'YYYY-MM-DD' is parsed as UTC midnight, which renders as the DAY
   // BEFORE anywhere west of Greenwich — a contract starting 2026-01-01 showed
@@ -77,7 +79,7 @@ export function formatDate(date: string | null | undefined): string {
   const localDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00` : date
   const d = new Date(localDate)
   if (isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
