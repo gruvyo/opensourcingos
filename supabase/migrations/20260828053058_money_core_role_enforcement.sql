@@ -329,6 +329,13 @@ revoke insert (created_by, updated_by), update (updated_by)
   on public.sourcing_events from authenticated;
 revoke insert (created_by, updated_by), update (updated_by)
   on public.baselines from authenticated;
+revoke insert (
+  hard_reduction_override, hard_reduction_override_reason,
+  hard_reduction_override_by, hard_reduction_override_at
+), update (
+  hard_reduction_override, hard_reduction_override_reason,
+  hard_reduction_override_by, hard_reduction_override_at
+) on public.baselines from authenticated;
 revoke insert (created_by, updated_by), update (updated_by)
   on public.supplier_offers from authenticated;
 revoke insert (created_by, updated_by), update (updated_by)

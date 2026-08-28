@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(39);
+select plan(40);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -259,16 +259,19 @@ insert into public.realization_periods (
   id, organization_id, event_id, savings_calculation_id, savings_period_id,
   period_name, period_start_date, period_end_date,
   baseline_amount, projected_savings, actual_amount, realized_savings,
-  leakage_amount, realization_status, finance_validated,
-  finance_validated_by, finance_validation_date
+  leakage_amount, realization_status
 )
 values (
   'b5000000-0000-4000-8000-000000000001',
   (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
   'b2000000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-000000000001',
   'b4000000-0000-4000-8000-000000000001', 'Aug 2026', '2026-08-01', '2026-08-31',
-  500, 160, 400, 100, 60, 'Partially Realized', true,
-  'b1000000-0000-4000-8000-000000000001', now()
+  500, 160, 400, 100, 60, 'Partially Realized'
+);
+
+select lives_ok(
+  $$ select public.set_finance_validation('b5000000-0000-4000-8000-000000000001', true) $$,
+  'finance validation setup uses the protected admin RPC'
 );
 
 select lives_ok(

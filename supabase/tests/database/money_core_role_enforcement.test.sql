@@ -16,15 +16,16 @@ where id = 'b1000000-0000-4000-8000-000000000002';
 update public.profiles set role = 'viewer'
 where id = 'b1000000-0000-4000-8000-000000000003';
 
-update public.organization_settings set savings_realization_enabled = true
-where organization_id in (
-  select organization_id from public.profiles
-  where id in (
+insert into public.organization_settings (organization_id, savings_realization_enabled)
+select organization_id, true
+from public.profiles
+where id in (
     'b1000000-0000-4000-8000-000000000001',
     'b1000000-0000-4000-8000-000000000002',
     'b1000000-0000-4000-8000-000000000003'
-  )
-);
+)
+on conflict (organization_id) do update
+set savings_realization_enabled = excluded.savings_realization_enabled;
 
 insert into public.sourcing_events (
   id, organization_id, event_name, event_type, event_status, project_type
