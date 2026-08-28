@@ -15,7 +15,11 @@ export type SupplierPortfolioCalculation = SavingsCalcRow & {
 export type SupplierPortfolioRealization = {
   event_id: string | null
   projected_savings?: number | null
+  projected_reduction_amount?: number | null
+  projected_avoidance_amount?: number | null
   realized_savings?: number | null
+  realized_reduction_amount?: number | null
+  realized_avoidance_amount?: number | null
 }
 
 export type SupplierPortfolioValue = {
@@ -90,10 +94,18 @@ export function supplierPortfolioValues(
     const supplierId = supplierByEvent.get(period.event_id)
     if (!supplierId) continue
     const current = getValue(supplierId)
-    current.realizedSavings += num(period.realized_savings)
+    const hasRealizedLegs = period.realized_reduction_amount !== undefined
+      || period.realized_avoidance_amount !== undefined
+    const hasProjectedLegs = period.projected_reduction_amount !== undefined
+      || period.projected_avoidance_amount !== undefined
+    current.realizedSavings += hasRealizedLegs
+      ? num(period.realized_reduction_amount) + num(period.realized_avoidance_amount)
+      : num(period.realized_savings)
     projectedBySupplier.set(
       supplierId,
-      (projectedBySupplier.get(supplierId) || 0) + num(period.projected_savings),
+      (projectedBySupplier.get(supplierId) || 0) + (hasProjectedLegs
+        ? num(period.projected_reduction_amount) + num(period.projected_avoidance_amount)
+        : num(period.projected_savings)),
     )
   }
 

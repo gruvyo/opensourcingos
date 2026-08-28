@@ -1063,7 +1063,11 @@ export type Database = {
           period_name: string
           period_start_date: string
           projected_savings: number | null
+          projected_avoidance_amount: number | null
+          projected_reduction_amount: number | null
           realization_status: string | null
+          realized_avoidance_amount: number | null
+          realized_reduction_amount: number | null
           realized_savings: number | null
           savings_calculation_id: string | null
           savings_period_id: string | null
@@ -1091,7 +1095,11 @@ export type Database = {
           period_name: string
           period_start_date: string
           projected_savings?: number | null
+          projected_avoidance_amount?: number | null
+          projected_reduction_amount?: number | null
           realization_status?: string | null
+          realized_avoidance_amount?: number | null
+          realized_reduction_amount?: number | null
           realized_savings?: number | null
           savings_calculation_id?: string | null
           savings_period_id?: string | null
@@ -1119,7 +1127,11 @@ export type Database = {
           period_name?: string
           period_start_date?: string
           projected_savings?: number | null
+          projected_avoidance_amount?: number | null
+          projected_reduction_amount?: number | null
           realization_status?: string | null
+          realized_avoidance_amount?: number | null
+          realized_reduction_amount?: number | null
           realized_savings?: number | null
           savings_calculation_id?: string | null
           savings_period_id?: string | null

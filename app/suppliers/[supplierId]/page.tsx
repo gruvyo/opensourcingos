@@ -58,7 +58,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
 
   const [{ data: calculations, error: calculationsError }, { data: periods, error: periodsError }, { data: audit, error: auditError }] = await Promise.all([
     savingsEventIds.length ? supabase.from('savings_calculations').select('id, event_id, calculation_name, calculation_status, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount, created_at').in('event_id', savingsEventIds).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
-    savingsEventIds.length && currencySettings?.savings_realization_enabled ? supabase.from('realization_periods').select('id, event_id, period_name, period_end_date, realized_savings, projected_savings, realization_status, finance_validated').in('event_id', savingsEventIds).order('period_end_date', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+    savingsEventIds.length && currencySettings?.savings_realization_enabled ? supabase.from('realization_periods').select('id, event_id, period_name, period_end_date, realized_savings, realized_reduction_amount, realized_avoidance_amount, projected_savings, projected_reduction_amount, projected_avoidance_amount, realization_status, finance_validated').in('event_id', savingsEventIds).order('period_end_date', { ascending: false }) : Promise.resolve({ data: [], error: null }),
     supabase.from('audit_log').select('id, action, actor_id, before_data, after_data, created_at').eq('entity_type', 'supplier').eq('entity_id', supplierId).order('created_at', { ascending: false }).limit(20),
   ])
 
@@ -75,7 +75,11 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     periodRows.map(row => ({
       event_id: typeof row.event_id === 'string' ? row.event_id : null,
       projected_savings: Number(row.projected_savings) || 0,
+      projected_reduction_amount: row.projected_reduction_amount == null ? null : Number(row.projected_reduction_amount),
+      projected_avoidance_amount: row.projected_avoidance_amount == null ? null : Number(row.projected_avoidance_amount),
       realized_savings: Number(row.realized_savings) || 0,
+      realized_reduction_amount: row.realized_reduction_amount == null ? null : Number(row.realized_reduction_amount),
+      realized_avoidance_amount: row.realized_avoidance_amount == null ? null : Number(row.realized_avoidance_amount),
     })),
   )
   const eventMap = new Map(events.map(event => [event.id, event.event_name]))

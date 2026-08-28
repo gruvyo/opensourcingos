@@ -24,6 +24,7 @@
     "test:supplier-governance-report": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-governance-report.test.mts",
     "test:supplier-segmentation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-segmentation.test.mts",
     "test:terminal-status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/terminal-status.test.mts",
+    "test:realization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/realization.test.mts",
     "verify:env": "node scripts/verify-supabase-env.mjs",
     "verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-savings.mts",
     "db:start": "supabase start",
