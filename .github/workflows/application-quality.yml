@@ -2,20 +2,6 @@ name: Application quality
 
 on:
   pull_request:
-    paths:
-      - 'app/**'
-      - 'components/**'
-      - 'config/**'
-      - 'lib/**'
-      - 'public/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.*'
-      - 'tsconfig.json'
-      - 'eslint.config.*'
-      - 'postcss.config.*'
-      - '.github/workflows/application-quality.yml'
   push:
     branches:
       - main

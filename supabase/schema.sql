@@ -1984,6 +1984,46 @@ $$;
 ALTER FUNCTION "public"."prevent_profile_privilege_change"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."prevent_executed_savings_parent_delete"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_table_name = 'sourcing_events' and exists (
+    select 1
+    from public.savings_calculations
+    where event_id = old.id
+      and calculation_status = 'executed'
+  ) then
+    raise exception 'reverse executed savings before deleting the project';
+  end if;
+
+  if tg_table_name = 'baselines' and exists (
+    select 1
+    from public.savings_calculations
+    where baseline_id = old.id
+      and calculation_status = 'executed'
+  ) then
+    raise exception 'reverse executed savings before deleting the baseline';
+  end if;
+
+  if tg_table_name = 'awards' and exists (
+    select 1
+    from public.savings_calculations
+    where award_id = old.id
+      and calculation_status = 'executed'
+  ) then
+    raise exception 'reverse executed savings before deleting the award';
+  end if;
+
+  return old;
+end
+$$;
+
+
+ALTER FUNCTION "public"."prevent_executed_savings_parent_delete"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."prevent_realization_history_delete"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'pg_catalog', 'public'
@@ -4201,6 +4241,16 @@ CREATE TABLE IF NOT EXISTS "public"."savings_calculations" (
     "execution_note" "text",
     "legacy_execution_actor_missing" boolean DEFAULT false NOT NULL,
     CONSTRAINT "chk_calculation_status" CHECK (("calculation_status" = ANY (ARRAY['estimated'::"text", 'executed'::"text"]))),
+    CONSTRAINT "chk_savings_calculations_chain" CHECK (((NOT ("cost_reduction_amount" IS DISTINCT FROM
+CASE
+    WHEN ("baseline_total_amount" IS NULL) THEN NULL::numeric
+    ELSE ("baseline_total_amount" - "award_total_amount")
+END)) AND (NOT ("cost_avoidance_amount" IS DISTINCT FROM
+CASE
+    WHEN (("baseline_total_amount" IS NOT NULL) AND ("opening_proposal_amount" IS NOT NULL)) THEN ("opening_proposal_amount" - "baseline_total_amount")
+    WHEN (("baseline_total_amount" IS NULL) AND ("opening_proposal_amount" IS NOT NULL)) THEN ("opening_proposal_amount" - "award_total_amount")
+    ELSE (0)::numeric
+END)) AND (NOT ("gross_savings_amount" IS DISTINCT FROM (COALESCE("cost_reduction_amount", (0)::numeric) + "cost_avoidance_amount"))) AND (NOT ("net_savings_amount" IS DISTINCT FROM "gross_savings_amount")))),
     CONSTRAINT "chk_savings_execution_metadata" CHECK (((("calculation_status" = 'estimated'::"text") AND ("executed_at" IS NULL) AND ("executed_by" IS NULL) AND ("execution_note" IS NULL) AND (NOT "legacy_execution_actor_missing")) OR (("calculation_status" = 'executed'::"text") AND ("executed_at" IS NOT NULL) AND ((("executed_by" IS NOT NULL) AND (NOT "legacy_execution_actor_missing")) OR (("executed_by" IS NULL) AND "legacy_execution_actor_missing"))))),
     CONSTRAINT "chk_schedule_period_count" CHECK ((("schedule_period_count" IS NULL) OR (("schedule_period_count" >= 1) AND ("schedule_period_count" <= 600)))),
     CONSTRAINT "chk_schedule_period_type" CHECK ((("schedule_period_type" IS NULL) OR ("schedule_period_type" = ANY (ARRAY['monthly'::"text", 'annual'::"text", 'one_time'::"text"])))),
@@ -4250,6 +4300,9 @@ COMMENT ON COLUMN "public"."savings_calculations"."schedule_period_count" IS 'Ho
 COMMENT ON COLUMN "public"."savings_calculations"."legacy_execution_actor_missing" IS 'True only for actorless executions preserved from before execution provenance controls existed.';
 
 
+COMMENT ON CONSTRAINT "chk_savings_calculations_chain" ON "public"."savings_calculations" IS 'Calculation anchors, signed legs, gross headline, and net headline satisfy the approved chain.';
+
+
 
 CREATE TABLE IF NOT EXISTS "public"."savings_periods" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
@@ -4282,22 +4335,22 @@ CREATE TABLE IF NOT EXISTS "public"."savings_periods" (
 CASE
     WHEN ("baseline_amount" IS NULL) THEN NULL::numeric
     ELSE ("baseline_amount" - "final_amount")
-END)) AND ("cost_avoidance_amount" =
+END)) AND (NOT ("cost_avoidance_amount" IS DISTINCT FROM
 CASE
-    WHEN (("baseline_amount" IS NOT NULL) AND ("opening_amount" > "baseline_amount")) THEN ("opening_amount" - "baseline_amount")
+    WHEN (("baseline_amount" IS NOT NULL) AND ("opening_amount" IS NOT NULL)) THEN ("opening_amount" - "baseline_amount")
     WHEN (("baseline_amount" IS NULL) AND ("opening_amount" IS NOT NULL)) THEN ("opening_amount" - "final_amount")
     ELSE (0)::numeric
-END) AND ("total_savings_amount" = (COALESCE("cost_reduction_amount", (0)::numeric) + "cost_avoidance_amount")))),
+END)) AND (NOT ("total_savings_amount" IS DISTINCT FROM (COALESCE("cost_reduction_amount", (0)::numeric) + "cost_avoidance_amount"))))),
     CONSTRAINT "chk_savings_periods_executed_chain" CHECK ((("executed_total_savings_amount" IS NULL) OR ((NOT ("executed_cost_reduction_amount" IS DISTINCT FROM
 CASE
     WHEN ("executed_baseline_amount" IS NULL) THEN NULL::numeric
     ELSE ("executed_baseline_amount" - "executed_final_amount")
-END)) AND ("executed_cost_avoidance_amount" =
+END)) AND (NOT ("executed_cost_avoidance_amount" IS DISTINCT FROM
 CASE
-    WHEN (("executed_baseline_amount" IS NOT NULL) AND ("executed_opening_amount" > "executed_baseline_amount")) THEN ("executed_opening_amount" - "executed_baseline_amount")
+    WHEN (("executed_baseline_amount" IS NOT NULL) AND ("executed_opening_amount" IS NOT NULL)) THEN ("executed_opening_amount" - "executed_baseline_amount")
     WHEN (("executed_baseline_amount" IS NULL) AND ("executed_opening_amount" IS NOT NULL)) THEN ("executed_opening_amount" - "executed_final_amount")
     ELSE (0)::numeric
-END) AND ("executed_total_savings_amount" = (COALESCE("executed_cost_reduction_amount", (0)::numeric) + "executed_cost_avoidance_amount"))))),
+END)) AND (NOT ("executed_total_savings_amount" IS DISTINCT FROM (COALESCE("executed_cost_reduction_amount", (0)::numeric) + "executed_cost_avoidance_amount")))))),
     CONSTRAINT "chk_savings_periods_month" CHECK ((("period_month" >= 1) AND ("period_month" <= 12))),
     CONSTRAINT "chk_savings_periods_months" CHECK (("period_months" >= (0)::numeric)),
     CONSTRAINT "chk_savings_periods_number" CHECK (("period_number" >= 1)),
@@ -4334,11 +4387,11 @@ COMMENT ON COLUMN "public"."savings_periods"."executed_total_savings_amount" IS 
 
 
 
-COMMENT ON CONSTRAINT "chk_savings_periods_estimated_chain" ON "public"."savings_periods" IS 'Cent-exact estimated row: anchors derive reduction/avoidance and both legs derive total.';
+COMMENT ON CONSTRAINT "chk_savings_periods_estimated_chain" ON "public"."savings_periods" IS 'Cent-exact estimated chain. Avoidance is Opening - Baseline without sign clamping.';
 
 
 
-COMMENT ON CONSTRAINT "chk_savings_periods_executed_chain" ON "public"."savings_periods" IS 'Cent-exact executed snapshot: anchors derive reduction/avoidance and both legs derive total.';
+COMMENT ON CONSTRAINT "chk_savings_periods_executed_chain" ON "public"."savings_periods" IS 'Cent-exact executed chain. Avoidance is Opening - Baseline without sign clamping.';
 
 
 
@@ -5175,6 +5228,9 @@ CREATE OR REPLACE TRIGGER "award_lines_updated_at" BEFORE UPDATE ON "public"."aw
 CREATE OR REPLACE TRIGGER "awards_actor" BEFORE INSERT OR UPDATE ON "public"."awards" FOR EACH ROW EXECUTE FUNCTION "public"."stamp_money_record_actor"();
 
 
+CREATE OR REPLACE TRIGGER "awards_executed_savings_delete_guard" BEFORE DELETE ON "public"."awards" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
+
+
 
 CREATE OR REPLACE TRIGGER "awards_updated_at" BEFORE UPDATE ON "public"."awards" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at"();
 
@@ -5189,6 +5245,9 @@ CREATE OR REPLACE TRIGGER "baseline_lines_updated_at" BEFORE UPDATE ON "public".
 
 
 CREATE OR REPLACE TRIGGER "baselines_actor" BEFORE INSERT OR UPDATE ON "public"."baselines" FOR EACH ROW EXECUTE FUNCTION "public"."stamp_money_record_actor"();
+
+
+CREATE OR REPLACE TRIGGER "baselines_executed_savings_delete_guard" BEFORE DELETE ON "public"."baselines" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
 
 
 
@@ -5365,6 +5424,9 @@ CREATE OR REPLACE TRIGGER "sourcing_events_enforce_project_owner_setting" BEFORE
 
 
 CREATE OR REPLACE TRIGGER "sourcing_events_enforce_support_project_setting" BEFORE INSERT OR UPDATE ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."enforce_support_project_setting"();
+
+
+CREATE OR REPLACE TRIGGER "sourcing_events_executed_savings_delete_guard" BEFORE DELETE ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
 
 
 
@@ -6822,6 +6884,10 @@ GRANT ALL ON FUNCTION "public"."prevent_last_project_choice_archive"() TO "servi
 
 REVOKE ALL ON FUNCTION "public"."prevent_profile_privilege_change"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."prevent_profile_privilege_change"() TO "service_role";
+
+
+REVOKE ALL ON FUNCTION "public"."prevent_executed_savings_parent_delete"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."prevent_executed_savings_parent_delete"() TO "service_role";
 
 
 

@@ -70,7 +70,7 @@ select ok(
     where cost_reduction_amount is distinct from case
         when baseline_amount is null then null else baseline_amount - final_amount end
       or cost_avoidance_amount <> case
-        when baseline_amount is not null and opening_amount > baseline_amount
+        when baseline_amount is not null and opening_amount is not null
           then opening_amount - baseline_amount
         when baseline_amount is null and opening_amount is not null
           then opening_amount - final_amount
@@ -89,7 +89,7 @@ select ok(
           when executed_baseline_amount is null then null
           else executed_baseline_amount - executed_final_amount end
         or executed_cost_avoidance_amount <> case
-          when executed_baseline_amount is not null and executed_opening_amount > executed_baseline_amount
+          when executed_baseline_amount is not null and executed_opening_amount is not null
             then executed_opening_amount - executed_baseline_amount
           when executed_baseline_amount is null and executed_opening_amount is not null
             then executed_opening_amount - executed_final_amount
