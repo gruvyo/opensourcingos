@@ -6,6 +6,7 @@ import { portfolioRollup, reportedSavings, scheduleLifecycleRollup, getFirst, ty
 import { Calculator, ArrowRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { sourcingSavingsPopulation } from '@/lib/savings-population'
 
 export default async function SavingsPage() {
   const supabase = await createClient()
@@ -22,7 +23,7 @@ export default async function SavingsPage() {
         cost_reduction_amount, cost_avoidance_amount,
         savings_start_date, savings_end_date,
         created_at, event_id,
-        event:sourcing_events(event_name, contract_start_date),
+        event:sourcing_events(event_name, contract_start_date, project_type),
         baseline:baselines(baseline_name),
         award:awards(award_name)
       `, { count: 'exact' })
@@ -32,7 +33,7 @@ export default async function SavingsPage() {
     )),
     fetchPortfolioRows('Projects', (from, to) => (
       supabase.from('sourcing_events')
-        .select('id, contract_start_date', { count: 'exact' })
+        .select('id, contract_start_date, project_type', { count: 'exact' })
         .order('id', { ascending: true })
         .range(from, to)
     )),
@@ -52,15 +53,22 @@ export default async function SavingsPage() {
   // from a genuinely empty portfolio. Say which one it is.
   const loadError = savingsCalcsError?.message || eventsError?.message || periodsError?.message || null
 
-  const calcs = savingsCalcs || []
   const eventList = events || []
+  const population = sourcingSavingsPopulation(
+    eventList,
+    savingsCalcs || [],
+    (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+  )
+  const calcs = population.calculations
+  const sourcingEvents = population.events
+  const sourcingPeriodRows = population.periodRows
   const now = new Date()
 
   // Single source of truth for every headline/breakdown number.
-  const rollup = portfolioRollup(calcs, eventList, { now })
+  const rollup = portfolioRollup(calcs, sourcingEvents, { now })
   const lifecycle = scheduleLifecycleRollup(
     calcs,
-    (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+    sourcingPeriodRows,
     now,
   )
 

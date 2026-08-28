@@ -55,11 +55,13 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     .or(`incumbent_supplier_id.eq.${supplierId},awarded_supplier_id.eq.${supplierId}`)
     .order('created_at', { ascending: false })
   const events = (eventsData || []) as EventRow[]
-  const eventIds = events.map(event => event.id)
+  const savingsEventIds = events
+    .filter(event => (event.project_type || 'Sourcing') === 'Sourcing')
+    .map(event => event.id)
 
   const [{ data: calculations, error: calculationsError }, { data: periods, error: periodsError }, { data: audit, error: auditError }] = await Promise.all([
-    eventIds.length ? supabase.from('savings_calculations').select('id, event_id, calculation_name, calculation_status, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount, created_at').in('event_id', eventIds).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
-    eventIds.length && currencySettings?.savings_realization_enabled ? supabase.from('realization_periods').select('id, event_id, period_name, period_end_date, realized_savings, projected_savings, realization_status, finance_validated').in('event_id', eventIds).order('period_end_date', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+    savingsEventIds.length ? supabase.from('savings_calculations').select('id, event_id, calculation_name, calculation_status, gross_savings_amount, cost_reduction_amount, cost_avoidance_amount, created_at').in('event_id', savingsEventIds).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+    savingsEventIds.length && currencySettings?.savings_realization_enabled ? supabase.from('realization_periods').select('id, event_id, period_name, period_end_date, realized_savings, projected_savings, realization_status, finance_validated').in('event_id', savingsEventIds).order('period_end_date', { ascending: false }) : Promise.resolve({ data: [], error: null }),
     supabase.from('audit_log').select('id, action, actor_id, before_data, after_data, created_at').eq('entity_type', 'supplier').eq('entity_id', supplierId).order('created_at', { ascending: false }).limit(20),
   ])
 

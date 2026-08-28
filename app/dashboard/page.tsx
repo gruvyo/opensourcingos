@@ -36,6 +36,7 @@ import { buildAttentionQueue } from '@/lib/attention-queue'
 import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow } from '@/lib/supplier-governance-report'
 import { clsx } from 'clsx'
+import { sourcingSavingsPopulation } from '@/lib/savings-population'
 
 const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
 
@@ -294,8 +295,16 @@ export default async function DashboardPage({
     || null
 
   const eventList = (events || []) as EventRow[]
-  const calcList = (savingsCalcs || []) as CalculationRow[]
-  const realizationList = (realizationPeriods || []) as DashboardRealizationPeriod[]
+  const population = sourcingSavingsPopulation(
+    eventList,
+    (savingsCalcs || []) as CalculationRow[],
+    (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+    (realizationPeriods || []) as DashboardRealizationPeriod[],
+  )
+  const sourcingEvents = population.events
+  const calcList = population.calculations
+  const sourcingPeriodRows = population.periodRows
+  const realizationList = population.realizationRows
   const supplierAttentionList = (supplierRows || []) as SupplierAttentionRow[]
   const supplierGovernance = supplierGovernanceSummaries(
     (supplierReviewRows || []) as SupplierPerformanceReviewSummaryRow[],
@@ -333,17 +342,17 @@ export default async function DashboardPage({
     asOfDate,
   )
 
-  const rollup = portfolioRollup(calcList, eventList, { topCategories: 8 })
+  const rollup = portfolioRollup(calcList, sourcingEvents, { topCategories: 8 })
   const lifecycle = scheduleLifecycleRollup(
     calcList,
-    (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+    sourcingPeriodRows,
     new Date(),
     selectedYear ?? undefined,
   )
 
   const periodsByCalcId = new Map<string, SchedulePeriod[]>()
   const calculationById = new Map(calcList.map(calculation => [calculation.id, calculation]))
-  for (const row of periodRows || []) {
+  for (const row of sourcingPeriodRows) {
     const calculationId = (row as { savings_calculation_id?: string }).savings_calculation_id
     if (!calculationId) continue
     const list = periodsByCalcId.get(calculationId) || []
@@ -368,7 +377,7 @@ export default async function DashboardPage({
   const trendData: DashboardTrendPoint[] = byYear.years.map(({ year }) => {
     const yearLifecycle = scheduleLifecycleRollup(
       calcList,
-      (periodRows || []) as Array<SchedulePeriodRow & { savings_calculation_id?: string | null }>,
+      sourcingPeriodRows,
       new Date(),
       year,
     )
@@ -389,10 +398,9 @@ export default async function DashboardPage({
       value: selectedYear === null ? rollup.totalCostAvoidance : (selectedSavings?.avoidance ?? 0),
     },
   ]
-  const suppliers = supplierSummaries(eventList, calcList, rollup.totalSavings)
-  const activeEvents = eventSummaries(eventList, calcList)
+  const suppliers = supplierSummaries(sourcingEvents, calcList, rollup.totalSavings)
+  const activeEvents = eventSummaries(sourcingEvents, calcList)
   const scopeLabel = selectedYear === null ? 'All years' : `FY${selectedYear}`
-  const sourcingEvents = eventList.filter(event => (event.project_type || 'Sourcing') === 'Sourcing')
   const activeSourcingEvents = sourcingEvents.filter(event => !INACTIVE_STATUSES.has(event.event_status || ''))
   const activityCards: ActivityBreakdown[] = [
     {

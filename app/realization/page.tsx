@@ -6,8 +6,9 @@ import { realizationRollup, getFirst } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { TrendingUp, ArrowRight } from 'lucide-react'
 import type { Tables } from '@/lib/database.types'
+import { isSourcingProject } from '@/lib/savings-population'
 
-type EventRelation = Pick<Tables<'sourcing_events'>, 'id' | 'event_name'>
+type EventRelation = Pick<Tables<'sourcing_events'>, 'id' | 'event_name' | 'project_type'>
 type RealizationPeriod = Pick<
   Tables<'realization_periods'>,
   | 'id'
@@ -67,7 +68,7 @@ export default async function RealizationPage() {
           baseline_amount, projected_savings, actual_amount,
           realized_savings, leakage_amount, realization_status,
           finance_validated, event_id,
-          event:sourcing_events(id, event_name)
+          event:sourcing_events(id, event_name, project_type)
         `, { count: 'exact' })
         .order('period_start_date', { ascending: true })
         .order('id', { ascending: true })
@@ -75,7 +76,10 @@ export default async function RealizationPage() {
     ),
   )
 
-  const rows = (periods || []) as RealizationPeriod[]
+  const rows = ((periods || []) as RealizationPeriod[]).filter(period => {
+    const event = getFirst<EventRelation>(period.event)
+    return Boolean(event && isSourcingProject(event))
+  })
   const rollup = realizationRollup(rows)
 
   return (

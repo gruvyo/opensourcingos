@@ -12,6 +12,7 @@ import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
 import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow, type SupplierRiskSummaryRow } from '@/lib/supplier-governance-report'
 import { supplierPortfolioSegments, type SupplierSegmentDimension } from '@/lib/supplier-segmentation'
 import { canonicalCalculationsByEvent } from '@/lib/calculation-integrity'
+import { sourcingSavingsPopulation } from '@/lib/savings-population'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -225,23 +226,26 @@ export function ReportsView({
   const [supplierReadinessFilter, setSupplierReadinessFilter] = useState<SupplierReadinessFilter>('')
   const [supplierSegmentDimension, setSupplierSegmentDimension] = useState<SupplierSegmentDimension>('Preferred status')
 
-  const sourcingEvents = useMemo(
-    () => events.filter(event => (event.project_type || 'Sourcing') === 'Sourcing'),
-    [events],
+  const population = useMemo(
+    () => sourcingSavingsPopulation(events, savingsCalcs, [], realizationPeriods),
+    [events, realizationPeriods, savingsCalcs],
   )
+  const sourcingEvents = population.events
+  const sourcingSavings = population.calculations
+  const sourcingRealization = population.realizationRows
 
   const canonicalSavings = useMemo(
-    () => canonicalCalculationsByEvent(savingsCalcs),
-    [savingsCalcs],
+    () => canonicalCalculationsByEvent(sourcingSavings),
+    [sourcingSavings],
   )
 
   const supplierPortfolio = useMemo(
     () => supplierPortfolioValues(
-      events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
-      savingsCalcs,
-      realizationPeriods,
+      sourcingEvents.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
+      sourcingSavings,
+      sourcingRealization,
     ),
-    [events, realizationPeriods, savingsCalcs],
+    [sourcingEvents, sourcingRealization, sourcingSavings],
   )
 
   const eventTypes = useMemo(
