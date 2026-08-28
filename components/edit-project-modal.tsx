@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import { completeSourcingProjectAtomically } from '@/lib/atomic-money-writers'
 import type { Tables } from '@/lib/database.types'
+import { statusRequiresSavingsDisposition } from '@/lib/terminal-status'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string; active_flag?: boolean }
 type ChoiceOption = {
@@ -16,6 +17,8 @@ type ChoiceOption = {
   project_type: 'Sourcing' | 'Support' | null
   label: string
   active_flag: boolean
+  is_terminal: boolean
+  requires_savings_disposition: boolean
 }
 type Project = Pick<
   Tables<'sourcing_events'>,
@@ -211,8 +214,8 @@ export function EditProjectModal({
 
   const handleSave = async () => {
     const completingSourcingProject = !isSupport
-      && form.event_status === 'Complete'
-      && project.event_status !== 'Complete'
+      && statusRequiresSavingsDisposition(form.event_status, project.project_type, choiceOptions)
+      && !statusRequiresSavingsDisposition(project.event_status, project.project_type, choiceOptions)
 
     if (completingSourcingProject && !project.savings_disposition) {
       setLoading(true); setError(null)

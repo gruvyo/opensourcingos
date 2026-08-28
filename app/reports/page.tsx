@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { ReportsView } from '@/components/reports-view'
 import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
+import type { TerminalStatusOption } from '@/lib/terminal-status'
 
 export default async function ReportsPage() {
   const supabase = await createClient()
@@ -13,6 +14,7 @@ export default async function ReportsPage() {
     { data: supplierReviews, error: supplierReviewsError },
     { data: supplierRisks, error: supplierRisksError },
     { data: realizationPeriods, error: realizationError },
+    { data: terminalStatusRows, error: terminalStatusesError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
@@ -72,12 +74,15 @@ export default async function ReportsPage() {
         .order('id', { ascending: true })
         .range(from, to)
     )),
+    supabase.from('project_choice_options')
+      .select('label, project_type, is_terminal')
+      .eq('choice_type', 'event_status'),
     supabase.from('organization_settings').select('timezone, savings_realization_enabled').maybeSingle(),
   ])
 
   // A failed query here would render as an empty report, which is indistinguishable
   // from a genuinely empty portfolio. Say which one it is.
-  const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || supplierReviewsError?.message || supplierRisksError?.message || realizationError?.message || settingsError?.message || null
+  const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || supplierReviewsError?.message || supplierRisksError?.message || realizationError?.message || terminalStatusesError?.message || settingsError?.message || null
   const timezone = settings?.timezone || 'America/Chicago'
   const asOfDate = dateKeyInTimeZone(new Date(), timezone)
 
@@ -107,6 +112,7 @@ export default async function ReportsPage() {
         realizationPeriods={realizationPeriods || []}
         savingsRealizationEnabled={settings?.savings_realization_enabled ?? false}
         asOfDate={asOfDate}
+        terminalStatuses={(terminalStatusRows || []) as TerminalStatusOption[]}
       />
     </div>
   )

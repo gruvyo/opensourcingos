@@ -24,6 +24,7 @@ import {
   type ReductionCoverage,
   type ReportSavingsTotals,
 } from '@/lib/report-savings'
+import { isTerminalStatus, type TerminalStatusOption } from '@/lib/terminal-status'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -104,8 +105,6 @@ type ReportDefinition = {
   rows: ReportRow[]
 }
 
-const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
-
 const REPORT_OPTIONS: Array<{ id: ReportId; label: string; group: string }> = [
   { id: 'pipeline', label: 'Sourcing Project Pipeline', group: 'Pipeline' },
   { id: 'pipeline-business-unit', label: 'Pipeline by Business Unit', group: 'Pipeline' },
@@ -180,6 +179,7 @@ function aggregateBy(
   events: EventRow[],
   totalsByEvent: Map<string, ReportSavingsTotals>,
   getLabel: (event: EventRow) => string,
+  terminalStatuses: TerminalStatusOption[],
 ) {
   const groups = new Map<string, {
     projects: number
@@ -193,7 +193,7 @@ function aggregateBy(
     groups.set(label, {
       ...merged,
       projects: current.projects + 1,
-      active: current.active + (INACTIVE_STATUSES.has(event.event_status) ? 0 : 1),
+      active: current.active + (isTerminalStatus(event.event_status, event.project_type, terminalStatuses) ? 0 : 1),
     })
   }
 
@@ -209,6 +209,7 @@ export function ReportsView({
   realizationPeriods,
   savingsRealizationEnabled,
   asOfDate,
+  terminalStatuses,
 }: {
   events: EventRow[]
   savingsCalcs: SavingsRow[]
@@ -218,6 +219,7 @@ export function ReportsView({
   realizationPeriods: RealizationRow[]
   savingsRealizationEnabled: boolean
   asOfDate: string
+  terminalStatuses: TerminalStatusOption[]
 }) {
   const [reportId, setReportId] = useState<ReportId>('pipeline')
   const [typeFilter, setTypeFilter] = useState('')
@@ -517,6 +519,7 @@ export function ReportsView({
       const savings = totalsByEvent.get(event.id) ?? emptyReportSavingsTotals()
       return {
         project: event.event_name,
+        projectType: event.project_type,
         type: event.event_type,
         owner: event.buyer_name || 'Unassigned',
         businessUnit: relationName(event.business_unit, 'business_unit_name', 'Unassigned'),
@@ -540,15 +543,17 @@ export function ReportsView({
       filteredEvents,
       totalsByEvent,
       event => relationName(event.business_unit, 'business_unit_name', 'Unassigned'),
+      terminalStatuses,
     )
-    const byBuyer = aggregateBy(filteredEvents, totalsByEvent, event => event.buyer_name || 'Unassigned')
-    const activeEvents = filteredEvents.filter(event => !INACTIVE_STATUSES.has(event.event_status))
+    const byBuyer = aggregateBy(filteredEvents, totalsByEvent, event => event.buyer_name || 'Unassigned', terminalStatuses)
+    const activeEvents = filteredEvents.filter(event => !isTerminalStatus(event.event_status, event.project_type, terminalStatuses))
     const activeByBusinessUnit = aggregateBy(
       activeEvents,
       totalsByEvent,
       event => relationName(event.business_unit, 'business_unit_name', 'Unassigned'),
+      terminalStatuses,
     )
-    const activeByBuyer = aggregateBy(activeEvents, totalsByEvent, event => event.buyer_name || 'Unassigned')
+    const activeByBuyer = aggregateBy(activeEvents, totalsByEvent, event => event.buyer_name || 'Unassigned', terminalStatuses)
 
     const savingsColumns: ReportColumn[] = [
       { key: 'name', label: 'Group' },
@@ -574,7 +579,11 @@ export function ReportsView({
           { key: 'dueDate', label: 'Due Date', format: 'date' },
           { key: 'status', label: 'Status', format: 'status' },
         ],
-        rows: projectRows.filter(row => !INACTIVE_STATUSES.has(String(row.status))),
+        rows: projectRows.filter(row => !isTerminalStatus(
+          typeof row.status === 'string' ? row.status : null,
+          typeof row.projectType === 'string' ? row.projectType : null,
+          terminalStatuses,
+        )),
       }
     }
 
@@ -654,7 +663,7 @@ export function ReportsView({
       ],
       rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
     }
-  }, [asOfDate, canonicalSavings, events, filteredEvents, filteredSuppliers, reportId, savingsRealizationEnabled, supplierPortfolio, supplierReviews, supplierRiskIssues, supplierSegmentDimension])
+  }, [asOfDate, canonicalSavings, events, filteredEvents, filteredSuppliers, reportId, savingsRealizationEnabled, supplierPortfolio, supplierReviews, supplierRiskIssues, supplierSegmentDimension, terminalStatuses])
 
   const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio' || reportId === 'supplier-performance-risk' || reportId === 'supplier-segmentation'
   const readinessReport = reportId === 'supplier-readiness'

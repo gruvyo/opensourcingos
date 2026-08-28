@@ -37,8 +37,7 @@ import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow } from '@/lib/supplier-governance-report'
 import { clsx } from 'clsx'
 import { sourcingSavingsPopulation } from '@/lib/savings-population'
-
-const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
+import { isTerminalStatus, type TerminalStatusOption } from '@/lib/terminal-status'
 
 const STATUS_PROGRESS: Record<string, number> = {
   Pipeline: 10,
@@ -111,7 +110,11 @@ function relationName(relation: unknown, key: string, fallback: string): string 
   return typeof value === 'string' && value.trim() ? value : fallback
 }
 
-function eventSummaries(events: EventRow[], calculations: CalculationRow[]): EventSummary[] {
+function eventSummaries(
+  events: EventRow[],
+  calculations: CalculationRow[],
+  terminalStatuses: TerminalStatusOption[],
+): EventSummary[] {
   const moneyByEvent = new Map<string, { baseline: number; savings: number }>()
 
   for (const calculation of calculations) {
@@ -123,7 +126,7 @@ function eventSummaries(events: EventRow[], calculations: CalculationRow[]): Eve
   }
 
   return events
-    .filter(event => !INACTIVE_STATUSES.has(event.event_status ?? ''))
+    .filter(event => !isTerminalStatus(event.event_status, event.project_type, terminalStatuses))
     .map(event => {
       const money = moneyByEvent.get(event.id) ?? { baseline: 0, savings: 0 }
       return {
@@ -215,6 +218,7 @@ export default async function DashboardPage({
     { data: supplierRows, error: suppliersError },
     { data: supplierRiskRows, error: supplierRisksError },
     { data: supplierReviewRows, error: supplierReviewsError },
+    { data: terminalStatusRows, error: terminalStatusesError },
     { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Projects', (from, to) => (
@@ -281,6 +285,9 @@ export default async function DashboardPage({
         .order('id', { ascending: false })
         .range(from, to)
     )),
+    supabase.from('project_choice_options')
+      .select('label, project_type, is_terminal')
+      .eq('choice_type', 'event_status'),
     supabase.from('organization_settings').select('savings_realization_enabled, timezone').maybeSingle(),
   ])
 
@@ -291,10 +298,12 @@ export default async function DashboardPage({
     || suppliersError?.message
     || supplierRisksError?.message
     || supplierReviewsError?.message
+    || terminalStatusesError?.message
     || settingsError?.message
     || null
 
   const eventList = (events || []) as EventRow[]
+  const terminalStatuses = (terminalStatusRows || []) as TerminalStatusOption[]
   const population = sourcingSavingsPopulation(
     eventList,
     (savingsCalcs || []) as CalculationRow[],
@@ -324,6 +333,7 @@ export default async function DashboardPage({
       id: event.id,
       name: event.event_name || null,
       status: event.event_status || null,
+      projectType: event.project_type || null,
       dueDate: event.project_due_date || null,
     })),
     supplierAttentionList.map(supplier => {
@@ -340,6 +350,7 @@ export default async function DashboardPage({
       }
     }),
     asOfDate,
+    terminalStatuses,
   )
 
   const rollup = portfolioRollup(calcList, sourcingEvents, { topCategories: 8 })
@@ -399,9 +410,11 @@ export default async function DashboardPage({
     },
   ]
   const suppliers = supplierSummaries(sourcingEvents, calcList, rollup.totalSavings)
-  const activeEvents = eventSummaries(sourcingEvents, calcList)
+  const activeEvents = eventSummaries(sourcingEvents, calcList, terminalStatuses)
   const scopeLabel = selectedYear === null ? 'All years' : `FY${selectedYear}`
-  const activeSourcingEvents = sourcingEvents.filter(event => !INACTIVE_STATUSES.has(event.event_status || ''))
+  const activeSourcingEvents = sourcingEvents.filter(event => (
+    !isTerminalStatus(event.event_status, event.project_type, terminalStatuses)
+  ))
   const activityCards: ActivityBreakdown[] = [
     {
       title: 'Projects by Business Unit',

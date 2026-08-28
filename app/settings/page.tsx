@@ -20,7 +20,7 @@ export default async function SettingsPage() {
     ? await Promise.all([
       supabase.from('organizations').select('id, name').eq('id', profile.organization_id).maybeSingle(),
       supabase.from('organization_settings').select('*').eq('organization_id', profile.organization_id).maybeSingle(),
-      supabase.from('project_choice_options').select('id, choice_type, project_type, label, active_flag, sort_order').eq('organization_id', profile.organization_id).order('sort_order').order('label'),
+      supabase.from('project_choice_options').select('id, choice_type, project_type, label, active_flag, is_terminal, requires_savings_disposition, sort_order').eq('organization_id', profile.organization_id).order('sort_order').order('label'),
       supabase.from('categories').select('id, category_name, active_flag').eq('organization_id', profile.organization_id).order('category_name'),
       supabase.from('business_units').select('id, business_unit_name, active_flag').eq('organization_id', profile.organization_id).order('business_unit_name'),
       supabase.from('cost_centers').select('id, cost_center_name, active_flag').eq('organization_id', profile.organization_id).order('cost_center_name'),
@@ -43,6 +43,8 @@ export default async function SettingsPage() {
       kind: choice.choice_type as ManagedClassificationOption['kind'],
       label: choice.label,
       active: choice.active_flag,
+      isTerminal: choice.is_terminal,
+      requiresSavingsDisposition: choice.requires_savings_disposition,
       projectType: choice.project_type as ManagedClassificationOption['projectType'],
       sortOrder: choice.sort_order,
     })),

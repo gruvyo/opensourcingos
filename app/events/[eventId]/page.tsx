@@ -55,7 +55,7 @@ export default async function EventDetailPage({
       .select('id, cost_center_name, active_flag')
       .order('cost_center_name'),
     supabase.from('project_choice_options')
-      .select('id, choice_type, project_type, label, active_flag')
+      .select('id, choice_type, project_type, label, active_flag, is_terminal, requires_savings_disposition')
       .order('sort_order')
       .order('label'),
     supabase.from('project_updates')
