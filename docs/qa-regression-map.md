@@ -25,6 +25,7 @@ runs every pgTAP file below against a disposable database.
 | U-DEPS | Production and development dependency advisories are cleared | `npm run audit:production`; `scripts/dependency-audit.test.mjs`; non-blocking full-tree audit in CI |
 | U-CI | Pull requests cannot bypass tests, verification, lint, types, build, database rebuild, generated types, or schema drift | `.github/workflows/application-quality.yml`; `.github/workflows/supabase-database.yml` |
 | U-GITIGNORE | Bare and environment-specific Next.js secret files cannot be accidentally committed; the public template remains available | `scripts/env-gitignore.test.mjs` |
+| U-HEADERS | Every route is protected against framing and receives CSP, MIME, referrer, permissions, and transport headers | `scripts/security-headers.test.mts`; production response-header check after deployment |
 
 Hardening units not yet merged must add their evidence to this map in the same
 pull request. A test name alone is not sufficient: the test must exercise the
