@@ -331,14 +331,14 @@ insert into public.realization_periods (
   id, organization_id, event_id, savings_calculation_id, savings_period_id,
   period_name, period_start_date, period_end_date,
   baseline_amount, projected_savings, actual_amount, realized_savings,
-  leakage_amount, realization_status, finance_validated
+  leakage_amount, realization_status
 )
 values (
   'b5000000-0000-4000-8000-000000000002',
   (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
   'b2000000-0000-4000-8000-000000000002', 'b3000000-0000-4000-8000-000000000002',
   'b4000000-0000-4000-8000-000000000003', 'Aug 2026', '2026-08-01', '2026-08-31',
-  500, 150, null, null, null, 'Pending', false
+  500, 150, null, null, null, 'Pending'
 );
 
 select set_config('request.jwt.claim.sub', 'b1000000-0000-4000-8000-000000000002', true);
