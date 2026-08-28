@@ -50,6 +50,26 @@ cancelled project preserves its historical estimate but does not create
 executed savings. Earlier finalizing statuses may show reminders; Complete is
 the enforcement point.
 
+### Corrections and reversals
+
+An executed schedule is a locked financial record. Ordinary edits and deletes
+are available only while a calculation is estimated. A correction is an
+explicit, audited transaction that updates the estimated values and executed
+snapshots together; the prior values remain in the audit history.
+
+If realization evidence exists, correction preserves every period identity,
+entered actual, and realized value. It re-bases the comparison fields, clears
+any superseded Finance validation, and requires an administrator. Before
+realization evidence exists, procurement users and administrators may correct
+the schedule, including replacing empty tracking shells.
+
+Only an administrator may reverse an execution, and only when it was premature:
+no actual, realized, or Finance-validated evidence may exist. Empty tracking
+shells are removed as part of the reversal. A completed sourcing project must
+be reopened first or atomically recorded as having no executed savings with a
+written reason. Once realization evidence exists, correction is the only
+remedy; reversal is permanently refused.
+
 ## Savings Realization
 
 Savings Realization is an organization-level capability and is off by default.

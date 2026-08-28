@@ -979,6 +979,8 @@ export type Database = {
         Row: {
           actual_amount: number | null
           baseline_amount: number | null
+          comparison_rebased_at: string | null
+          comparison_rebased_by: string | null
           created_at: string | null
           created_by: string | null
           event_id: string | null
@@ -1005,6 +1007,8 @@ export type Database = {
         Insert: {
           actual_amount?: number | null
           baseline_amount?: number | null
+          comparison_rebased_at?: string | null
+          comparison_rebased_by?: string | null
           created_at?: string | null
           created_by?: string | null
           event_id?: string | null
@@ -1031,6 +1035,8 @@ export type Database = {
         Update: {
           actual_amount?: number | null
           baseline_amount?: number | null
+          comparison_rebased_at?: string | null
+          comparison_rebased_by?: string | null
           created_at?: string | null
           created_by?: string | null
           event_id?: string | null
@@ -1055,6 +1061,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "realization_periods_comparison_rebased_by_fkey"
+            columns: ["comparison_rebased_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "realization_periods_created_by_fkey"
             columns: ["created_by"]
@@ -2292,6 +2305,15 @@ export type Database = {
         Args: { p_owner: string; p_source: string; p_target: string }
         Returns: number
       }
+      correct_savings_execution: {
+        Args: {
+          p_calc_id: string
+          p_calculation: Json
+          p_note: string
+          p_periods: Json
+        }
+        Returns: undefined
+      }
       current_org_id: { Args: never; Returns: string }
       mark_savings_schedule_executed: {
         Args: { p_execution_note?: string; p_savings_calculation_id: string }
@@ -2304,6 +2326,14 @@ export type Database = {
           p_schedule_period_type: string
           p_schedule_start_month: number
           p_schedule_start_year: number
+        }
+        Returns: undefined
+      }
+      reverse_savings_execution: {
+        Args: {
+          p_calc_id: string
+          p_disposition_action: string
+          p_note: string
         }
         Returns: undefined
       }
