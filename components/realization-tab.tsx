@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
-import type { Tables, TablesUpdate } from '@/lib/database.types'
+import type { Tables } from '@/lib/database.types'
 
 type RealizationPeriod = Omit<
   Tables<'realization_periods'>,
@@ -42,7 +42,13 @@ const REALIZATION_STATUS_COLORS: Record<string, string> = {
 
 const REALIZATION_STATUSES = ['Pending', 'In Progress', 'Realized', 'Partially Realized', 'Not Realized', 'Leaked']
 
-export function RealizationTab({ eventId }: { eventId: string }) {
+export function RealizationTab({
+  eventId,
+  currentUserRole,
+}: {
+  eventId: string
+  currentUserRole: string | null
+}) {
   const [periods, setPeriods] = useState<RealizationPeriod[]>([])
   const [scheduleRows, setScheduleRows] = useState<ExecutedScheduleRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -211,26 +217,12 @@ export function RealizationTab({ eventId }: { eventId: string }) {
   const toggleFinanceValidated = async (period: RealizationPeriod) => {
     setBusy(true)
     setError(null)
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      setError(`Finance validation could not be saved: ${userError?.message || 'Not logged in'}`)
-      setBusy(false)
-      return
-    }
-
-    const updates: TablesUpdate<'realization_periods'> = { finance_validated: !period.finance_validated }
-    if (!period.finance_validated) {
-      updates.finance_validated_by = user.id
-      updates.finance_validation_date = new Date().toISOString()
-    }
-    const { data: updatedPeriod, error: updateError } = await supabase
-      .from('realization_periods')
-      .update(updates)
-      .eq('id', period.id)
-      .select('id')
-      .maybeSingle()
-    if (updateError || !updatedPeriod) {
-      setError(`Finance validation could not be saved: ${updateError?.message || 'The realization period was not updated'}`)
+    const { error: updateError } = await supabase.rpc('set_finance_validation', {
+      p_realization_period_id: period.id,
+      p_validated: !period.finance_validated,
+    })
+    if (updateError) {
+      setError(`Finance validation could not be saved: ${updateError.message}`)
       setBusy(false)
       return
     }
@@ -478,19 +470,25 @@ export function RealizationTab({ eventId }: { eventId: string }) {
                       </Select>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button type="button" onClick={() => toggleFinanceValidated(period)}
-                        disabled={busy}
-                        aria-pressed={period.finance_validated}
-                        aria-label={`${period.finance_validated ? 'Remove' : 'Mark'} finance validation for ${period.period_name}`}
-                        className={clsx(
-                          'inline-flex items-center justify-center rounded-full p-1',
-                          period.finance_validated
-                            ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
-                            : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--border)]'
-                        )}
-                      >
-                        {period.finance_validated ? <ShieldCheck className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
-                      </button>
+                      {currentUserRole === 'admin' ? (
+                        <button type="button" onClick={() => toggleFinanceValidated(period)}
+                          disabled={busy}
+                          aria-pressed={period.finance_validated}
+                          aria-label={`${period.finance_validated ? 'Remove' : 'Mark'} finance validation for ${period.period_name}`}
+                          className={clsx(
+                            'inline-flex items-center justify-center rounded-full p-1',
+                            period.finance_validated
+                              ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
+                              : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--border)]'
+                          )}
+                        >
+                          {period.finance_validated ? <ShieldCheck className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                        </button>
+                      ) : period.finance_validated ? (
+                        <ShieldCheck className="mx-auto h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-label="Finance validated" />
+                      ) : (
+                        <Clock className="mx-auto h-4 w-4 text-[var(--text-3)]" aria-label="Awaiting finance validation" />
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button type="button" onClick={() => setPeriodToDelete(period)}

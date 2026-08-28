@@ -258,7 +258,9 @@ export function EventDetail({
             currentUserRole={currentProfile.role}
           />
         )}
-        {!isSupport && activeTab === 'realization' && <RealizationTab eventId={event.id} />}
+        {!isSupport && activeTab === 'realization' && (
+          <RealizationTab eventId={event.id} currentUserRole={currentProfile.role} />
+        )}
 
       </div>
 
