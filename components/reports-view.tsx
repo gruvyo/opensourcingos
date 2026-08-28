@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
 import { formatCurrency, formatDate, formatReduction, statusColor } from '@/lib/utils'
 import { fixedMoney } from '@/lib/money'
+import { csvCell } from '@/lib/csv'
 import { getFirst, num, type SavingsCalcRow } from '@/lib/savings'
 import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
 import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
@@ -134,10 +135,6 @@ function personName(relation: unknown): string | null {
   return person?.full_name || person?.email || null
 }
 
-function csvCell(value: ReportValue): string {
-  return `"${String(value ?? '').replace(/"/g, '""')}"`
-}
-
 function csvReportValue(value: ReportValue, column: ReportColumn, row: ReportRow): ReportValue {
   if (column.format === 'reduction') {
     const coverage = (column.annotationKey ? row[column.annotationKey] : 'complete') as ReductionCoverage
@@ -149,7 +146,10 @@ function csvReportValue(value: ReportValue, column: ReportColumn, row: ReportRow
 function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[]) {
   const csvRows = [
     columns.map(column => csvCell(column.label)).join(','),
-    ...rows.map(row => columns.map(column => csvCell(csvReportValue(row[column.key], column, row))).join(',')),
+    ...rows.map(row => columns.map(column => csvCell(
+      csvReportValue(row[column.key], column, row),
+      column.format !== 'currency' && column.format !== 'reduction',
+    )).join(',')),
   ]
   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
