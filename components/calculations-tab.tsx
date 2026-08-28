@@ -13,6 +13,7 @@ import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/input'
+import { calculationLoadError } from '@/lib/calculation-integrity'
 
 type Anchor = {
   label: string
@@ -57,6 +58,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
 
   const [baseline, setBaseline] = useState<CalculationBaseline | null>(null)
@@ -71,29 +73,50 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
     let cancelled = false
 
     const load = async () => {
-      const [{ data: bases }, { data: offers }, { data: calcs }] = await Promise.all([
-        supabase.from('baselines')
-          .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected, hard_reduction_override, hard_reduction_override_reason')
-          .eq('event_id', eventId),
-        supabase.from('supplier_offers')
-          .select('id, offer_total_amount, offer_term_months, offer_role, offer_type, offer_round, supplier:suppliers(supplier_name)')
-          .eq('event_id', eventId),
-        supabase.from('savings_calculations').select('*').eq('event_id', eventId)
-          .order('created_at', { ascending: true }),
-      ])
+      setLoading(true)
+      setLoadError(null)
+      setError(null)
+      setSavedAt(null)
+      setBaseline(null)
+      setOpening(null)
+      setFinal(null)
+      setExisting(null)
 
-      if (cancelled) return
+      try {
+        const [basesResult, offersResult, calcsResult] = await Promise.all([
+          supabase.from('baselines')
+            .select('id, baseline_name, baseline_type, baseline_source, baseline_total_amount, baseline_term_months, is_selected, hard_reduction_override, hard_reduction_override_reason')
+            .eq('event_id', eventId),
+          supabase.from('supplier_offers')
+            .select('id, offer_total_amount, offer_term_months, offer_role, offer_type, offer_round, supplier:suppliers(supplier_name)')
+            .eq('event_id', eventId),
+          supabase.from('savings_calculations').select('*').eq('event_id', eventId)
+            .order('created_at', { ascending: true }),
+        ])
 
-      setBaseline((bases || []).find(b => b.is_selected) ?? null)
-      setOpening((offers || []).find(o => o.offer_role === 'opening') ?? null)
-      setFinal((offers || []).find(o => o.offer_role === 'final') ?? null)
+        if (cancelled) return
 
-      const calc = (calcs || [])[0] ?? null
-      setExisting(calc)
-      if (calc) {
-        setSavedAt(calc.updated_at || calc.created_at || null)
+        const readError = calculationLoadError([
+          { label: 'baselines', error: basesResult.error },
+          { label: 'supplier offers', error: offersResult.error },
+          { label: 'savings record', error: calcsResult.error },
+        ])
+
+        setBaseline((basesResult.data || []).find(b => b.is_selected) ?? null)
+        setOpening((offersResult.data || []).find(o => o.offer_role === 'opening') ?? null)
+        setFinal((offersResult.data || []).find(o => o.offer_role === 'final') ?? null)
+
+        const calc = (calcsResult.data || [])[0] ?? null
+        setExisting(calc)
+        setSavedAt(calc?.updated_at || calc?.created_at || null)
+        setLoadError(readError)
+      } catch (cause) {
+        if (cancelled) return
+        const message = cause instanceof Error ? cause.message : 'unknown read error'
+        setLoadError(`The calculation could not be loaded safely (${message}). Saving is disabled so a second savings record cannot be created.`)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      setLoading(false)
     }
 
     void load()
@@ -162,6 +185,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
   const basisLabel = basis === 'perMonth' ? 'per month' : basis === 'perYear' ? 'per year' : `over the ${dealMonths}-month term`
 
   const save = async () => {
+    if (loadError) { setError('Saving remains disabled until the calculation loads successfully.'); return }
     if (!final) { setError('Select a Final offer before saving.'); return }
     // Without the Final offer's term there is no deal term, so nothing here is
     // derivable. Refuse rather than publish a figure built on a guessed 12.
@@ -173,8 +197,13 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Not logged in'); setSaving(false); return }
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles').select('organization_id').eq('id', user.id).single()
+    if (profileError || !profile?.organization_id) {
+      setError(profileError?.message || 'Your workspace could not be identified.')
+      setSaving(false)
+      return
+    }
 
     // WHAT GETS PUBLISHED IS ALWAYS THE WHOLE DEAL TERM, whatever basis is on
     // screen. The basis switch is a lens for reading the numbers, not a claim
@@ -220,7 +249,12 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           .insert({ ...payload, organization_id: profile?.organization_id, created_by: user.id })
 
     setSaving(false)
-    if (res.error) { setError(res.error.message); return }
+    if (res.error) {
+      setError(res.error.code === '23505'
+        ? 'This project already has a savings record. Reload the page before trying again.'
+        : res.error.message)
+      return
+    }
     setSavedAt(new Date().toISOString())
     setRefreshKey(key => key + 1)
   }
@@ -239,6 +273,13 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
           Derived from the anchors you selected. Nothing here is typed by hand.
         </p>
       </div>
+
+      {loadError && (
+        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <p><strong>Savings record not loaded.</strong> {loadError}</p>
+          <Button className="mt-3" onClick={() => setRefreshKey(key => key + 1)}>Try loading again</Button>
+        </div>
+      )}
 
       {/* The methodology, stated correctly. */}
       <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
@@ -410,7 +451,7 @@ export function CalculationsTab({ eventId }: { eventId: string }) {
                   <Check className="h-3.5 w-3.5" /> Saved
                 </span>
               )}
-              <Button onClick={save} disabled={saving || existing?.calculation_status === 'executed'}>
+              <Button onClick={save} disabled={saving || !!loadError || existing?.calculation_status === 'executed'}>
                 {saving ? 'Saving...' : existing ? 'Update savings record' : 'Save savings record'}
               </Button>
             </div>

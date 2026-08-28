@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(305);
+select plan(307);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -33,6 +33,43 @@ select is(
   (select sum(total_savings_amount) from public.savings_periods where savings_calculation_id = '00000000-0000-4000-8000-000000000051'),
   900000::numeric,
   'the original estimate remains alongside the executed snapshot'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_index i
+    join pg_catalog.pg_class c on c.oid = i.indexrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'uq_savings_calculations_event'
+      and i.indisunique
+      and pg_catalog.pg_get_expr(i.indpred, i.indrelid) ilike '%event_id IS NOT NULL%'
+  ),
+  'savings calculations enforce one linked record per project'
+);
+
+select throws_ok(
+  $$
+    insert into public.savings_calculations (
+      organization_id,
+      event_id,
+      calculation_name,
+      savings_type,
+      calculation_status
+    )
+    select
+      organization_id,
+      event_id,
+      'Duplicate savings record',
+      'Cost Reduction',
+      'estimated'
+    from public.savings_calculations
+    where id = '00000000-0000-4000-8000-000000000051'
+  $$,
+  '23505',
+  'duplicate key value violates unique constraint "uq_savings_calculations_event"',
+  'a second savings calculation for the same project is rejected'
 );
 
 select ok(

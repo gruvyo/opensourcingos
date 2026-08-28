@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Download, FileBarChart2, Filter, RotateCcw } from 'lucide-react'
+import { AlertTriangle, Download, FileBarChart2, Filter, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
@@ -11,6 +11,7 @@ import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierR
 import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
 import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow, type SupplierRiskSummaryRow } from '@/lib/supplier-governance-report'
 import { supplierPortfolioSegments, type SupplierSegmentDimension } from '@/lib/supplier-segmentation'
+import { canonicalCalculationsByEvent } from '@/lib/calculation-integrity'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -48,6 +49,7 @@ type SupplierRow = {
 type SavingsRow = SavingsCalcRow & {
   id: string
   event_id: string | null
+  created_at: string | null
   baseline_total_amount: number | null
 }
 
@@ -228,6 +230,20 @@ export function ReportsView({
     [events],
   )
 
+  const canonicalSavings = useMemo(
+    () => canonicalCalculationsByEvent(savingsCalcs),
+    [savingsCalcs],
+  )
+
+  const supplierPortfolio = useMemo(
+    () => supplierPortfolioValues(
+      events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
+      savingsCalcs,
+      realizationPeriods,
+    ),
+    [events, realizationPeriods, savingsCalcs],
+  )
+
   const eventTypes = useMemo(
     () => Array.from(new Set(sourcingEvents.map(event => event.event_type).filter(Boolean))).sort(),
     [sourcingEvents],
@@ -278,11 +294,6 @@ export function ReportsView({
 
   const report = useMemo<ReportDefinition>(() => {
     if (reportId === 'supplier-segmentation') {
-      const portfolioValues = supplierPortfolioValues(
-        events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
-        savingsCalcs,
-        realizationPeriods,
-      )
       const rows = supplierPortfolioSegments(
         filteredSuppliers.map(supplier => ({
           id: supplier.id,
@@ -291,7 +302,7 @@ export function ReportsView({
           preferred: Boolean(supplier.preferred_flag),
           diverse: Boolean(supplier.diversity_flag),
         })),
-        portfolioValues,
+        supplierPortfolio.values,
         supplierSegmentDimension,
       ).map(segment => ({
         segment: segment.label,
@@ -379,13 +390,8 @@ export function ReportsView({
     }
 
     if (reportId === 'supplier-portfolio') {
-      const portfolioValues = supplierPortfolioValues(
-        events.map(event => ({ id: event.id, awardedSupplierId: event.awarded_supplier_id })),
-        savingsCalcs,
-        realizationPeriods,
-      )
       const rows = filteredSuppliers.map(supplier => {
-        const value = portfolioValues.get(supplier.id)
+        const value = supplierPortfolio.values.get(supplier.id)
         return {
           supplier: supplier.supplier_name,
           status: supplier.supplier_status || 'Active',
@@ -493,7 +499,7 @@ export function ReportsView({
 
     const filteredIds = new Set(filteredEvents.map(event => event.id))
     const totalsByEvent = new Map<string, SavingsTotals>()
-    for (const calculation of savingsCalcs) {
+    for (const calculation of canonicalSavings.calculations) {
       if (!calculation.event_id || !filteredIds.has(calculation.event_id)) continue
       const current = totalsByEvent.get(calculation.event_id) ?? { reduction: 0, avoidance: 0, total: 0, estimated: 0, executed: 0 }
       current.reduction += num(calculation.cost_reduction_amount)
@@ -643,7 +649,7 @@ export function ReportsView({
       ],
       rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
     }
-  }, [asOfDate, events, filteredEvents, filteredSuppliers, realizationPeriods, reportId, savingsCalcs, savingsRealizationEnabled, supplierReviews, supplierRiskIssues, supplierSegmentDimension])
+  }, [asOfDate, canonicalSavings, events, filteredEvents, filteredSuppliers, reportId, savingsRealizationEnabled, supplierPortfolio, supplierReviews, supplierRiskIssues, supplierSegmentDimension])
 
   const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio' || reportId === 'supplier-performance-risk' || reportId === 'supplier-segmentation'
   const readinessReport = reportId === 'supplier-readiness'
@@ -668,6 +674,16 @@ export function ReportsView({
 
   return (
     <div className="mt-6 space-y-6">
+      {canonicalSavings.dataQuality.duplicateCalculationEvents > 0 && (
+        <div role="alert" className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <p>
+            <strong>Duplicate savings records detected.</strong>{' '}
+            {canonicalSavings.dataQuality.duplicateCalculationEvents} project{canonicalSavings.dataQuality.duplicateCalculationEvents === 1 ? '' : 's'} had more than one calculation.
+            These reports use the earliest record once to prevent double counting. Ask a workspace administrator to investigate the data.
+          </p>
+        </div>
+      )}
       <Card className="p-5 sm:p-6">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,360px)_1fr_auto] lg:items-end">
           <div>
