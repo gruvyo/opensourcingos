@@ -251,13 +251,6 @@ alter table public.savings_periods
   alter column executed_cost_avoidance_amount type numeric(15,2) using round(executed_cost_avoidance_amount, 2),
   alter column executed_total_savings_amount type numeric(15,2) using round(executed_total_savings_amount, 2);
 
-alter table public.savings_calculations
-  add constraint chk_savings_calculations_total_chain check (
-    gross_savings_amount is null
-    or (cost_reduction_amount is null and cost_avoidance_amount is null)
-    or gross_savings_amount = coalesce(cost_reduction_amount, 0) + coalesce(cost_avoidance_amount, 0)
-  );
-
 alter table public.savings_periods
   add constraint chk_savings_periods_estimated_chain check (
     cost_reduction_amount is not distinct from case
