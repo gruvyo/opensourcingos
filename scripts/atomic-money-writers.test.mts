@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  completeSourcingProjectAtomically,
   replaceSavingsScheduleAtomically,
   selectBaselineAtomically,
   setOfferRoleAtomically,
+  syncRealizationPeriodsAtomically,
 } from '../lib/atomic-money-writers.ts'
 
 function recordingClient() {
@@ -18,6 +20,30 @@ function recordingClient() {
     } as never,
   }
 }
+
+test('project completion sends only lifecycle intent to the guarded RPC', async () => {
+  const { client, calls } = recordingClient()
+  await completeSourcingProjectAtomically(client, 'event-1', 'executed')
+  await completeSourcingProjectAtomically(
+    client, 'event-2', 'no_executed_savings', 'No commercial result was executed.',
+  )
+  assert.deepEqual(calls, [
+    {
+      name: 'complete_sourcing_project',
+      args: { p_event_id: 'event-1', p_disposition: 'executed' },
+    },
+    {
+      name: 'complete_sourcing_project',
+      args: {
+        p_event_id: 'event-2',
+        p_disposition: 'no_executed_savings',
+        p_reason: 'No commercial result was executed.',
+      },
+    },
+  ])
+  assert.equal(JSON.stringify(calls).includes('actor'), false)
+  assert.equal(JSON.stringify(calls).includes('organization_id'), false)
+})
 
 test('baseline selection uses the single reviewed RPC and sends no actor or workspace', async () => {
   const { client, calls } = recordingClient()
@@ -69,4 +95,16 @@ test('schedule replacement sends only calculation settings and period values', a
   assert.equal(JSON.stringify(calls).includes('organization_id'), false)
   assert.equal(JSON.stringify(calls).includes('created_by'), false)
   assert.equal(JSON.stringify(calls).includes('updated_by'), false)
+})
+
+test('realization sync sends only the project ID to the guarded RPC', async () => {
+  const { client, calls } = recordingClient()
+  await syncRealizationPeriodsAtomically(client, 'event-1')
+  assert.deepEqual(calls, [{
+    name: 'sync_realization_periods',
+    args: { p_event_id: 'event-1' },
+  }])
+  assert.equal(JSON.stringify(calls).includes('organization_id'), false)
+  assert.equal(JSON.stringify(calls).includes('savings_period_id'), false)
+  assert.equal(JSON.stringify(calls).includes('created_by'), false)
 })

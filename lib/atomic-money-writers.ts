@@ -18,6 +18,17 @@ export type SchedulePeriodWrite = {
   notes?: string | null
 }
 
+export function completeSourcingProjectAtomically(
+  client: Client,
+  eventId: string,
+  disposition: 'executed' | 'no_executed_savings',
+  reason?: string,
+) {
+  return client.rpc('complete_sourcing_project', reason === undefined
+    ? { p_event_id: eventId, p_disposition: disposition }
+    : { p_event_id: eventId, p_disposition: disposition, p_reason: reason })
+}
+
 export function selectBaselineAtomically(client: Client, baselineId: string) {
   return client.rpc('select_baseline', { p_baseline_id: baselineId })
 }
@@ -47,4 +58,8 @@ export function replaceSavingsScheduleAtomically(
     p_schedule_period_type: periodType,
     p_periods: periods as Json,
   })
+}
+
+export function syncRealizationPeriodsAtomically(client: Client, eventId: string) {
+  return client.rpc('sync_realization_periods', { p_event_id: eventId })
 }

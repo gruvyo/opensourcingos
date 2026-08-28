@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
+import { completeSourcingProjectAtomically } from '@/lib/atomic-money-writers'
 import type { Tables } from '@/lib/database.types'
 
 type Option = { id: string; category_name?: string; business_unit_name?: string; cost_center_name?: string; supplier_name?: string; active_flag?: boolean }
@@ -52,6 +53,7 @@ export function EditProjectModal({
   projectCategoriesEnabled,
   projectBusinessUnitsEnabled,
   projectIncumbentSuppliersEnabled,
+  canDelete,
   onClose,
   onSaved,
 }: {
@@ -67,6 +69,7 @@ export function EditProjectModal({
   projectCategoriesEnabled: boolean
   projectBusinessUnitsEnabled: boolean
   projectIncumbentSuppliersEnabled: boolean
+  canDelete: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -164,7 +167,6 @@ export function EditProjectModal({
       contract_start_date: form.contract_start_date || null,
       contract_end_date: form.contract_end_date || null,
       notes: form.notes || null,
-      updated_at: new Date().toISOString(),
       ...extra,
     }
 
@@ -207,20 +209,6 @@ export function EditProjectModal({
     onSaved()
   }
 
-  const savingsDecisionMetadata = async () => {
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      setError(userError?.message ?? 'Your session could not be verified. Please sign in again.')
-      setLoading(false)
-      return null
-    }
-
-    return {
-      savings_disposition_at: new Date().toISOString(),
-      savings_disposition_by: user.id,
-    }
-  }
-
   const handleSave = async () => {
     const completingSourcingProject = !isSupport
       && form.event_status === 'Complete'
@@ -239,13 +227,11 @@ export function EditProjectModal({
       if (calculationError) { setError(calculationError.message); setLoading(false); return }
 
       if (calculation?.calculation_status === 'executed') {
-        const decisionMetadata = await savingsDecisionMetadata()
-        if (!decisionMetadata) return
-        await persistUpdates({
-          savings_disposition: 'executed',
-          savings_disposition_reason: 'Savings schedule was already marked executed.',
-          ...decisionMetadata,
-        })
+        const { error: completionError } = await completeSourcingProjectAtomically(
+          supabase, project.id, 'executed', 'Savings schedule was already marked executed.',
+        )
+        if (completionError) { setError(completionError.message); setLoading(false); return }
+        await persistUpdates()
         return
       }
 
@@ -276,11 +262,13 @@ export function EditProjectModal({
       p_execution_note: 'Confirmed while completing the sourcing project.',
     })
     if (executeError) { setError(executeError.message); setLoading(false); return }
+    const { error: completionError } = await completeSourcingProjectAtomically(
+      supabase, project.id, 'executed',
+      'Savings schedule marked executed while completing the project.',
+    )
+    if (completionError) { setError(completionError.message); setLoading(false); return }
     setShowSavingsDecision(false)
-    await persistUpdates({
-      savings_disposition: 'executed',
-      savings_disposition_reason: 'Savings schedule marked executed while completing the project.',
-    })
+    await persistUpdates()
   }
 
   const completeWithoutExecution = async () => {
@@ -290,14 +278,12 @@ export function EditProjectModal({
       return
     }
     setLoading(true)
-    const decisionMetadata = await savingsDecisionMetadata()
-    if (!decisionMetadata) return
+    const { error: completionError } = await completeSourcingProjectAtomically(
+      supabase, project.id, 'no_executed_savings', reason,
+    )
+    if (completionError) { setError(completionError.message); setLoading(false); return }
     setShowSavingsDecision(false)
-    await persistUpdates({
-      savings_disposition: 'no_executed_savings',
-      savings_disposition_reason: reason,
-      ...decisionMetadata,
-    })
+    await persistUpdates()
   }
 
   const handleDelete = async () => {
@@ -474,9 +460,11 @@ export function EditProjectModal({
 
         {/* Action buttons */}
         <div className="mt-6 flex items-center justify-between">
-          <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} disabled={loading}>
-            Delete Project
-          </Button>
+          {canDelete ? (
+            <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} disabled={loading}>
+              Delete Project
+            </Button>
+          ) : <span />}
           <div className="flex gap-3">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
             <Button onClick={handleSave} disabled={loading}>
@@ -529,7 +517,7 @@ export function EditProjectModal({
           </div>
         </div>
       )}
-      {showDeleteConfirm && (
+      {canDelete && showDeleteConfirm && (
         <ConfirmDialog
           title="Delete this project?"
           description="This removes the project and all of its scope lines, baselines, offers, awards, and savings calculations. This cannot be undone."

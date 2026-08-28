@@ -183,8 +183,6 @@ export function EventForm({
       notes: form.notes || null,
       organization_id: profile.organization_id,
       procurement_owner_id: user.id,
-      created_by: user.id,
-      updated_by: user.id,
       currency_code: defaultCurrency,
       fx_rate_to_usd: 1.0,
       event_status: form.event_status,

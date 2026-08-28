@@ -80,7 +80,7 @@ const BASELINE_TYPE_DEFENSIBILITY: Record<string, string> = {
   'Initial Supplier Quote': 'Medium-Low',
 }
 
-export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLines: ScopeLine[] }) {
+export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId: string; scopeLines: ScopeLine[]; currentUserRole: string | null }) {
   const [baselines, setBaselines] = useState<Baseline[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -92,6 +92,8 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [actionError, setActionError] = useState<string | null>(null)
   const [baselineToDelete, setBaselineToDelete] = useState<Baseline | null>(null)
   const supabase = createClient()
+  const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
+  const canDelete = currentUserRole === 'admin'
 
   // Exactly one baseline per project is THE baseline. The database function
   // clears the prior selection and sets this one in a single transaction.
@@ -174,10 +176,10 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
           <h2 className="text-lg font-semibold text-[var(--text)]">Baselines</h2>
           <p className="text-sm text-[var(--text-2)]">Establish what the company would have paid without procurement action</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
+        {canEdit && <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4" />
           Add Baseline
-        </Button>
+        </Button>}
       </div>
 
       {actionError && (
@@ -222,7 +224,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
       </div>
 
       {/* Add Baseline Form */}
-      {showForm && (
+      {canEdit && showForm && (
         <AddBaselineForm
           eventId={eventId}
           isFirstBaseline={baselines.length === 0}
@@ -231,7 +233,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
         />
       )}
 
-      {editingBaseline && (
+      {canEdit && editingBaseline && (
         <AddBaselineForm
           eventId={eventId}
           isFirstBaseline={false}
@@ -301,12 +303,14 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                           className="w-36 py-1 text-right text-sm" />
                         <Button type="button" size="sm" onClick={() => saveTotal(baseline.id)}>Save</Button>
                       </div>
-                    ) : (
+                    ) : canEdit ? (
                       <button type="button" title="Click to edit"
                         onClick={() => { setEditingTotalId(baseline.id); setEditTotalValue(String(baseline.baseline_total_amount ?? '')) }}
                         className="text-lg font-bold text-[var(--text)] underline decoration-dotted underline-offset-4 hover:text-[var(--brand-ink)]">
                         {formatCurrency(baseline.baseline_total_amount)}
                       </button>
+                    ) : (
+                      <p className="text-lg font-bold text-[var(--text)]">{formatCurrency(baseline.baseline_total_amount)}</p>
                     )}
                     {(() => {
                       const r = termRates(baseline.baseline_total_amount, baseline.baseline_term_months)
@@ -328,13 +332,13 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         title="This is the baseline the savings chain measures against">
                         <Star className="h-3 w-3 fill-current" /> Baseline
                       </span>
-                    ) : (
+                    ) : canEdit ? (
                       <button type="button" onClick={() => selectBaseline(baseline.id)}
                         className="rounded border border-[var(--border-strong)] px-2 py-1 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                         title="Use this as the baseline for the savings chain">
                         Use as baseline
                       </button>
-                    )}
+                    ) : null}
 
                     {/* Whether this type may book a HARD Cost Reduction. Shown on
                         every baseline, not just the selected one, so the
@@ -385,25 +389,29 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                         per-category "Mark Official" toggles were removed: the real process has
                         no baseline-approval concept, and the savings calculation no longer
                         depends on which baseline is flagged official. Baselines stay editable. */}
-                    <div className="flex items-center justify-end gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+                    {(canEdit || canDelete) && <div className="flex items-center justify-end gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+                      {canEdit && (
                       <button type="button" onClick={() => setEditingBaseline(baseline)}
                         className="flex items-center gap-1 text-xs font-medium text-[var(--brand-ink)] hover:underline">
                         <Pencil className="h-3.5 w-3.5" /> Edit baseline
                       </button>
+                      )}
+                      {canDelete && (
                       <button type="button" onClick={() => setBaselineToDelete(baseline)}
                         aria-label={`Delete baseline ${baseline.baseline_name}`}
                         className="text-[var(--text-3)] hover:text-red-600 dark:hover:text-red-400">
                         <Trash2 className="h-4 w-4" />
                       </button>
-                    </div>
+                      )}
+                    </div>}
 
                     {/* The hard/soft override. Only offered where it can matter:
                         a type that does not already qualify on its own. */}
-                    <HardReductionOverride
+                    {canEdit && <HardReductionOverride
                       baseline={baseline}
                       onChanged={fetchBaselines}
                       onError={setActionError}
-                    />
+                    />}
 
                     {/* Baseline Lines Table */}
                     <BaselineLinesTable
@@ -414,6 +422,8 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
                       lines={lines}
                       onLinesChanged={() => fetchBaselineLines(baseline.id)}
                       isLocked={baseline.baseline_lock_status !== 'Draft'}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
                     />
                   </div>
                 )}
@@ -422,7 +432,7 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
           })}
         </div>
       )}
-      {baselineToDelete && (
+      {canDelete && baselineToDelete && (
         <ConfirmDialog
           title="Delete this baseline?"
           description={`This permanently removes ${baselineToDelete.baseline_name} and all of its line detail. This cannot be undone.`}
@@ -623,7 +633,6 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
         official_for_hard_savings: isFirstBaseline,
         official_for_cost_avoidance: isFirstBaseline,
         official_for_demand_reduction: isFirstBaseline,
-        created_by: user.id,
       })
 
     if (insertError) {
@@ -711,13 +720,15 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
 // ============================================
 // Baseline Lines Table (with calculations)
 // ============================================
-function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLines, onLinesChanged, isLocked }: {
+function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLines, onLinesChanged, isLocked, canEdit, canDelete }: {
   baselineId: string
   eventId: string
   scopeLines: ScopeLine[]
   lines: BaselineLine[]
   onLinesChanged: () => void
   isLocked: boolean
+  canEdit: boolean
+  canDelete: boolean
 }) {
   const supabase = createClient()
   const [lines, setLines] = useState(initialLines)
@@ -860,7 +871,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
             their sum. Most deals just need the total.
           </p>
         </div>
-        {!isLocked && (
+        {canEdit && !isLocked && (
           <button type="button" onClick={() => setShowAddLine(!showAddLine)}
             className="flex items-center gap-1 rounded bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/30">
             <Plus className="h-3 w-3" /> Add Line
@@ -875,7 +886,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       )}
 
       {/* Add Line Form */}
-      {showAddLine && !isLocked && (
+      {canEdit && showAddLine && !isLocked && (
         <form onSubmit={handleAddLine} className="mb-4 rounded border border-indigo-200 dark:border-indigo-800 bg-[var(--surface)] p-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div className="md:col-span-4">
@@ -956,7 +967,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
                 <th scope="col" className="px-2 py-2 text-right">One-Time</th>
                 <th scope="col" className="px-2 py-2 text-right">Term (mo)</th>
                 <th scope="col" className="px-2 py-2 text-right">Annualized</th>
-                {!isLocked && <th scope="col" aria-label="Actions" className="px-2 py-2"></th>}
+                {canDelete && !isLocked && <th scope="col" aria-label="Actions" className="px-2 py-2"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -988,7 +999,7 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
                   <td className="px-2 py-2 text-right text-xs font-medium text-indigo-700 dark:text-indigo-300">
                     {formatCurrency(line.annualized_baseline_amount)}
                   </td>
-                  {!isLocked && (
+                  {canDelete && !isLocked && (
                     <td className="px-2 py-2 text-right">
                       <button type="button" onClick={() => setLineToDelete(line)}
                         aria-label={`Delete baseline line ${line.line_number}`}
@@ -1007,13 +1018,13 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
                 <td colSpan={2} className="px-2 py-2"></td>
                 <td className="px-2 py-2 text-right text-xs text-[var(--text-2)]">Annual:</td>
                 <td className="px-2 py-2 text-right text-xs font-bold text-indigo-700 dark:text-indigo-300">{formatCurrency(totalAnnualized)}</td>
-                {!isLocked && <td className="px-2 py-2"></td>}
+                {canDelete && !isLocked && <td className="px-2 py-2"></td>}
               </tr>
             </tfoot>
           </table>
         </div>
       )}
-      {lineToDelete && (
+      {canDelete && lineToDelete && (
         <ConfirmDialog
           title="Delete this baseline line?"
           description={`This permanently removes baseline line ${lineToDelete.line_number}. This cannot be undone.`}
