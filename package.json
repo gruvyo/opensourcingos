@@ -16,6 +16,7 @@
     "test:attention-queue": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/attention-queue.test.mts",
     "test:atomic-money-writers": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/atomic-money-writers.test.mts",
     "test:money-precision": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/money-precision.test.mts",
+    "test:report-savings": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/report-savings.test.mts",
     "test:savings-population": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/savings-population.test.mts",
     "test:supplier-portfolio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-portfolio.test.mts",
     "test:supplier-governance-report": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-governance-report.test.mts",

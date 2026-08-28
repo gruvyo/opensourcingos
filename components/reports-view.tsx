@@ -5,15 +5,25 @@ import { AlertTriangle, Download, FileBarChart2, Filter, RotateCcw } from 'lucid
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
-import { formatCurrency, formatDate, statusColor } from '@/lib/utils'
+import { formatCurrency, formatDate, formatReduction, statusColor } from '@/lib/utils'
 import { fixedMoney } from '@/lib/money'
-import { getFirst, num, reportedSavings, type SavingsCalcRow } from '@/lib/savings'
+import { getFirst, num, type SavingsCalcRow } from '@/lib/savings'
 import { assessSupplierReadiness, matchesSupplierReadinessFilter, type SupplierReadinessFilter } from '@/lib/supplier-readiness'
 import { supplierPortfolioValues } from '@/lib/supplier-portfolio'
 import { supplierGovernanceSummaries, type SupplierPerformanceReviewSummaryRow, type SupplierRiskSummaryRow } from '@/lib/supplier-governance-report'
 import { supplierPortfolioSegments, type SupplierSegmentDimension } from '@/lib/supplier-segmentation'
 import { canonicalCalculationsByEvent } from '@/lib/calculation-integrity'
 import { sourcingSavingsPopulation } from '@/lib/savings-population'
+import {
+  addReportSavingsCalculation,
+  emptyReportSavingsTotals,
+  mergeReportSavingsTotals,
+  reductionCoverage,
+  reportReductionExport,
+  reportReductionValue,
+  type ReductionCoverage,
+  type ReportSavingsTotals,
+} from '@/lib/report-savings'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -83,6 +93,7 @@ type ReportColumn = {
   key: string
   label: string
   format?: ColumnFormat
+  annotationKey?: string
 }
 
 type ReportDefinition = {
@@ -91,14 +102,6 @@ type ReportDefinition = {
   filename: string
   columns: ReportColumn[]
   rows: ReportRow[]
-}
-
-type SavingsTotals = {
-  reduction: number
-  avoidance: number
-  total: number
-  estimated: number
-  executed: number
 }
 
 const INACTIVE_STATUSES = new Set(['Cancelled', 'Complete'])
@@ -132,16 +135,18 @@ function csvCell(value: ReportValue): string {
   return `"${String(value ?? '').replace(/"/g, '""')}"`
 }
 
-function csvReportValue(value: ReportValue, column: ReportColumn): ReportValue {
-  return column.format === 'currency' || column.format === 'reduction'
-    ? fixedMoney(num(value))
-    : value
+function csvReportValue(value: ReportValue, column: ReportColumn, row: ReportRow): ReportValue {
+  if (column.format === 'reduction') {
+    const coverage = (column.annotationKey ? row[column.annotationKey] : 'complete') as ReductionCoverage
+    return reportReductionExport(value === null ? null : num(value), coverage)
+  }
+  return column.format === 'currency' ? fixedMoney(num(value)) : value
 }
 
 function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[]) {
   const csvRows = [
     columns.map(column => csvCell(column.label)).join(','),
-    ...rows.map(row => columns.map(column => csvCell(csvReportValue(row[column.key], column))).join(',')),
+    ...rows.map(row => columns.map(column => csvCell(csvReportValue(row[column.key], column, row))).join(',')),
   ]
   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -157,11 +162,11 @@ function sortRows(rows: ReportRow[], key: string): ReportRow[] {
   return rows.sort((a, b) => num(b[key]) - num(a[key]) || String(a[key]).localeCompare(String(b[key])))
 }
 
-function formatValue(value: ReportValue, format: ColumnFormat = 'text'): string {
+function formatValue(value: ReportValue, format: ColumnFormat = 'text', annotation?: ReportValue): string {
   if (format === 'currency') return formatCurrency(num(value))
   if (format === 'reduction') {
-    const amount = num(value)
-    return amount < 0 ? `(${formatCurrency(Math.abs(amount))})` : formatCurrency(amount)
+    const formatted = formatReduction(value === null ? null : num(value))
+    return annotation === 'partial' ? `${formatted}*` : formatted
   }
   if (format === 'date') return formatDate(typeof value === 'string' ? value : null)
   if (format === 'number') return num(value).toLocaleString('en-US')
@@ -173,31 +178,23 @@ function formatValue(value: ReportValue, format: ColumnFormat = 'text'): string 
 
 function aggregateBy(
   events: EventRow[],
-  totalsByEvent: Map<string, SavingsTotals>,
+  totalsByEvent: Map<string, ReportSavingsTotals>,
   getLabel: (event: EventRow) => string,
 ) {
   const groups = new Map<string, {
     projects: number
     active: number
-    reduction: number
-    avoidance: number
-    savings: number
-    estimated: number
-    executed: number
-  }>()
+  } & ReportSavingsTotals>()
 
   for (const event of events) {
     const label = getLabel(event)
-    const current = groups.get(label) ?? { projects: 0, active: 0, reduction: 0, avoidance: 0, savings: 0, estimated: 0, executed: 0 }
-    const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0, estimated: 0, executed: 0 }
-    current.projects += 1
-    current.active += INACTIVE_STATUSES.has(event.event_status) ? 0 : 1
-    current.reduction += savings.reduction
-    current.avoidance += savings.avoidance
-    current.savings += savings.total
-    current.estimated += savings.estimated
-    current.executed += savings.executed
-    groups.set(label, current)
+    const current = groups.get(label) ?? { projects: 0, active: 0, ...emptyReportSavingsTotals() }
+    const merged = mergeReportSavingsTotals(current, totalsByEvent.get(event.id) ?? emptyReportSavingsTotals())
+    groups.set(label, {
+      ...merged,
+      projects: current.projects + 1,
+      active: current.active + (INACTIVE_STATUSES.has(event.event_status) ? 0 : 1),
+    })
   }
 
   return groups
@@ -509,20 +506,15 @@ export function ReportsView({
     }
 
     const filteredIds = new Set(filteredEvents.map(event => event.id))
-    const totalsByEvent = new Map<string, SavingsTotals>()
+    const totalsByEvent = new Map<string, ReportSavingsTotals>()
     for (const calculation of canonicalSavings.calculations) {
       if (!calculation.event_id || !filteredIds.has(calculation.event_id)) continue
-      const current = totalsByEvent.get(calculation.event_id) ?? { reduction: 0, avoidance: 0, total: 0, estimated: 0, executed: 0 }
-      current.reduction += num(calculation.cost_reduction_amount)
-      current.avoidance += num(calculation.cost_avoidance_amount)
-      current.total += reportedSavings(calculation)
-      if (calculation.calculation_status === 'executed') current.executed += reportedSavings(calculation)
-      else current.estimated += reportedSavings(calculation)
-      totalsByEvent.set(calculation.event_id, current)
+      const current = totalsByEvent.get(calculation.event_id) ?? emptyReportSavingsTotals()
+      totalsByEvent.set(calculation.event_id, addReportSavingsCalculation(current, calculation))
     }
 
     const projectRows = filteredEvents.map(event => {
-      const savings = totalsByEvent.get(event.id) ?? { reduction: 0, avoidance: 0, total: 0, estimated: 0, executed: 0 }
+      const savings = totalsByEvent.get(event.id) ?? emptyReportSavingsTotals()
       return {
         project: event.event_name,
         type: event.event_type,
@@ -535,7 +527,8 @@ export function ReportsView({
         ),
         dueDate: event.project_due_date,
         status: event.event_status,
-        reduction: savings.reduction,
+        reduction: reportReductionValue(savings),
+        reductionCoverage: reductionCoverage(savings),
         avoidance: savings.avoidance,
         savings: savings.total,
         estimated: savings.estimated,
@@ -560,7 +553,7 @@ export function ReportsView({
     const savingsColumns: ReportColumn[] = [
       { key: 'name', label: 'Group' },
       { key: 'projects', label: 'Projects', format: 'number' },
-      { key: 'reduction', label: 'Cost Reduction', format: 'reduction' },
+      { key: 'reduction', label: 'Cost Reduction', format: 'reduction', annotationKey: 'reductionCoverage' },
       { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
       { key: 'savings', label: 'Total Savings', format: 'currency' },
       { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
@@ -595,7 +588,7 @@ export function ReportsView({
           { key: 'owner', label: 'Owner' },
           { key: 'businessUnit', label: 'Business Unit' },
           { key: 'status', label: 'Status', format: 'status' },
-          { key: 'reduction', label: 'Cost Reduction', format: 'reduction' },
+          { key: 'reduction', label: 'Cost Reduction', format: 'reduction', annotationKey: 'reductionCoverage' },
           { key: 'avoidance', label: 'Cost Avoidance', format: 'currency' },
           { key: 'savings', label: 'Total Savings', format: 'currency' },
           { key: 'estimated', label: 'Estimated Pipeline', format: 'currency' },
@@ -610,9 +603,10 @@ export function ReportsView({
         name,
         projects: pipelineOnly ? values.active : values.projects,
         active: values.active,
-        reduction: values.reduction,
+        reduction: reportReductionValue(values),
+        reductionCoverage: reductionCoverage(values),
         avoidance: values.avoidance,
-        savings: values.savings,
+        savings: values.total,
         estimated: values.estimated,
         executed: values.executed,
       }))
@@ -668,6 +662,11 @@ export function ReportsView({
   const filtersActive = supplierReport
     ? Boolean(supplierStatusFilter || supplierRiskFilter || supplierAttributeFilter || (readinessReport && supplierReadinessFilter))
     : Boolean(typeFilter || statusFilter || businessUnitFilter || buyerFilter)
+  const hasPartialReduction = report.columns.some(column => (
+    column.format === 'reduction'
+    && Boolean(column.annotationKey)
+    && report.rows.some(row => column.annotationKey && row[column.annotationKey] === 'partial')
+  ))
 
   const resetFilters = () => {
     if (supplierReport) {
@@ -809,7 +808,11 @@ export function ReportsView({
               ) : report.rows.map((row, rowIndex) => (
                 <tr key={`${reportId}-${rowIndex}`} className="transition-colors hover:bg-[var(--surface-2)]">
                   {report.columns.map(column => {
-                    const formatted = formatValue(row[column.key], column.format)
+                    const formatted = formatValue(
+                      row[column.key],
+                      column.format,
+                      column.annotationKey ? row[column.annotationKey] : undefined,
+                    )
                     const numeric = column.format === 'currency' || column.format === 'reduction' || column.format === 'number' || column.format === 'percent' || column.format === 'score'
                     return (
                       <td key={column.key} className={`px-4 py-3 text-sm ${numeric ? 'text-right font-medium tabular-nums text-[var(--text)]' : 'text-left text-[var(--text-2)]'}`}>
@@ -824,6 +827,11 @@ export function ReportsView({
             </tbody>
           </table>
         </div>
+        {hasPartialReduction && (
+          <p className="border-t border-[var(--border)] px-5 py-3 text-xs text-[var(--text-3)] sm:px-6">
+            * Cost Reduction is the known subtotal only; one or more projects in this group have no hard baseline and are excluded from that subtotal.
+          </p>
+        )}
       </Card>
     </div>
   )
