@@ -477,22 +477,11 @@ function HardReductionOverride({
     onError(null)
     if (enable && reason.trim().length < MIN) return
     setBusy(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from('baselines').update(
-      enable
-        ? {
-            hard_reduction_override: true,
-            hard_reduction_override_reason: reason.trim(),
-            hard_reduction_override_by: user?.id ?? null,
-            hard_reduction_override_at: new Date().toISOString(),
-          }
-        : {
-            hard_reduction_override: false,
-            hard_reduction_override_reason: null,
-            hard_reduction_override_by: null,
-            hard_reduction_override_at: null,
-          },
-    ).eq('id', baseline.id)
+    const { error } = await supabase.rpc('set_hard_reduction_override', {
+      p_baseline_id: baseline.id,
+      p_enabled: enable,
+      p_reason: enable ? reason.trim() : undefined,
+    })
     setBusy(false)
     if (error) { onError(error.message); return }
     setOpen(false)

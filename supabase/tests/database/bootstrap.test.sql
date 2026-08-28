@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(309);
+select plan(311);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -87,6 +87,46 @@ select is(
   ),
   27::bigint,
   'all 27 public application tables exist'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name in (
+        'event_scope_lines', 'baseline_lines', 'supplier_offer_lines',
+        'award_lines', 'savings_calculation_lines'
+      )
+      and column_name in ('created_by', 'updated_by')
+  ),
+  10::bigint,
+  'all money-detail tables expose server-owned actor columns'
+);
+
+select ok(
+  (select count(*) = 12
+   from pg_catalog.pg_trigger trigger
+   join pg_catalog.pg_class relation on relation.oid = trigger.tgrelid
+   join pg_catalog.pg_namespace namespace on namespace.oid = relation.relnamespace
+   where namespace.nspname = 'public'
+     and relation.relname in (
+       'sourcing_events', 'event_scope_lines', 'baselines', 'baseline_lines',
+       'supplier_offers', 'supplier_offer_lines', 'awards', 'award_lines',
+       'savings_calculations', 'savings_calculation_lines',
+       'savings_periods', 'realization_periods'
+     )
+     and trigger.tgfoid = 'public.stamp_money_record_actor()'::regprocedure
+     and not trigger.tgisinternal)
+  and not (select prosecdef from pg_catalog.pg_proc
+           where oid = 'public.stamp_money_record_actor()'::regprocedure)
+  and (select array_to_string(proconfig, ',') like '%search_path=pg_catalog, public%'
+       from pg_catalog.pg_proc
+       where oid = 'public.stamp_money_record_actor()'::regprocedure)
+  and not has_function_privilege('anon', 'public.stamp_money_record_actor()', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.stamp_money_record_actor()', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.stamp_money_record_actor()', 'EXECUTE'),
+  'all money tables use the locked-down actor-stamping trigger'
 );
 
 select ok(
@@ -3583,21 +3623,19 @@ select is(
       ]::text[]), 'SELECT'::text
       union all
       select unnest(array[
-        'baseline_lines', 'business_units', 'categories',
-        'cost_centers', 'event_scope_lines', 'project_choice_options',
-        'project_updates', 'realization_periods',
+        'business_units', 'categories',
+        'cost_centers', 'project_choice_options',
+        'project_updates',
         'supplier_certifications',
-        'supplier_contacts', 'supplier_notes', 'supplier_offer_lines',
+        'supplier_contacts', 'supplier_notes',
         'supplier_performance_reviews', 'supplier_risks',
         'suppliers'
       ]::text[]), 'INSERT'::text
       union all
       select unnest(array[
-        'baseline_lines', 'business_units', 'categories',
-        'cost_centers', 'event_scope_lines', 'project_choice_options',
-        'realization_periods',
+        'business_units', 'categories',
+        'cost_centers', 'project_choice_options',
         'supplier_certifications', 'supplier_contacts',
-        'supplier_offer_lines',
         'supplier_performance_reviews', 'supplier_risks', 'suppliers'
       ]::text[]), 'UPDATE'::text
       union all
@@ -3687,12 +3725,15 @@ select is(
         and has_function_privilege('authenticated', p.oid, 'EXECUTE')
     ), expected(signature) as (
       values
+        ('confirm_business_equivalency(p_scope_line_id uuid, p_confirmed boolean)'),
         ('current_org_id()'),
         ('correct_savings_execution(p_calc_id uuid, p_note text, p_calculation jsonb, p_periods jsonb)'),
         ('mark_savings_schedule_executed(p_savings_calculation_id uuid, p_execution_note text)'),
         ('replace_savings_schedule(p_savings_calculation_id uuid, p_schedule_start_month integer, p_schedule_start_year integer, p_schedule_period_type text, p_periods jsonb)'),
         ('reverse_savings_execution(p_calc_id uuid, p_note text, p_disposition_action text)'),
         ('select_baseline(p_baseline_id uuid)'),
+        ('set_finance_validation(p_realization_period_id uuid, p_validated boolean)'),
+        ('set_hard_reduction_override(p_baseline_id uuid, p_enabled boolean, p_reason text)'),
         ('set_offer_role(p_offer_id uuid, p_role text)'),
         ('update_workspace_settings_v9(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean, p_project_incumbent_suppliers_enabled boolean, p_savings_realization_enabled boolean)')
     ), differences as (
@@ -3733,7 +3774,10 @@ select ok(
      'public.replace_savings_schedule(uuid,integer,integer,text,jsonb)'::regprocedure,
      'public.mark_savings_schedule_executed(uuid,text)'::regprocedure,
      'public.correct_savings_execution(uuid,text,jsonb,jsonb)'::regprocedure,
-     'public.reverse_savings_execution(uuid,text,text)'::regprocedure
+     'public.reverse_savings_execution(uuid,text,text)'::regprocedure,
+     'public.set_hard_reduction_override(uuid,boolean,text)'::regprocedure,
+     'public.confirm_business_equivalency(uuid,boolean)'::regprocedure,
+     'public.set_finance_validation(uuid,boolean)'::regprocedure
    )),
   'money-writer RPCs use definer rights with a fixed search path'
 );
@@ -3745,6 +3789,19 @@ select ok(
   and not has_column_privilege('authenticated', 'public.supplier_offers', 'offer_role', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.sourcing_events', 'awarded_supplier_id', 'INSERT')
   and not has_column_privilege('authenticated', 'public.sourcing_events', 'awarded_supplier_id', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.baselines', 'hard_reduction_override', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.baselines', 'hard_reduction_override', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.baselines', 'hard_reduction_override_by', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.event_scope_lines', 'business_equivalency_confirmed', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.event_scope_lines', 'business_equivalency_confirmed', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.event_scope_lines', 'business_equivalency_confirmed_by', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.realization_periods', 'finance_validated', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.realization_periods', 'finance_validated', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.realization_periods', 'finance_validated_by', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.event_scope_lines', 'created_by', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.event_scope_lines', 'updated_by', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.baseline_lines', 'created_by', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.supplier_offer_lines', 'updated_by', 'UPDATE')
   and not has_table_privilege('authenticated', 'public.savings_periods', 'INSERT')
   and not has_table_privilege('authenticated', 'public.savings_periods', 'DELETE')
   and has_column_privilege('authenticated', 'public.baselines', 'baseline_total_amount', 'UPDATE')

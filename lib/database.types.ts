@@ -71,12 +71,14 @@ export type Database = {
           awarded_term_months: number | null
           awarded_unit_price: number | null
           created_at: string | null
+          created_by: string | null
           event_id: string | null
           id: string
           line_number: number
           organization_id: string | null
           scope_line_id: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           annualized_award_amount?: number | null
@@ -88,12 +90,14 @@ export type Database = {
           awarded_term_months?: number | null
           awarded_unit_price?: number | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           id?: string
           line_number: number
           organization_id?: string | null
           scope_line_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           annualized_award_amount?: number | null
@@ -105,12 +109,14 @@ export type Database = {
           awarded_term_months?: number | null
           awarded_unit_price?: number | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           id?: string
           line_number?: number
           organization_id?: string | null
           scope_line_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -118,6 +124,13 @@ export type Database = {
             columns: ["award_id"]
             isOneToOne: false
             referencedRelation: "awards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "award_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -139,6 +152,13 @@ export type Database = {
             columns: ["scope_line_id"]
             isOneToOne: false
             referencedRelation: "event_scope_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "award_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -261,6 +281,7 @@ export type Database = {
           baseline_term_months: number | null
           baseline_unit_price: number | null
           created_at: string | null
+          created_by: string | null
           event_id: string | null
           freight_amount_included: number | null
           id: string
@@ -274,6 +295,7 @@ export type Database = {
           source_document_id: string | null
           tax_amount_included: number | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           annualized_baseline_amount?: number | null
@@ -285,6 +307,7 @@ export type Database = {
           baseline_term_months?: number | null
           baseline_unit_price?: number | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           freight_amount_included?: number | null
           id?: string
@@ -298,6 +321,7 @@ export type Database = {
           source_document_id?: string | null
           tax_amount_included?: number | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           annualized_baseline_amount?: number | null
@@ -309,6 +333,7 @@ export type Database = {
           baseline_term_months?: number | null
           baseline_unit_price?: number | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           freight_amount_included?: number | null
           id?: string
@@ -322,6 +347,7 @@ export type Database = {
           source_document_id?: string | null
           tax_amount_included?: number | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -329,6 +355,13 @@ export type Database = {
             columns: ["baseline_id"]
             isOneToOne: false
             referencedRelation: "baselines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "baseline_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -350,6 +383,13 @@ export type Database = {
             columns: ["scope_line_id"]
             isOneToOne: false
             referencedRelation: "event_scope_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "baseline_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -628,6 +668,7 @@ export type Database = {
           business_equivalency_confirmed_by: string | null
           category_id: string | null
           created_at: string | null
+          created_by: string | null
           event_id: string | null
           final_quantity: number | null
           forecast_quantity: number | null
@@ -641,6 +682,7 @@ export type Database = {
           scope_change_flag: boolean | null
           uom: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           baseline_quantity?: number | null
@@ -648,6 +690,7 @@ export type Database = {
           business_equivalency_confirmed_by?: string | null
           category_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           final_quantity?: number | null
           forecast_quantity?: number | null
@@ -661,6 +704,7 @@ export type Database = {
           scope_change_flag?: boolean | null
           uom?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           baseline_quantity?: number | null
@@ -668,6 +712,7 @@ export type Database = {
           business_equivalency_confirmed_by?: string | null
           category_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           final_quantity?: number | null
           forecast_quantity?: number | null
@@ -681,6 +726,7 @@ export type Database = {
           scope_change_flag?: boolean | null
           uom?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -698,6 +744,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "event_scope_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "event_scope_lines_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
@@ -709,6 +762,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_scope_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1128,6 +1188,7 @@ export type Database = {
           baseline_quantity: number | null
           baseline_unit_price: number | null
           created_at: string | null
+          created_by: string | null
           event_id: string | null
           id: string
           line_number: number
@@ -1138,6 +1199,7 @@ export type Database = {
           savings_type: string | null
           scope_line_id: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           awarded_extended_amount?: number | null
@@ -1147,6 +1209,7 @@ export type Database = {
           baseline_quantity?: number | null
           baseline_unit_price?: number | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           id?: string
           line_number: number
@@ -1157,6 +1220,7 @@ export type Database = {
           savings_type?: string | null
           scope_line_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           awarded_extended_amount?: number | null
@@ -1166,6 +1230,7 @@ export type Database = {
           baseline_quantity?: number | null
           baseline_unit_price?: number | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           id?: string
           line_number?: number
@@ -1176,8 +1241,16 @@ export type Database = {
           savings_type?: string | null
           scope_line_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "savings_calculation_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "savings_calculation_lines_event_id_fkey"
             columns: ["event_id"]
@@ -1204,6 +1277,13 @@ export type Database = {
             columns: ["scope_line_id"]
             isOneToOne: false
             referencedRelation: "event_scope_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "savings_calculation_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1872,6 +1952,7 @@ export type Database = {
           annualized_offer_amount: number | null
           compliance_status: string | null
           created_at: string | null
+          created_by: string | null
           event_id: string | null
           exclusion_notes: string | null
           id: string
@@ -1886,11 +1967,13 @@ export type Database = {
           organization_id: string | null
           scope_line_id: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           annualized_offer_amount?: number | null
           compliance_status?: string | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           exclusion_notes?: string | null
           id?: string
@@ -1905,11 +1988,13 @@ export type Database = {
           organization_id?: string | null
           scope_line_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           annualized_offer_amount?: number | null
           compliance_status?: string | null
           created_at?: string | null
+          created_by?: string | null
           event_id?: string | null
           exclusion_notes?: string | null
           id?: string
@@ -1924,8 +2009,16 @@ export type Database = {
           organization_id?: string | null
           scope_line_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "supplier_offer_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "supplier_offer_lines_event_id_fkey"
             columns: ["event_id"]
@@ -1952,6 +2045,13 @@ export type Database = {
             columns: ["scope_line_id"]
             isOneToOne: false
             referencedRelation: "event_scope_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_offer_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2308,6 +2408,10 @@ export type Database = {
         Args: { p_owner: string; p_source: string; p_target: string }
         Returns: number
       }
+      confirm_business_equivalency: {
+        Args: { p_confirmed: boolean; p_scope_line_id: string }
+        Returns: undefined
+      }
       correct_savings_execution: {
         Args: {
           p_calc_id: string
@@ -2341,6 +2445,14 @@ export type Database = {
         Returns: undefined
       }
       select_baseline: { Args: { p_baseline_id: string }; Returns: undefined }
+      set_finance_validation: {
+        Args: { p_realization_period_id: string; p_validated: boolean }
+        Returns: undefined
+      }
+      set_hard_reduction_override: {
+        Args: { p_baseline_id: string; p_enabled: boolean; p_reason?: string }
+        Returns: undefined
+      }
       set_offer_role: {
         Args: { p_offer_id: string; p_role?: string }
         Returns: undefined

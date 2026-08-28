@@ -34,6 +34,7 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
   const [scopeLines, setScopeLines] = useState(initialLines)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [lineToDelete, setLineToDelete] = useState<ScopeLine | null>(null)
   const supabase = createClient()
 
@@ -52,9 +53,14 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError(null)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setLoading(false); return }
+    if (!user) {
+      setError('You must be signed in to create a scope line')
+      setLoading(false)
+      return
+    }
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -78,7 +84,6 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
         final_quantity: newLine.final_quantity ? parseFloat(newLine.final_quantity) : null,
         scope_change_flag: newLine.scope_change_flag,
         scope_change_description: newLine.scope_change_description || null,
-        business_equivalency_confirmed: newLine.business_equivalency_confirmed,
       })
       .select(`
         *,
@@ -86,16 +91,36 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
       `)
       .single()
 
-    if (!error && data) {
-      setScopeLines([...scopeLines, data])
-      setNewLine({
-        item_service_name: '', item_description: '', uom: '',
-        baseline_quantity: '', forecast_quantity: '', final_quantity: '',
-        scope_change_flag: false, scope_change_description: '',
-        business_equivalency_confirmed: false,
-      })
-      setShowForm(false)
+    if (error || !data) {
+      setError(error?.message || 'The scope line was not created')
+      setLoading(false)
+      return
     }
+
+    let equivalencyConfirmed = false
+    if (newLine.business_equivalency_confirmed) {
+      const { error: confirmationError } = await supabase.rpc('confirm_business_equivalency', {
+        p_scope_line_id: data.id,
+        p_confirmed: true,
+      })
+      if (confirmationError) {
+        setError(`The line was created, but business equivalency was not confirmed: ${confirmationError.message}`)
+      } else {
+        equivalencyConfirmed = true
+      }
+    }
+
+    setScopeLines([
+      ...scopeLines,
+      { ...data, business_equivalency_confirmed: equivalencyConfirmed },
+    ])
+    setNewLine({
+      item_service_name: '', item_description: '', uom: '',
+      baseline_quantity: '', forecast_quantity: '', final_quantity: '',
+      scope_change_flag: false, scope_change_description: '',
+      business_equivalency_confirmed: false,
+    })
+    setShowForm(false)
     setLoading(false)
   }
 
@@ -120,6 +145,12 @@ export function ScopeLinesTab({ eventId, scopeLines: initialLines }: { eventId: 
           Add Scope Line
         </Button>
       </div>
+
+      {error && (
+        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
+          {error}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleAdd} className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-6">
