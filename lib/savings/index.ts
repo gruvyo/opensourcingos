@@ -11,6 +11,7 @@
 // =====================================================================
 
 import { allocateMoney, centsToMoney, moneyToCents, roundMoney } from '../money.ts'
+import { dateKeyInTimeZone } from '../supplier-readiness.ts'
 
 // ---- Loose row shapes (match the DB columns; tolerate nulls) ----------
 
@@ -833,16 +834,19 @@ export function chainWithBaselineQuality(
  * (not yet started). Canonical rule, replacing the 3 divergent versions:
  *   1. use savings_start_date if present;
  *   2. else fall back to the parent event's contract_start_date;
- *   3. Realized iff that date <= now; otherwise Accrued (incl. no date at all).
+ *   3. Realized iff that date <= today's date in the workspace timezone;
+ *      otherwise Accrued (including no date at all).
  */
 export function classifyRealization(
   c: SavingsCalcRow,
   contractStartByEventId: Map<string, string | null>,
   now: Date = new Date(),
+  timeZone = 'UTC',
 ): RealizationClass {
   let effective = c.savings_start_date || null
   if (!effective && c.event_id) effective = contractStartByEventId.get(c.event_id) || null
-  if (effective && new Date(effective) <= now) return 'Realized'
+  const effectiveDate = effective?.match(/^\d{4}-\d{2}-\d{2}/)?.[0]
+  if (effectiveDate && effectiveDate <= dateKeyInTimeZone(now, timeZone)) return 'Realized'
   return 'Accrued'
 }
 
@@ -873,6 +877,8 @@ export interface PortfolioRollup {
 
 export interface RollupOptions {
   now?: Date
+  /** Workspace timezone used to decide which calendar date is "today." */
+  timeZone?: string
   /** Cap byCategory to the top N (0 = no cap). Default 0. */
   topCategories?: number
 }
@@ -913,7 +919,7 @@ export function portfolioRollup(
     totalCostReduction += num(c.cost_reduction_amount)
     totalCostAvoidance += num(c.cost_avoidance_amount)
 
-    if (classifyRealization(c, contractStartByEventId, now) === 'Realized') realized += gross
+    if (classifyRealization(c, contractStartByEventId, now, opts.timeZone) === 'Realized') realized += gross
     else accrued += gross
 
     // Pipeline vs booked, driven by workflow stage (not by date).
