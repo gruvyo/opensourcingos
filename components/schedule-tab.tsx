@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { replaceSavingsScheduleAtomically } from '@/lib/atomic-money-writers'
 import type { Tables } from '@/lib/database.types'
 import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X, BadgeCheck } from 'lucide-react'
 import { formatCurrency, formatReduction as money } from '@/lib/utils'
@@ -249,16 +250,7 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
     if (isExecuted) { setError('Executed schedules are preserved and cannot be regenerated.'); return }
 
     setBusy(true); setError(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Not logged in'); setBusy(false); return }
-
-    const del = await supabase.from('savings_periods').delete().eq('savings_calculation_id', calc.id)
-    if (del.error) { setError(del.error.message); setBusy(false); return }
-
     const payload = preview.map(p => ({
-      organization_id: calc.organization_id,
-      event_id: eventId,
-      savings_calculation_id: calc.id,
       period_number: p.periodNumber,
       period_month: p.month,
       period_year: p.year,
@@ -270,22 +262,11 @@ export function ScheduleTab({ eventId }: { eventId: string }) {
       cost_avoidance_amount: p.avoidance,
       total_savings_amount: p.total,
       is_edited: false,
-      created_by: user.id,
-      updated_by: user.id,
     }))
-    const ins = await supabase.from('savings_periods').insert(payload)
-    if (ins.error) { setError(ins.error.message); setBusy(false); return }
-
-    const upd = await supabase.from('savings_calculations').update({
-      schedule_start_month: startMonth,
-      schedule_start_year: startYear,
-      schedule_period_type: periodType,
-      schedule_period_count: periodCount,
-      ...publishable(preview, startMonth, startYear, dealMonths),
-      updated_by: user.id,
-      updated_at: new Date().toISOString(),
-    }).eq('id', calc.id)
-    if (upd.error) { setError(upd.error.message); setBusy(false); return }
+    const { error: replaceError } = await replaceSavingsScheduleAtomically(
+      supabase, calc.id, startMonth, startYear, periodType, payload,
+    )
+    if (replaceError) { setError(replaceError.message); setBusy(false); return }
 
     setBusy(false)
     load()

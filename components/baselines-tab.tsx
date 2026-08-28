@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { selectBaselineAtomically } from '@/lib/atomic-money-writers'
 import {
   Plus, Star, Trash2, ChevronDown, Pencil,
   ChevronRight, Shield, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react'
@@ -92,16 +93,12 @@ export function BaselinesTab({ eventId, scopeLines }: { eventId: string; scopeLi
   const [baselineToDelete, setBaselineToDelete] = useState<Baseline | null>(null)
   const supabase = createClient()
 
-  // Exactly one baseline per project is THE baseline. Clear the others first so
-  // the partial unique index can never be violated.
+  // Exactly one baseline per project is THE baseline. The database function
+  // clears the prior selection and sets this one in a single transaction.
   const selectBaseline = async (baselineId: string) => {
     setActionError(null)
-    const clear = await supabase.from('baselines').update({ is_selected: false })
-      .eq('event_id', eventId).neq('id', baselineId)
-    if (clear.error) { setActionError(clear.error.message); return }
-    const set = await supabase.from('baselines').update({ is_selected: true }).eq('id', baselineId)
-    // Surface it. A failed write here used to do nothing at all on screen.
-    if (set.error) { setActionError(set.error.message); return }
+    const { error } = await selectBaselineAtomically(supabase, baselineId)
+    if (error) { setActionError(error.message); return }
     fetchBaselines()
   }
 

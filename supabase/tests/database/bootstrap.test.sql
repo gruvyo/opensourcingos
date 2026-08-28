@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(307);
+select plan(309);
 
 select is(
   (select savings_realization_enabled from public.organization_settings where organization_id = '00000000-0000-4000-8000-000000000001'),
@@ -3583,27 +3583,27 @@ select is(
       ]::text[]), 'SELECT'::text
       union all
       select unnest(array[
-        'baseline_lines', 'baselines', 'business_units', 'categories',
+        'baseline_lines', 'business_units', 'categories',
         'cost_centers', 'event_scope_lines', 'project_choice_options',
         'project_updates', 'realization_periods', 'savings_calculations',
-        'savings_periods', 'sourcing_events', 'supplier_certifications',
+        'supplier_certifications',
         'supplier_contacts', 'supplier_notes', 'supplier_offer_lines',
-        'supplier_offers', 'supplier_performance_reviews', 'supplier_risks',
+        'supplier_performance_reviews', 'supplier_risks',
         'suppliers'
       ]::text[]), 'INSERT'::text
       union all
       select unnest(array[
-        'baseline_lines', 'baselines', 'business_units', 'categories',
+        'baseline_lines', 'business_units', 'categories',
         'cost_centers', 'event_scope_lines', 'project_choice_options',
-        'realization_periods', 'savings_calculations', 'savings_periods',
-        'sourcing_events', 'supplier_certifications', 'supplier_contacts',
-        'supplier_offer_lines', 'supplier_offers',
+        'realization_periods', 'savings_calculations',
+        'supplier_certifications', 'supplier_contacts',
+        'supplier_offer_lines',
         'supplier_performance_reviews', 'supplier_risks', 'suppliers'
       ]::text[]), 'UPDATE'::text
       union all
       select unnest(array[
         'baseline_lines', 'baselines', 'event_scope_lines',
-        'realization_periods', 'savings_periods', 'sourcing_events',
+        'realization_periods', 'sourcing_events',
         'supplier_certifications', 'supplier_contacts',
         'supplier_offer_lines', 'supplier_offers',
         'supplier_performance_reviews', 'supplier_risks', 'suppliers'
@@ -3689,6 +3689,9 @@ select is(
       values
         ('current_org_id()'),
         ('mark_savings_schedule_executed(p_savings_calculation_id uuid, p_execution_note text)'),
+        ('replace_savings_schedule(p_savings_calculation_id uuid, p_schedule_start_month integer, p_schedule_start_year integer, p_schedule_period_type text, p_periods jsonb)'),
+        ('select_baseline(p_baseline_id uuid)'),
+        ('set_offer_role(p_offer_id uuid, p_role text)'),
         ('update_workspace_settings_v9(p_organization_name text, p_full_name text, p_currency_code text, p_locale text, p_timezone text, p_fiscal_year_start_month integer, p_date_format text, p_default_recognition_method text, p_require_baseline boolean, p_hard_reduction_approval_threshold numeric, p_support_projects_enabled boolean, p_project_descriptions_enabled boolean, p_project_owners_enabled boolean, p_project_cost_centers_enabled boolean, p_project_categories_enabled boolean, p_project_business_units_enabled boolean, p_project_updates_enabled boolean, p_project_incumbent_suppliers_enabled boolean, p_savings_realization_enabled boolean)')
     ), differences as (
       (select * from actual except select * from expected)
@@ -3717,6 +3720,33 @@ select ok(
     where p.oid = 'public.update_workspace_settings_v9(text,text,text,text,text,integer,text,text,boolean,numeric,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)'::regprocedure
   ),
   'the definer settings RPC keeps a fixed search path'
+);
+
+select ok(
+  (select bool_and(p.prosecdef and array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%')
+   from pg_catalog.pg_proc p
+   where p.oid in (
+     'public.select_baseline(uuid)'::regprocedure,
+     'public.set_offer_role(uuid,text)'::regprocedure,
+     'public.replace_savings_schedule(uuid,integer,integer,text,jsonb)'::regprocedure,
+     'public.mark_savings_schedule_executed(uuid,text)'::regprocedure
+   )),
+  'money-writer RPCs use definer rights with a fixed search path'
+);
+
+select ok(
+  not has_column_privilege('authenticated', 'public.baselines', 'is_selected', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.baselines', 'is_selected', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.supplier_offers', 'offer_role', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.supplier_offers', 'offer_role', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.sourcing_events', 'awarded_supplier_id', 'INSERT')
+  and not has_column_privilege('authenticated', 'public.sourcing_events', 'awarded_supplier_id', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.savings_periods', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.savings_periods', 'DELETE')
+  and has_column_privilege('authenticated', 'public.baselines', 'baseline_total_amount', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.supplier_offers', 'offer_total_amount', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.savings_periods', 'final_amount', 'UPDATE'),
+  'protected tuple columns are RPC-only while ordinary money edits remain available'
 );
 
 select is(

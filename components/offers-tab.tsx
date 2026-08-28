@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { setOfferRoleAtomically } from '@/lib/atomic-money-writers'
 import type { Tables, TablesInsert } from '@/lib/database.types'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, CheckCircle, XCircle,
@@ -97,26 +98,10 @@ export function OffersTab({
   // award ceremony. At most one of each role per project.
   const setRole = async (offerId: string, role: 'opening' | 'final' | null) => {
     setActionError(null)
-    if (role) {
-      const clearRes = await supabase.from('supplier_offers').update({ offer_role: null })
-        .eq('event_id', eventId).eq('offer_role', role).neq('id', offerId)
-      if (clearRes.error) { setActionError(clearRes.error.message); return }
-    }
-    const res = await supabase.from('supplier_offers').update({ offer_role: role }).eq('id', offerId)
-    if (res.error) { setActionError(res.error.message); return }
-
-    // Marking an offer Final IS the award decision, so record who won on the
-    // project. sourcing_events.awarded_supplier_id is read by the Projects list,
-    // event detail, Reports and Suppliers; the retired award flow used to be the
-    // only thing that set it.
-    if (role === 'final') {
-      const won = offers.find(o => o.id === offerId)
-      if (won?.supplier_id) {
-        const awardRes = await supabase.from('sourcing_events')
-          .update({ awarded_supplier_id: won.supplier_id }).eq('id', eventId)
-        if (awardRes.error) { setActionError(awardRes.error.message); return }
-      }
-    }
+    // Role replacement and the awarded-supplier pointer are one database
+    // decision. Unsetting the final offer also clears the pointer there.
+    const { error } = await setOfferRoleAtomically(supabase, offerId, role)
+    if (error) { setActionError(error.message); return }
     fetchOffers()
   }
 

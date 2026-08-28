@@ -14,6 +14,7 @@
     "test:audit-display": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/audit-display.test.mts",
     "test:supplier-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-readiness.test.mts",
     "test:attention-queue": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/attention-queue.test.mts",
+    "test:atomic-money-writers": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/atomic-money-writers.test.mts",
     "test:supplier-portfolio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-portfolio.test.mts",
     "test:supplier-governance-report": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-governance-report.test.mts",
     "test:supplier-segmentation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-segmentation.test.mts",
