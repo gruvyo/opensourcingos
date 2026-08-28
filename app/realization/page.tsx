@@ -134,6 +134,7 @@ export default async function RealizationPage() {
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">
               <th scope="col" className="px-4 py-3">Project</th>
+              <th scope="col" className="px-4 py-3">Period</th>
               <th scope="col" className="px-4 py-3 text-right">Executed</th>
               <th scope="col" className="px-4 py-3 text-right">Actual</th>
               <th scope="col" className="px-4 py-3 text-right">Realized</th>
