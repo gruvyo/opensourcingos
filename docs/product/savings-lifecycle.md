@@ -88,6 +88,20 @@ defensible. Direct actual-savings entry remains available because cost
 avoidance is counterfactual and cannot always be derived safely from spend
 alone. Every manual value and finance validation must retain its actor and time.
 
+Realization keeps the two savings legs separate. Actual spend may derive
+**realized reduction** as Baseline minus Actual Spend when an executed reduction
+comparator exists. **Realized avoidance** is entered directly; it is never
+inferred from spend. Total realized savings is exactly realized reduction plus
+realized avoidance. Leakage is a like-for-like reduction measure only:
+positive executed reduction minus realized reduction. Missing or lower
+avoidance can keep a period Pending, In Progress, or Partially Realized, but it
+can never be classified as leakage.
+
+Period status is derived from the two projected and realized legs, not entered
+manually. An expected but unentered leg is In Progress; entered zero results are
+Not Realized or Leaked only when the reduction comparison supports that label;
+both achieved legs are Realized; otherwise the period is Partially Realized.
+
 ## Portfolio measures
 
 Dashboard and reporting should distinguish, without double counting:

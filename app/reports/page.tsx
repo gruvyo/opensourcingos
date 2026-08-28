@@ -69,7 +69,8 @@ export default async function ReportsPage() {
     )),
     fetchPortfolioRows('Realization periods', (from, to) => (
       supabase.from('realization_periods').select(`
-        id, event_id, projected_savings, realized_savings
+        id, event_id, projected_savings, projected_reduction_amount, projected_avoidance_amount,
+        realized_savings, realized_reduction_amount, realized_avoidance_amount
       `, { count: 'exact' })
         .order('id', { ascending: true })
         .range(from, to)

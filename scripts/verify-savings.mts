@@ -36,6 +36,7 @@ import {
   type PeriodType,
   type ScheduleRates,
 } from '../lib/savings/index.ts'
+import { deriveRealization } from '../lib/realization.ts'
 
 let failures = 0
 let checks = 0
@@ -704,6 +705,28 @@ section('17. Estimated and executed schedules coexist without double counting')
   const january = scheduleLifecycleRollup(calculations, periods, new Date('2027-12-31T12:00:00Z'), 2027)
   near('year filtering preserves the full 2027 estimated pipeline', january.estimatedPipeline, 100)
   near('year filtering preserves the full 2027 executed value', january.executed, 80)
+}
+
+section('18. Realization preserves the reduction and avoidance legs')
+{
+  const result = deriveRealization({
+    projectedReduction: 100_000,
+    projectedAvoidance: 200_000,
+    realizedReduction: 80_000,
+    realizedAvoidance: 150_000,
+  })
+  near('realized total adds both legs exactly once', result.realizedTotal, 230_000)
+  near('leakage compares reduction with reduction', result.reductionLeakage, 20_000)
+  eq('an avoidance shortfall does not create a leaked status', result.status, 'Partially Realized')
+
+  const avoidancePending = deriveRealization({
+    projectedReduction: 100_000,
+    projectedAvoidance: 200_000,
+    realizedReduction: 100_000,
+    realizedAvoidance: null,
+  })
+  near('fully achieved reduction has zero leakage', avoidancePending.reductionLeakage, 0)
+  eq('unentered avoidance stays in progress', avoidancePending.status, 'In Progress')
 }
 
 // ---------------------------------------------------------------------

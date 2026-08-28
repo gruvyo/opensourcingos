@@ -11,9 +11,11 @@ import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { Input, Select } from '@/components/ui/input'
+import { Input } from '@/components/ui/input'
 import { syncRealizationPeriodsAtomically } from '@/lib/atomic-money-writers'
+import { hasCentPrecision } from '@/lib/money'
 import type { Tables } from '@/lib/database.types'
+import { reductionFromActualSpend } from '@/lib/realization'
 
 type RealizationPeriod = Omit<
   Tables<'realization_periods'>,
@@ -29,7 +31,8 @@ type RealizationPeriod = Omit<
 
 type ExecutedScheduleRow = Pick<Tables<'savings_periods'>,
   'id' | 'savings_calculation_id' | 'period_month' | 'period_year' | 'period_months' |
-  'executed_baseline_amount' | 'executed_total_savings_amount'
+  'executed_baseline_amount' | 'executed_cost_reduction_amount' |
+  'executed_cost_avoidance_amount' | 'executed_total_savings_amount'
 >
 
 const REALIZATION_STATUS_COLORS: Record<string, string> = {
@@ -40,8 +43,6 @@ const REALIZATION_STATUS_COLORS: Record<string, string> = {
   'Not Realized': 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
   'Leaked': 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
 }
-
-const REALIZATION_STATUSES = ['Pending', 'In Progress', 'Realized', 'Partially Realized', 'Not Realized', 'Leaked']
 
 export function RealizationTab({
   eventId,
@@ -95,7 +96,7 @@ export function RealizationTab({
           .eq('event_id', eventId)
           .order('period_start_date', { ascending: true }),
         supabase.from('savings_periods')
-          .select('id, savings_calculation_id, period_month, period_year, period_months, executed_baseline_amount, executed_total_savings_amount')
+          .select('id, savings_calculation_id, period_month, period_year, period_months, executed_baseline_amount, executed_cost_reduction_amount, executed_cost_avoidance_amount, executed_total_savings_amount')
           .eq('event_id', eventId)
           .not('executed_total_savings_amount', 'is', null)
           .order('period_number'),
@@ -124,28 +125,31 @@ export function RealizationTab({
     const period = periods.find(p => p.id === periodId)
     if (!period) return false
     const hasActual = actualAmount.trim() !== ''
-    const actual = hasActual ? (parseFloat(actualAmount) || 0) : null
+    const actual = hasActual ? Number(actualAmount) : null
+
+    if (actual !== null && (!Number.isFinite(actual) || actual < 0 || !hasCentPrecision(actual))) {
+      setError('Actual spend must be a valid non-negative amount with no more than two decimal places.')
+      return false
+    }
 
     if (!hasActual) {
       setBusy(true); setError(null)
       const { error: clearError } = await supabase.from('realization_periods')
-        .update({ actual_amount: null }).eq('id', periodId)
+        .update({ actual_amount: null, realized_reduction_amount: null }).eq('id', periodId)
       if (clearError) { setError(`Actual spend could not be cleared: ${clearError.message}`); setBusy(false); return false }
       const refreshed = await fetchPeriods('Actual spend was cleared, but realization data could not be refreshed')
       setBusy(false)
       return refreshed
     }
 
-    const realized = period.baseline_amount > 0
-      ? period.baseline_amount - Number(actual)
-      : Number(period.realized_savings ?? 0)
-    const leakage = period.projected_savings - realized
-
-    let status = 'Pending'
-    if (Number(actual) > 0) {
-      if (leakage <= 0) status = 'Realized'
-      else if (leakage < period.projected_savings) status = 'Partially Realized'
-      else status = 'Leaked'
+    const realizedReduction = reductionFromActualSpend(
+      period.baseline_amount,
+      actual,
+      period.projected_reduction_amount,
+    )
+    if (realizedReduction === null) {
+      setError('Actual spend cannot derive reduction for this period because there is no executed reduction comparator. Enter the realized legs directly.')
+      return false
     }
 
     setBusy(true)
@@ -154,9 +158,7 @@ export function RealizationTab({
       .from('realization_periods')
       .update({
         actual_amount: actual,
-        realized_savings: realized,
-        leakage_amount: leakage,
-        realization_status: status,
+        realized_reduction_amount: realizedReduction,
       })
       .eq('id', periodId)
       .select('id')
@@ -172,49 +174,39 @@ export function RealizationTab({
     return refreshed
   }
 
-  const updateRealizedSavings = async (periodId: string, realizedAmount: string) => {
+  const updateRealizedLeg = async (
+    periodId: string,
+    leg: 'reduction' | 'avoidance',
+    realizedAmount: string,
+  ) => {
     const period = periods.find(candidate => candidate.id === periodId)
     if (!period) return false
-    const realized = parseFloat(realizedAmount) || 0
-    const leakage = period.projected_savings - realized
-    const status = realized <= 0 ? 'Not Realized'
-      : leakage <= 0 ? 'Realized'
-      : 'Partially Realized'
+    const hasValue = realizedAmount.trim() !== ''
+    const realized = hasValue ? Number(realizedAmount) : null
+    if (realized !== null && (!Number.isFinite(realized) || !hasCentPrecision(realized))) {
+      setError(`Realized ${leg} must be a valid amount with no more than two decimal places.`)
+      return false
+    }
+
+    const update = leg === 'reduction'
+      ? { realized_reduction_amount: realized, actual_amount: null }
+      : { realized_avoidance_amount: realized }
 
     setBusy(true); setError(null)
     const { data: updatedPeriod, error: updateError } = await supabase
       .from('realization_periods')
-      .update({ realized_savings: realized, leakage_amount: leakage, realization_status: status })
+      .update(update)
       .eq('id', periodId)
       .select('id')
       .maybeSingle()
     if (updateError || !updatedPeriod) {
-      setError(`Realized savings could not be saved: ${updateError?.message || 'The realization period was not updated'}`)
+      setError(`Realized ${leg} could not be saved: ${updateError?.message || 'The realization period was not updated'}`)
       setBusy(false)
       return false
     }
-    const refreshed = await fetchPeriods('Realized savings was saved, but realization data could not be refreshed')
+    const refreshed = await fetchPeriods(`Realized ${leg} was saved, but realization data could not be refreshed`)
     setBusy(false)
     return refreshed
-  }
-
-  const updateStatus = async (periodId: string, status: string) => {
-    setBusy(true)
-    setError(null)
-    const { data: updatedPeriod, error: updateError } = await supabase
-      .from('realization_periods')
-      .update({ realization_status: status })
-      .eq('id', periodId)
-      .select('id')
-      .maybeSingle()
-    if (updateError || !updatedPeriod) {
-      setError(`Realization status could not be saved: ${updateError?.message || 'The realization period was not updated'}`)
-      setBusy(false)
-      return
-    }
-
-    await fetchPeriods('Realization status was saved, but realization data could not be refreshed')
-    setBusy(false)
   }
 
   const toggleFinanceValidated = async (period: RealizationPeriod) => {
@@ -275,6 +267,10 @@ export function RealizationTab({
   const totalProjected = periods.reduce((sum, p) => sum + (p.projected_savings || 0), 0)
   const totalRealized = periods.reduce((sum, p) => sum + (p.realized_savings || 0), 0)
   const totalLeakage = periods.reduce((sum, p) => sum + (p.leakage_amount || 0), 0)
+  const totalProjectedReduction = periods.reduce((sum, p) => sum + (p.projected_reduction_amount || 0), 0)
+  const totalProjectedAvoidance = periods.reduce((sum, p) => sum + (p.projected_avoidance_amount || 0), 0)
+  const totalRealizedReduction = periods.reduce((sum, p) => sum + (p.realized_reduction_amount || 0), 0)
+  const totalRealizedAvoidance = periods.reduce((sum, p) => sum + (p.realized_avoidance_amount || 0), 0)
   const realizationRate = totalProjected > 0 ? (totalRealized / totalProjected) * 100 : 0
 
   return (
@@ -304,10 +300,12 @@ export function RealizationTab({
         <Card className="p-4">
           <p className="text-xs text-[var(--text-3)]">Executed Savings</p>
           <p className="mt-1 text-xl font-bold text-[var(--text)]">{formatCurrency(totalProjected)}</p>
+          <p className="mt-1 text-[11px] text-[var(--text-3)]">{formatCurrency(totalProjectedReduction)} reduction + {formatCurrency(totalProjectedAvoidance)} avoidance</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-[var(--text-3)]">Realized Savings</p>
           <p className="mt-1 text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRealized)}</p>
+          <p className="mt-1 text-[11px] text-[var(--text-3)]">{formatCurrency(totalRealizedReduction)} reduction + {formatCurrency(totalRealizedAvoidance)} avoidance</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-[var(--text-3)]">Leakage</p>
@@ -339,10 +337,13 @@ export function RealizationTab({
                 <tr className="border-b border-[var(--border)] bg-[var(--surface-2)] text-left text-xs uppercase text-[var(--text-3)]">
                   <th scope="col" className="px-4 py-3">Period</th>
                   <th scope="col" className="px-4 py-3 text-right">Baseline</th>
-                  <th scope="col" className="px-4 py-3 text-right">Executed</th>
-                  <th scope="col" className="px-4 py-3 text-right">Actual</th>
-                  <th scope="col" className="px-4 py-3 text-right">Realized</th>
-                  <th scope="col" className="px-4 py-3 text-right">Leakage</th>
+                  <th scope="col" className="px-4 py-3 text-right">Executed Reduction</th>
+                  <th scope="col" className="px-4 py-3 text-right">Executed Avoidance</th>
+                  <th scope="col" className="px-4 py-3 text-right">Actual Spend</th>
+                  <th scope="col" className="px-4 py-3 text-right">Realized Reduction</th>
+                  <th scope="col" className="px-4 py-3 text-right">Realized Avoidance</th>
+                  <th scope="col" className="px-4 py-3 text-right">Total Realized</th>
+                  <th scope="col" className="px-4 py-3 text-right">Reduction Leakage</th>
                   <th scope="col" className="px-4 py-3 text-center">Status</th>
                   <th scope="col" className="px-4 py-3 text-center">Finance</th>
                   <th scope="col" aria-label="Actions" className="px-4 py-3"></th>
@@ -375,19 +376,23 @@ export function RealizationTab({
                       {formatCurrency(period.baseline_amount)}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-[var(--text)]">
-                      {formatCurrency(period.projected_savings)}
+                      {period.projected_reduction_amount === null ? 'n/a' : formatCurrency(period.projected_reduction_amount)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-[var(--text)]">
+                      {formatCurrency(period.projected_avoidance_amount)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Input
                         aria-label={`Actual spend for ${period.period_name}`}
                         type="number"
                         step="0.01"
-        defaultValue={period.actual_amount ?? ''}
-                        disabled={busy || !canEdit}
+                        defaultValue={period.actual_amount == null ? '' : period.actual_amount.toFixed(2)}
+                        disabled={busy || !canEdit || period.projected_reduction_amount === null}
+                        title={period.projected_reduction_amount === null ? 'Actual spend cannot derive reduction without an executed reduction comparator' : undefined}
                         onBlur={async (e) => {
                           const input = e.currentTarget
                           const saved = await updateActualAmount(period.id, input.value)
-                          if (!saved) input.value = period.actual_amount == null ? '' : String(period.actual_amount)
+                          if (!saved) input.value = period.actual_amount == null ? '' : period.actual_amount.toFixed(2)
                         }}
                         placeholder="0"
                         className="w-28"
@@ -395,39 +400,51 @@ export function RealizationTab({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Input
-                        aria-label={`Realized savings for ${period.period_name}`}
+                        aria-label={`Realized reduction for ${period.period_name}`}
                         type="number"
                         step="0.01"
-                        defaultValue={period.realized_savings ?? ''}
+                        defaultValue={period.realized_reduction_amount == null ? '' : period.realized_reduction_amount.toFixed(2)}
                         disabled={busy || !canEdit}
                         onBlur={async event => {
                           const input = event.currentTarget
-                          const saved = await updateRealizedSavings(period.id, input.value)
-                          if (!saved) input.value = period.realized_savings == null ? '' : String(period.realized_savings)
+                          const saved = await updateRealizedLeg(period.id, 'reduction', input.value)
+                          if (!saved) input.value = period.realized_reduction_amount == null ? '' : period.realized_reduction_amount.toFixed(2)
                         }}
                         placeholder="0"
                         className="w-28"
                       />
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <Input
+                        aria-label={`Realized avoidance for ${period.period_name}`}
+                        type="number"
+                        step="0.01"
+                        defaultValue={period.realized_avoidance_amount == null ? '' : period.realized_avoidance_amount.toFixed(2)}
+                        disabled={busy || !canEdit}
+                        onBlur={async event => {
+                          const input = event.currentTarget
+                          const saved = await updateRealizedLeg(period.id, 'avoidance', input.value)
+                          if (!saved) input.value = period.realized_avoidance_amount == null ? '' : period.realized_avoidance_amount.toFixed(2)
+                        }}
+                        placeholder="0"
+                        className="w-28"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
+                      {period.realized_savings === null ? '—' : formatCurrency(period.realized_savings)}
+                    </td>
                     <td className={clsx('px-4 py-3 text-right text-sm font-medium',
                       period.leakage_amount > 0 ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-2)]'
                     )}>
-                      {period.leakage_amount > 0 ? formatCurrency(period.leakage_amount) : '—'}
+                      {period.leakage_amount === null ? 'Unknown' : period.leakage_amount > 0 ? formatCurrency(period.leakage_amount) : '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Select
-                        aria-label={`Status for ${period.period_name}`}
-                        value={period.realization_status}
-                        disabled={busy || !canEdit}
-                        onChange={(e) => updateStatus(period.id, e.target.value)}
-                        className={clsx('w-auto rounded-full border-0 px-2.5 py-1 text-xs font-medium',
-                          REALIZATION_STATUS_COLORS[period.realization_status]
-                        )}
-                      >
-                        {REALIZATION_STATUSES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </Select>
+                      <span className={clsx(
+                        'inline-flex rounded-full px-2.5 py-1 text-xs font-medium',
+                        REALIZATION_STATUS_COLORS[period.realization_status],
+                      )}>
+                        {period.realization_status}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {currentUserRole === 'admin' ? (
@@ -468,8 +485,11 @@ export function RealizationTab({
                 <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-2)] font-semibold">
                   <td className="px-4 py-3 text-sm text-[var(--text)]">Totals</td>
                   <td className="px-4 py-3"></td>
-                  <td className="px-4 py-3 text-right text-sm text-[var(--text)]">{formatCurrency(totalProjected)}</td>
+                  <td className="px-4 py-3 text-right text-sm text-[var(--text)]">{formatCurrency(totalProjectedReduction)}</td>
+                  <td className="px-4 py-3 text-right text-sm text-[var(--text)]">{formatCurrency(totalProjectedAvoidance)}</td>
                   <td className="px-4 py-3"></td>
+                  <td className="px-4 py-3 text-right text-sm text-green-600 dark:text-green-400">{formatCurrency(totalRealizedReduction)}</td>
+                  <td className="px-4 py-3 text-right text-sm text-green-600 dark:text-green-400">{formatCurrency(totalRealizedAvoidance)}</td>
                   <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRealized)}</td>
                   <td className="px-4 py-3 text-right text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(totalLeakage)}</td>
                   <td colSpan={3} className="px-4 py-3"></td>
@@ -487,9 +507,9 @@ export function RealizationTab({
           <div>
             <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300">How realized savings are captured</h3>
             <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-              For a defensible spend baseline, entering actual spend calculates realized savings as Baseline − Actual Spend.
-              You may also enter realized savings directly when the result is finance-approved or cost avoidance cannot be derived safely from spend.
-              Leakage is Executed Savings − Realized Savings.
+              Actual spend derives only realized reduction as Baseline − Actual Spend when the executed reduction comparator is defensible.
+              Reduction and avoidance remain separate; avoidance is entered directly because it cannot be inferred safely from spend.
+              Total realized savings adds the two legs exactly once. Leakage compares executed reduction with realized reduction only, so unconfirmed avoidance is never reported as leakage.
             </p>
           </div>
         </div>

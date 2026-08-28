@@ -97,7 +97,12 @@ select ok(
   not has_table_privilege('authenticated', 'public.savings_periods', 'INSERT,DELETE')
   and not has_table_privilege('authenticated', 'public.realization_periods', 'INSERT')
   and has_column_privilege('authenticated', 'public.savings_periods', 'final_amount', 'UPDATE')
-  and has_column_privilege('authenticated', 'public.realization_periods', 'actual_amount', 'UPDATE'),
+  and has_column_privilege('authenticated', 'public.realization_periods', 'actual_amount', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.realization_periods', 'realized_reduction_amount', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.realization_periods', 'realized_avoidance_amount', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.realization_periods', 'realized_savings', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.realization_periods', 'leakage_amount', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.realization_periods', 'realization_status', 'UPDATE'),
   'RPC-owned creation/deletion and ordinary estimated/actual edits have exact privileges'
 );
 
@@ -358,6 +363,8 @@ select ok(
        and period_start_date = '2026-08-01'
        and period_end_date = '2026-09-30'
        and baseline_amount = 1000
+       and projected_reduction_amount = 150
+       and projected_avoidance_amount = 100
        and projected_savings = 250
        and actual_amount is null
        and realized_savings is null
@@ -417,8 +424,8 @@ select throws_ok(
 
 select lives_ok(
   $$ update public.realization_periods
-     set actual_amount = 900, realized_savings = 100,
-         leakage_amount = 150, realization_status = 'Partially Realized'
+     set actual_amount = 900, realized_reduction_amount = 100,
+         realized_avoidance_amount = 50
      where savings_period_id = 'c5000000-0000-4000-8000-000000000002' $$,
   'procurement can record actual realization results'
 );

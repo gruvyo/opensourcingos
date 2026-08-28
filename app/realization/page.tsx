@@ -17,8 +17,12 @@ type RealizationPeriod = Pick<
   | 'period_end_date'
   | 'baseline_amount'
   | 'projected_savings'
+  | 'projected_reduction_amount'
+  | 'projected_avoidance_amount'
   | 'actual_amount'
   | 'realized_savings'
+  | 'realized_reduction_amount'
+  | 'realized_avoidance_amount'
   | 'leakage_amount'
   | 'realization_status'
   | 'finance_validated'
@@ -65,8 +69,9 @@ export default async function RealizationPage() {
         .from('realization_periods')
         .select(`
           id, period_name, period_start_date, period_end_date,
-          baseline_amount, projected_savings, actual_amount,
-          realized_savings, leakage_amount, realization_status,
+          baseline_amount, projected_savings, projected_reduction_amount, projected_avoidance_amount,
+          actual_amount, realized_savings, realized_reduction_amount, realized_avoidance_amount,
+          leakage_amount, realization_status,
           finance_validated, event_id,
           event:sourcing_events(id, event_name, project_type)
         `, { count: 'exact' })
@@ -132,7 +137,7 @@ export default async function RealizationPage() {
               <th scope="col" className="px-4 py-3 text-right">Executed</th>
               <th scope="col" className="px-4 py-3 text-right">Actual</th>
               <th scope="col" className="px-4 py-3 text-right">Realized</th>
-              <th scope="col" className="px-4 py-3 text-right">Leakage</th>
+              <th scope="col" className="px-4 py-3 text-right">Reduction Leakage</th>
               <th scope="col" className="px-4 py-3">Status</th>
             </tr>
           </thead>
@@ -164,9 +169,21 @@ export default async function RealizationPage() {
                       <div className="text-sm text-[var(--text)]">{p.period_name}</div>
                       <div className="text-xs text-[var(--text-3)]">{formatDate(p.period_start_date)} → {formatDate(p.period_end_date)}</div>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-[var(--text)]">{formatCurrency(p.projected_savings)}</td>
-                    <td className="px-4 py-3 text-right text-sm text-[var(--text-2)]">{formatCurrency(p.actual_amount)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">{formatCurrency(p.realized_savings)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-[var(--text)]">
+                      {formatCurrency(p.projected_savings)}
+                      <div className="text-[11px] font-normal text-[var(--text-3)]">
+                        {p.projected_reduction_amount === null ? 'n/a' : formatCurrency(p.projected_reduction_amount)} reduction + {formatCurrency(p.projected_avoidance_amount)} avoidance
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm text-[var(--text-2)]">{p.actual_amount === null ? '—' : formatCurrency(p.actual_amount)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
+                      {p.realized_savings === null ? '—' : formatCurrency(p.realized_savings)}
+                      {(p.realized_reduction_amount !== null || p.realized_avoidance_amount !== null) && (
+                        <div className="text-[11px] font-normal text-[var(--text-3)]">
+                          {p.realized_reduction_amount === null ? 'not entered' : formatCurrency(p.realized_reduction_amount)} reduction + {p.realized_avoidance_amount === null ? 'not entered' : formatCurrency(p.realized_avoidance_amount)} avoidance
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{(p.leakage_amount ?? 0) > 0 ? formatCurrency(p.leakage_amount) : '—'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PILL[p.realization_status ?? ''] || STATUS_PILL['Pending']}`}>

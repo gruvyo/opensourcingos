@@ -1062,8 +1062,12 @@ export type Database = {
           period_end_date: string
           period_name: string
           period_start_date: string
+          projected_avoidance_amount: number | null
+          projected_reduction_amount: number | null
           projected_savings: number | null
           realization_status: string | null
+          realized_avoidance_amount: number | null
+          realized_reduction_amount: number | null
           realized_savings: number | null
           savings_calculation_id: string | null
           savings_period_id: string | null
@@ -1090,8 +1094,12 @@ export type Database = {
           period_end_date: string
           period_name: string
           period_start_date: string
+          projected_avoidance_amount?: number | null
+          projected_reduction_amount?: number | null
           projected_savings?: number | null
           realization_status?: string | null
+          realized_avoidance_amount?: number | null
+          realized_reduction_amount?: number | null
           realized_savings?: number | null
           savings_calculation_id?: string | null
           savings_period_id?: string | null
@@ -1118,8 +1126,12 @@ export type Database = {
           period_end_date?: string
           period_name?: string
           period_start_date?: string
+          projected_avoidance_amount?: number | null
+          projected_reduction_amount?: number | null
           projected_savings?: number | null
           realization_status?: string | null
+          realized_avoidance_amount?: number | null
+          realized_reduction_amount?: number | null
           realized_savings?: number | null
           savings_calculation_id?: string | null
           savings_period_id?: string | null
@@ -2432,6 +2444,15 @@ export type Database = {
         Returns: undefined
       }
       current_org_id: { Args: never; Returns: string }
+      derive_realization_status: {
+        Args: {
+          p_projected_avoidance: number
+          p_projected_reduction: number
+          p_realized_avoidance: number
+          p_realized_reduction: number
+        }
+        Returns: string
+      }
       mark_savings_schedule_executed: {
         Args: { p_execution_note?: string; p_savings_calculation_id: string }
         Returns: undefined

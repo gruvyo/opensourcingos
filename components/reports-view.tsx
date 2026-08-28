@@ -69,7 +69,11 @@ type SavingsRow = SavingsCalcRow & {
 type RealizationRow = {
   event_id: string | null
   projected_savings: number | null
+  projected_reduction_amount: number | null
+  projected_avoidance_amount: number | null
   realized_savings: number | null
+  realized_reduction_amount: number | null
+  realized_avoidance_amount: number | null
 }
 
 type ReportId =

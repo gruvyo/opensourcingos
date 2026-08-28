@@ -256,7 +256,9 @@ export default async function DashboardPage({
     )),
     fetchPortfolioRows('Realization periods', (from, to) => (
       supabase.from('realization_periods').select(`
-        id, projected_savings, realized_savings, leakage_amount, realization_status,
+        id, projected_savings, projected_reduction_amount, projected_avoidance_amount,
+        realized_savings, realized_reduction_amount, realized_avoidance_amount,
+        leakage_amount, realization_status,
         event_id, period_start_date
       `, { count: 'exact' })
         .order('id', { ascending: true })

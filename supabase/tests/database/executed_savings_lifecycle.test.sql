@@ -261,8 +261,8 @@ begin
 end
 $$;
 update public.realization_periods
-set actual_amount = 400, realized_savings = 100,
-    leakage_amount = 60, realization_status = 'Partially Realized'
+set actual_amount = 400, realized_reduction_amount = 100,
+    realized_avoidance_amount = 0
 where savings_period_id = 'b4000000-0000-4000-8000-000000000001';
 
 select lives_ok(
@@ -286,8 +286,11 @@ select lives_ok(
   'an administrator can correct values in place after realization evidence exists'
 );
 select ok(
-  (select actual_amount = 400 and realized_savings = 100 and projected_savings = 170
-     and leakage_amount = 70 and realization_status = 'Partially Realized'
+  (select actual_amount = 400
+     and projected_reduction_amount = 70 and projected_avoidance_amount = 100
+     and realized_reduction_amount = 100 and realized_avoidance_amount = 0
+     and realized_savings = 100 and projected_savings = 170
+     and leakage_amount = 0 and realization_status = 'Partially Realized'
      and not finance_validated and finance_validated_by is null
      and finance_validation_date is null and comparison_rebased_at is not null
    from public.realization_periods

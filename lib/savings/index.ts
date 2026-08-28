@@ -1180,7 +1180,11 @@ export function yearOverYear(years: { year: number; total: number; reduction: nu
 
 export interface RealizationPeriodRow {
   projected_savings?: number | null
+  projected_reduction_amount?: number | null
+  projected_avoidance_amount?: number | null
   realized_savings?: number | null
+  realized_reduction_amount?: number | null
+  realized_avoidance_amount?: number | null
   leakage_amount?: number | null
   actual_amount?: number | null
   realization_status?: string | null
@@ -1189,7 +1193,11 @@ export interface RealizationPeriodRow {
 
 export interface RealizationRollup {
   totalProjected: number
+  totalProjectedReduction: number
+  totalProjectedAvoidance: number
   totalRealized: number
+  totalRealizedReduction: number
+  totalRealizedAvoidance: number
   totalLeakage: number
   /** realized ÷ projected, as a percentage (0 when nothing projected). */
   realizationRate: number
@@ -1202,13 +1210,37 @@ export interface RealizationRollup {
  */
 export function realizationRollup(periods: RealizationPeriodRow[]): RealizationRollup {
   let totalProjected = 0
+  let totalProjectedReduction = 0
+  let totalProjectedAvoidance = 0
   let totalRealized = 0
+  let totalRealizedReduction = 0
+  let totalRealizedAvoidance = 0
   let totalLeakage = 0
   for (const p of periods) {
-    totalProjected += num(p.projected_savings)
-    totalRealized += num(p.realized_savings)
+    const hasProjectedLegs = p.projected_reduction_amount !== undefined || p.projected_avoidance_amount !== undefined
+    const hasRealizedLegs = p.realized_reduction_amount !== undefined || p.realized_avoidance_amount !== undefined
+    const projectedReduction = num(p.projected_reduction_amount)
+    const projectedAvoidance = num(p.projected_avoidance_amount)
+    const realizedReduction = num(p.realized_reduction_amount)
+    const realizedAvoidance = num(p.realized_avoidance_amount)
+    totalProjectedReduction += projectedReduction
+    totalProjectedAvoidance += projectedAvoidance
+    totalRealizedReduction += realizedReduction
+    totalRealizedAvoidance += realizedAvoidance
+    totalProjected += hasProjectedLegs ? projectedReduction + projectedAvoidance : num(p.projected_savings)
+    totalRealized += hasRealizedLegs ? realizedReduction + realizedAvoidance : num(p.realized_savings)
     totalLeakage += num(p.leakage_amount)
   }
   const realizationRate = totalProjected > 0 ? (totalRealized / totalProjected) * 100 : 0
-  return { totalProjected, totalRealized, totalLeakage, realizationRate, periodCount: periods.length }
+  return {
+    totalProjected,
+    totalProjectedReduction,
+    totalProjectedAvoidance,
+    totalRealized,
+    totalRealizedReduction,
+    totalRealizedAvoidance,
+    totalLeakage,
+    realizationRate,
+    periodCount: periods.length,
+  }
 }
