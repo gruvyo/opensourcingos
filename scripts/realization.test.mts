@@ -1,7 +1,25 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { deriveRealization, reductionFromActualSpend } from '../lib/realization.ts'
 import { realizationRollup } from '../lib/savings/index.ts'
+
+test('portfolio realization table labels all seven body columns', () => {
+  const source = readFileSync(new URL('../app/realization/page.tsx', import.meta.url), 'utf8')
+  const header = source.match(/<thead>[\s\S]*?<\/thead>/)?.[0] ?? ''
+  const labels = [...header.matchAll(/<th[^>]*>([^<]+)<\/th>/g)]
+    .map(match => match[1].trim())
+
+  assert.deepEqual(labels, [
+    'Project',
+    'Period',
+    'Executed',
+    'Actual',
+    'Realized',
+    'Reduction Leakage',
+    'Status',
+  ])
+})
 
 test('compares realized reduction only with executed reduction', () => {
   const result = deriveRealization({
