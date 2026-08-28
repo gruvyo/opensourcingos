@@ -4638,7 +4638,8 @@ CREATE TABLE IF NOT EXISTS "public"."suppliers" (
     "notes" "text",
     CONSTRAINT "suppliers_country_code_check" CHECK ((("country_code" IS NULL) OR ("country_code" ~ '^[A-Z]{2}$'::"text"))),
     CONSTRAINT "suppliers_risk_rating_check" CHECK ((("risk_rating" = ANY (ARRAY['Low'::"text", 'Medium'::"text", 'High'::"text"])) OR ("risk_rating" IS NULL))),
-    CONSTRAINT "suppliers_supplier_status_check" CHECK (("supplier_status" = ANY (ARRAY['Active'::"text", 'Inactive'::"text", 'Prospective'::"text", 'Blocked'::"text", 'Under Review'::"text"])))
+    CONSTRAINT "suppliers_supplier_status_check" CHECK (("supplier_status" = ANY (ARRAY['Active'::"text", 'Inactive'::"text", 'Prospective'::"text", 'Blocked'::"text", 'Under Review'::"text"]))),
+    CONSTRAINT "suppliers_website_url_check" CHECK ((("website" IS NULL) OR (("char_length"("website") <= 2000) AND ("website" ~* '^https?://'::"text"))))
 );
 
 ALTER TABLE ONLY "public"."suppliers" FORCE ROW LEVEL SECURITY;
