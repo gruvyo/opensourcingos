@@ -5,6 +5,13 @@ import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { SuppliersView, type SupplierSummary } from '@/components/suppliers-view'
 import { PageHeader } from '@/components/ui/page-header'
 import { formatDate } from '@/lib/utils'
+import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
+import { assessSupplierAttention } from '@/lib/supplier-attention'
+import {
+  supplierGovernanceSummaries,
+  type SupplierPerformanceReviewSummaryRow,
+  type SupplierRiskSummaryRow,
+} from '@/lib/supplier-governance-report'
 
 type RelatedEvent = {
   id: string
@@ -18,13 +25,16 @@ export default async function SuppliersPage() {
   const [
     { data: suppliers, error: suppliersError },
     { data: events, error: eventsError },
+    { data: supplierReviews, error: supplierReviewsError },
+    { data: supplierRisks, error: supplierRisksError },
+    { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Suppliers', (from, to) => (
       supabase
         .from('suppliers')
         .select(`
           id, supplier_name, supplier_status, preferred_flag, diversity_flag,
-          risk_rating, created_at
+          risk_rating, next_review_date, created_at
         `, { count: 'exact' })
         .order('supplier_name', { ascending: true })
         .order('id', { ascending: true })
@@ -37,9 +47,36 @@ export default async function SuppliersPage() {
         .order('id', { ascending: true })
         .range(from, to)
     )),
+    fetchPortfolioRows('Supplier performance reviews', (from, to) => (
+      supabase.from('supplier_performance_reviews').select(`
+        id, supplier_id, review_date, created_at, overall_score, next_review_date
+      `, { count: 'exact' })
+        .order('supplier_id', { ascending: true })
+        .order('review_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+    )),
+    fetchPortfolioRows('Supplier risks', (from, to) => (
+      supabase.from('supplier_risks').select('id, supplier_id, severity, risk_status', { count: 'exact' })
+        .order('supplier_id', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )),
+    supabase.from('organization_settings').select('timezone').maybeSingle(),
   ])
 
-  const loadError = suppliersError?.message || eventsError?.message || null
+  const loadError = suppliersError?.message
+    || eventsError?.message
+    || supplierReviewsError?.message
+    || supplierRisksError?.message
+    || settingsError?.message
+    || null
+  const asOfDate = dateKeyInTimeZone(new Date(), settings?.timezone || 'America/Chicago')
+  const governance = supplierGovernanceSummaries(
+    (supplierReviews || []) as SupplierPerformanceReviewSummaryRow[],
+    (supplierRisks || []) as SupplierRiskSummaryRow[],
+  )
 
   const incumbentProjectsBySupplier = new Map<string, Set<string>>()
   const awardedProjectsBySupplier = new Map<string, Set<string>>()
@@ -63,6 +100,15 @@ export default async function SuppliersPage() {
       ...incumbentEvents,
       ...awardedEvents,
     ])
+    const supplierGovernance = governance.get(supplier.id)
+    const attention = assessSupplierAttention({
+      status: supplier.supplier_status || 'Active',
+      risk: supplier.risk_rating,
+      nextReviewDate: supplier.next_review_date,
+      performanceNextReviewDate: supplierGovernance?.performanceNextReviewDate || null,
+      criticalRiskIssues: supplierGovernance?.criticalRisks || 0,
+      highRiskIssues: supplierGovernance?.highRisks || 0,
+    }, asOfDate)
 
     return {
       id: supplier.id,
@@ -74,6 +120,7 @@ export default async function SuppliersPage() {
       incumbentProjects: incumbentEvents.size,
       awardedProjects: awardedEvents.size,
       linkedProjects: linkedEventIds.size,
+      needsAttention: attention.reasons.length > 0,
       // Format timestamps on the server so hydration cannot change the date
       // when the browser is in a different timezone.
       addedOn: formatDate(supplier.created_at),

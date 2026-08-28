@@ -1,8 +1,8 @@
+import { assessSupplierAttention, type SupplierAttentionInput } from './supplier-attention.ts'
+
 export type SupplierReadinessInput = {
   relationshipOwner: string | null
-  nextReviewDate: string | null
-  risk: string | null
-}
+} & SupplierAttentionInput
 
 export type SupplierReadiness = {
   alerts: string[]
@@ -51,9 +51,9 @@ export function assessSupplierReadiness(
 ): SupplierReadiness {
   const alerts: string[] = []
   const gaps: string[] = []
+  const attention = assessSupplierAttention(supplier, asOfDate)
 
-  if (supplier.risk === 'High') alerts.push('High risk')
-  if (supplier.nextReviewDate && supplier.nextReviewDate < asOfDate) alerts.push('Review overdue')
+  alerts.push(...attention.reasons)
   if (!supplier.relationshipOwner) gaps.push('Missing owner')
   if (!supplier.nextReviewDate) gaps.push('Missing review date')
   if (!supplier.risk) gaps.push('Unrated risk')
@@ -63,7 +63,7 @@ export function assessSupplierReadiness(
       alerts,
       gaps,
       label: alerts.join('; '),
-      priority: supplier.risk === 'High' ? 0 : 1,
+      priority: attention.priority,
       state: 'attention',
     }
   }

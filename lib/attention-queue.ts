@@ -1,4 +1,5 @@
 import { isTerminalStatus, type TerminalStatusOption } from './terminal-status.ts'
+import { assessSupplierAttention } from './supplier-attention.ts'
 
 export type AttentionProject = {
   id: string
@@ -34,12 +35,6 @@ export type AttentionQueue = {
   dueSoonProjects: number
   supplierAttention: number
   items: AttentionItem[]
-}
-
-const INACTIVE_SUPPLIER_STATUSES = new Set(['Inactive'])
-
-function issueReason(count: number, severity: 'critical' | 'high'): string {
-  return `${count} unresolved ${severity} risk ${count === 1 ? 'issue' : 'issues'}`
 }
 
 function addDays(dateKey: string, days: number): string {
@@ -88,28 +83,17 @@ export function buildAttentionQueue(
   }
 
   for (const supplier of suppliers) {
-    if (INACTIVE_SUPPLIER_STATUSES.has(supplier.status || '')) continue
-    const reasons: string[] = []
-    if (supplier.risk === 'High') reasons.push('High risk')
-    if (supplier.criticalRiskIssues) reasons.push(issueReason(supplier.criticalRiskIssues, 'critical'))
-    if (supplier.highRiskIssues) reasons.push(issueReason(supplier.highRiskIssues, 'high'))
-    const relationshipReviewOverdue = Boolean(supplier.nextReviewDate && supplier.nextReviewDate < asOfDate)
-    const performanceReviewOverdue = Boolean(supplier.performanceNextReviewDate && supplier.performanceNextReviewDate < asOfDate)
-    if (relationshipReviewOverdue) reasons.push('Relationship review overdue')
-    if (performanceReviewOverdue) reasons.push('Performance review overdue')
-    if (reasons.length === 0) continue
+    const assessment = assessSupplierAttention(supplier, asOfDate)
+    if (assessment.reasons.length === 0) continue
 
     supplierItems.push({
       id: `supplier:${supplier.id}`,
       kind: 'supplier',
       title: supplier.name || 'Unnamed supplier',
       href: `/suppliers/${supplier.id}`,
-      reasons,
-      date: [
-        relationshipReviewOverdue ? supplier.nextReviewDate : null,
-        performanceReviewOverdue ? supplier.performanceNextReviewDate : null,
-      ].filter((date): date is string => Boolean(date)).sort()[0] || null,
-      priority: supplier.criticalRiskIssues ? 0.5 : supplier.risk === 'High' || supplier.highRiskIssues ? 1 : 1.5,
+      reasons: assessment.reasons,
+      date: assessment.date,
+      priority: assessment.priority,
     })
   }
 

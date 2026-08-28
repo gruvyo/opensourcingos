@@ -282,6 +282,10 @@ export function ReportsView({
     () => Array.from(new Set(suppliers.map(supplier => supplier.risk_rating || 'Unrated'))).sort(),
     [suppliers],
   )
+  const supplierGovernance = useMemo(
+    () => supplierGovernanceSummaries(supplierReviews, supplierRiskIssues),
+    [supplierReviews, supplierRiskIssues],
+  )
 
   const filteredEvents = useMemo(() => sourcingEvents.filter(event => {
     if (typeFilter && event.event_type !== typeFilter) return false
@@ -294,17 +298,22 @@ export function ReportsView({
   const filteredSuppliers = useMemo(() => suppliers.filter(supplier => {
     const status = supplier.supplier_status || 'Active'
     const risk = supplier.risk_rating || 'Unrated'
+    const governance = supplierGovernance.get(supplier.id)
     const readiness = assessSupplierReadiness({
       relationshipOwner: personName(supplier.relationship_owner),
+      status,
       nextReviewDate: supplier.next_review_date,
       risk: supplier.risk_rating,
+      performanceNextReviewDate: governance?.performanceNextReviewDate || null,
+      criticalRiskIssues: governance?.criticalRisks || 0,
+      highRiskIssues: governance?.highRisks || 0,
     }, asOfDate)
     if (supplierStatusFilter && status !== supplierStatusFilter) return false
     if (supplierRiskFilter && risk !== supplierRiskFilter) return false
     if (supplierAttributeFilter === 'Preferred' && !supplier.preferred_flag) return false
     if (supplierAttributeFilter === 'Diverse' && !supplier.diversity_flag) return false
     return reportId !== 'supplier-readiness' || matchesSupplierReadinessFilter(readiness, supplierReadinessFilter)
-  }), [asOfDate, reportId, supplierAttributeFilter, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
+  }), [asOfDate, reportId, supplierAttributeFilter, supplierGovernance, supplierReadinessFilter, supplierRiskFilter, supplierStatusFilter, suppliers])
 
   const report = useMemo<ReportDefinition>(() => {
     if (reportId === 'supplier-segmentation') {
@@ -354,9 +363,8 @@ export function ReportsView({
     }
 
     if (reportId === 'supplier-performance-risk') {
-      const governance = supplierGovernanceSummaries(supplierReviews, supplierRiskIssues)
       const rows = filteredSuppliers.map(supplier => {
-        const summary = governance.get(supplier.id)
+        const summary = supplierGovernance.get(supplier.id)
         return {
           supplier: supplier.supplier_name,
           status: supplier.supplier_status || 'Active',
@@ -469,10 +477,15 @@ export function ReportsView({
 
       const rows = filteredSuppliers.map(supplier => {
         const owner = personName(supplier.relationship_owner)
+        const governance = supplierGovernance.get(supplier.id)
         const readiness = assessSupplierReadiness({
           relationshipOwner: owner,
+          status: supplier.supplier_status || 'Active',
           nextReviewDate: supplier.next_review_date,
           risk: supplier.risk_rating,
+          performanceNextReviewDate: governance?.performanceNextReviewDate || null,
+          criticalRiskIssues: governance?.criticalRisks || 0,
+          highRiskIssues: governance?.highRisks || 0,
         }, asOfDate)
         return {
           supplier: supplier.supplier_name,
@@ -667,7 +680,7 @@ export function ReportsView({
       ],
       rows: sortRows(groupedRows(byUnit ? activeByBusinessUnit : activeByBuyer, true), 'savings'),
     }
-  }, [asOfDate, canonicalSavings, events, filteredEvents, filteredSuppliers, reportId, savingsRealizationEnabled, supplierPortfolio, supplierReviews, supplierRiskIssues, supplierSegmentDimension, terminalStatuses])
+  }, [asOfDate, canonicalSavings, events, filteredEvents, filteredSuppliers, reportId, savingsRealizationEnabled, supplierGovernance, supplierPortfolio, supplierSegmentDimension, terminalStatuses])
 
   const supplierReport = reportId === 'supplier-readiness' || reportId === 'supplier-portfolio' || reportId === 'supplier-performance-risk' || reportId === 'supplier-segmentation'
   const readinessReport = reportId === 'supplier-readiness'

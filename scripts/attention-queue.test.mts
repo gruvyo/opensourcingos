@@ -89,3 +89,13 @@ test('surfaces unresolved structured risk issues without changing the relationsh
   ])
   assert.equal(queue.items[0].priority, 0.5)
 })
+
+test('uses the same blocked and under-review status rule as the supplier portfolio', () => {
+  const queue = buildAttentionQueue([], [
+    { id: 'blocked', name: 'Blocked supplier', status: 'Blocked', risk: 'Low', nextReviewDate: null },
+    { id: 'review', name: 'Review supplier', status: 'Under Review', risk: 'Low', nextReviewDate: null },
+  ], '2026-08-08')
+
+  assert.equal(queue.supplierAttention, 2)
+  assert.deepEqual(queue.items.map(item => item.reasons), [['Blocked'], ['Under review']])
+})

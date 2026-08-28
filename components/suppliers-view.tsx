@@ -28,6 +28,7 @@ export type SupplierSummary = {
   incumbentProjects: number
   awardedProjects: number
   linkedProjects: number
+  needsAttention: boolean
   addedOn: string
 }
 
@@ -53,12 +54,6 @@ function riskTone(risk: string | null): BadgeTone {
   if (risk === 'Medium') return 'warning'
   if (risk === 'Low') return 'success'
   return 'neutral'
-}
-
-function needsAttention(supplier: SupplierSummary): boolean {
-  return supplier.risk === 'High'
-    || supplier.status === 'Blocked'
-    || supplier.status === 'Under Review'
 }
 
 function PortfolioStat({
@@ -96,7 +91,7 @@ export function SuppliersView({ suppliers }: { suppliers: SupplierSummary[] }) {
   const summary = useMemo(() => ({
     preferred: suppliers.filter(supplier => supplier.preferred).length,
     diverse: suppliers.filter(supplier => supplier.diverse).length,
-    attention: suppliers.filter(needsAttention).length,
+    attention: suppliers.filter(supplier => supplier.needsAttention).length,
     projects: suppliers.reduce((total, supplier) => total + supplier.linkedProjects, 0),
   }), [suppliers])
 
@@ -107,7 +102,7 @@ export function SuppliersView({ suppliers }: { suppliers: SupplierSummary[] }) {
       const matchesFilter = filter === 'all'
         || (filter === 'preferred' && supplier.preferred)
         || (filter === 'diverse' && supplier.diverse)
-        || (filter === 'attention' && needsAttention(supplier))
+        || (filter === 'attention' && supplier.needsAttention)
       return matchesSearch && matchesFilter
     })
   }, [filter, search, suppliers])
@@ -117,7 +112,7 @@ export function SuppliersView({ suppliers }: { suppliers: SupplierSummary[] }) {
       <section aria-label="Supplier portfolio summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <PortfolioStat label="Supplier records" value={suppliers.length} note="Visible in this workspace" icon={Building2} />
         <PortfolioStat label="Preferred" value={summary.preferred} note="Approved strategic relationships" icon={Star} />
-        <PortfolioStat label="Needs attention" value={summary.attention} note="High risk, blocked, or under review" icon={CircleAlert} />
+        <PortfolioStat label="Needs attention" value={summary.attention} note="Status, risk, issues, or overdue reviews" icon={CircleAlert} />
         <PortfolioStat label="Project links" value={summary.projects} note={`${summary.diverse} diverse supplier${summary.diverse === 1 ? '' : 's'}`} icon={Network} />
       </section>
 
