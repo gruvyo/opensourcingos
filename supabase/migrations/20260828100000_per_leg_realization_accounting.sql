@@ -105,7 +105,7 @@ $$;
 revoke all on function public.derive_realization_status(numeric, numeric, numeric, numeric)
   from public, anon, authenticated;
 grant execute on function public.derive_realization_status(numeric, numeric, numeric, numeric)
-  to authenticated, service_role;
+  to service_role;
 
 create function public.derive_realization_period_fields()
 returns trigger
