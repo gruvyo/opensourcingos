@@ -1935,6 +1935,46 @@ $$;
 ALTER FUNCTION "public"."normalize_project_choice_option"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."prevent_executed_savings_parent_delete"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if tg_table_name = 'sourcing_events' and exists (
+    select 1
+    from public.savings_calculations
+    where event_id = old.id
+      and calculation_status = 'executed'
+  ) then
+    raise exception 'reverse executed savings before deleting the project';
+  end if;
+
+  if tg_table_name = 'baselines' and exists (
+    select 1
+    from public.savings_calculations
+    where baseline_id = old.id
+      and calculation_status = 'executed'
+  ) then
+    raise exception 'reverse executed savings before deleting the baseline';
+  end if;
+
+  if tg_table_name = 'awards' and exists (
+    select 1
+    from public.savings_calculations
+    where award_id = old.id
+      and calculation_status = 'executed'
+  ) then
+    raise exception 'reverse executed savings before deleting the award';
+  end if;
+
+  return old;
+end
+$$;
+
+
+ALTER FUNCTION "public"."prevent_executed_savings_parent_delete"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."prevent_last_project_choice_archive"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'pg_catalog', 'public'
@@ -1982,46 +2022,6 @@ $$;
 
 
 ALTER FUNCTION "public"."prevent_profile_privilege_change"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."prevent_executed_savings_parent_delete"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-begin
-  if tg_table_name = 'sourcing_events' and exists (
-    select 1
-    from public.savings_calculations
-    where event_id = old.id
-      and calculation_status = 'executed'
-  ) then
-    raise exception 'reverse executed savings before deleting the project';
-  end if;
-
-  if tg_table_name = 'baselines' and exists (
-    select 1
-    from public.savings_calculations
-    where baseline_id = old.id
-      and calculation_status = 'executed'
-  ) then
-    raise exception 'reverse executed savings before deleting the baseline';
-  end if;
-
-  if tg_table_name = 'awards' and exists (
-    select 1
-    from public.savings_calculations
-    where award_id = old.id
-      and calculation_status = 'executed'
-  ) then
-    raise exception 'reverse executed savings before deleting the award';
-  end if;
-
-  return old;
-end
-$$;
-
-
-ALTER FUNCTION "public"."prevent_executed_savings_parent_delete"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."prevent_realization_history_delete"() RETURNS "trigger"
@@ -4300,6 +4300,7 @@ COMMENT ON COLUMN "public"."savings_calculations"."schedule_period_count" IS 'Ho
 COMMENT ON COLUMN "public"."savings_calculations"."legacy_execution_actor_missing" IS 'True only for actorless executions preserved from before execution provenance controls existed.';
 
 
+
 COMMENT ON CONSTRAINT "chk_savings_calculations_chain" ON "public"."savings_calculations" IS 'Calculation anchors, signed legs, gross headline, and net headline satisfy the approved chain.';
 
 
@@ -5228,6 +5229,7 @@ CREATE OR REPLACE TRIGGER "award_lines_updated_at" BEFORE UPDATE ON "public"."aw
 CREATE OR REPLACE TRIGGER "awards_actor" BEFORE INSERT OR UPDATE ON "public"."awards" FOR EACH ROW EXECUTE FUNCTION "public"."stamp_money_record_actor"();
 
 
+
 CREATE OR REPLACE TRIGGER "awards_executed_savings_delete_guard" BEFORE DELETE ON "public"."awards" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
 
 
@@ -5245,6 +5247,7 @@ CREATE OR REPLACE TRIGGER "baseline_lines_updated_at" BEFORE UPDATE ON "public".
 
 
 CREATE OR REPLACE TRIGGER "baselines_actor" BEFORE INSERT OR UPDATE ON "public"."baselines" FOR EACH ROW EXECUTE FUNCTION "public"."stamp_money_record_actor"();
+
 
 
 CREATE OR REPLACE TRIGGER "baselines_executed_savings_delete_guard" BEFORE DELETE ON "public"."baselines" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
@@ -5424,6 +5427,7 @@ CREATE OR REPLACE TRIGGER "sourcing_events_enforce_project_owner_setting" BEFORE
 
 
 CREATE OR REPLACE TRIGGER "sourcing_events_enforce_support_project_setting" BEFORE INSERT OR UPDATE ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."enforce_support_project_setting"();
+
 
 
 CREATE OR REPLACE TRIGGER "sourcing_events_executed_savings_delete_guard" BEFORE DELETE ON "public"."sourcing_events" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_executed_savings_parent_delete"();
@@ -6877,6 +6881,11 @@ GRANT ALL ON FUNCTION "public"."normalize_project_choice_option"() TO "service_r
 
 
 
+REVOKE ALL ON FUNCTION "public"."prevent_executed_savings_parent_delete"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."prevent_executed_savings_parent_delete"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."prevent_last_project_choice_archive"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."prevent_last_project_choice_archive"() TO "service_role";
 
@@ -6884,10 +6893,6 @@ GRANT ALL ON FUNCTION "public"."prevent_last_project_choice_archive"() TO "servi
 
 REVOKE ALL ON FUNCTION "public"."prevent_profile_privilege_change"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."prevent_profile_privilege_change"() TO "service_role";
-
-
-REVOKE ALL ON FUNCTION "public"."prevent_executed_savings_parent_delete"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."prevent_executed_savings_parent_delete"() TO "service_role";
 
 
 
