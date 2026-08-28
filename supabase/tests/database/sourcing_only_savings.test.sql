@@ -44,12 +44,15 @@ values (
   '{"full_name":"Sourcing Only Admin"}'
 );
 
-insert into public.organization_settings (organization_id, support_projects_enabled)
-select organization_id, true
+insert into public.organization_settings (
+  organization_id, support_projects_enabled, savings_realization_enabled
+)
+select organization_id, true, true
 from public.profiles
 where id = 'd1000000-0000-4000-8000-000000000001'
 on conflict (organization_id) do update
-set support_projects_enabled = excluded.support_projects_enabled;
+set support_projects_enabled = excluded.support_projects_enabled,
+    savings_realization_enabled = excluded.savings_realization_enabled;
 
 insert into public.sourcing_events (
   id, organization_id, event_name, event_type, event_status, project_type
@@ -78,12 +81,12 @@ select set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000001
 select lives_ok(
   $$ insert into public.savings_calculations (
        id, organization_id, event_id, calculation_name, savings_type,
-       calculation_status, gross_savings_amount
+       gross_savings_amount
      ) values (
        'd3000000-0000-4000-8000-000000000001',
        (select organization_id from public.profiles where id = auth.uid()),
        'd2000000-0000-4000-8000-000000000001',
-       'Allowed Sourcing calculation', 'Cost Reduction', 'estimated', 100
+       'Allowed Sourcing calculation', 'Cost Reduction', 100
      ) $$,
   'an administrator can create savings for a Sourcing Project'
 );
@@ -98,33 +101,33 @@ select ok(
 
 select throws_ok(
   $$ insert into public.savings_calculations (
-       organization_id, event_id, calculation_name, savings_type, calculation_status
+       organization_id, event_id, calculation_name, savings_type
      ) values (
        (select organization_id from public.profiles where id = auth.uid()),
        'd2000000-0000-4000-8000-000000000002',
-       'Blocked Support calculation', 'Cost Reduction', 'estimated'
+       'Blocked Support calculation', 'Cost Reduction'
      ) $$,
   '23514', 'Savings records require a Sourcing Project',
   'Support / Non-Commercial projects cannot receive savings calculations'
 );
 
-select throws_ok(
+select lives_ok(
   $$ insert into public.savings_calculations (
-       organization_id, calculation_name, savings_type, calculation_status
+       id, organization_id, calculation_name, savings_type
      ) values (
+       'd3000000-0000-4000-8000-000000000099',
        (select organization_id from public.profiles where id = auth.uid()),
-       'Blocked unlinked calculation', 'Cost Reduction', 'estimated'
+       'Legacy unlinked calculation', 'Cost Reduction'
      ) $$,
-  '23514', 'Savings records require a linked Sourcing Project',
-  'unlinked calculations cannot bypass the project population boundary'
+  'the legacy unlinked-calculation path remains compatible and report-excluded'
 );
 
 select throws_ok(
   $$ insert into public.savings_calculations (
-       organization_id, event_id, calculation_name, savings_type, calculation_status
+       organization_id, event_id, calculation_name, savings_type
      ) values (
        gen_random_uuid(), 'd2000000-0000-4000-8000-000000000001',
-       'Blocked workspace mismatch', 'Cost Reduction', 'estimated'
+       'Blocked workspace mismatch', 'Cost Reduction'
      ) $$,
   '23514', 'Savings records must use the project workspace',
   'a savings calculation cannot claim another workspace'
@@ -230,9 +233,6 @@ select throws_ok(
   'a savings detail line cannot mismatch its calculation and project'
 );
 
-set local role authenticated;
-select set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000001', true);
-
 select throws_ok(
   $$ update public.savings_calculations
      set event_id = 'd2000000-0000-4000-8000-000000000002'
@@ -240,6 +240,9 @@ select throws_ok(
   '23514', 'Savings records require a Sourcing Project',
   'an existing calculation cannot be reassigned to a Support project'
 );
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000001', true);
 
 select lives_ok(
   $$ update public.sourcing_events

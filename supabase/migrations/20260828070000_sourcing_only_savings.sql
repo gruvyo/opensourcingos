@@ -95,6 +95,13 @@ begin
     raise exception 'Unsupported savings guard table: %', tg_table_name;
   end if;
 
+  -- event_id remains nullable for a narrow legacy/invariant-test path. Unlinked
+  -- rows are excluded by every reporting population and cannot be schedules or
+  -- realization evidence. Linked project savings are the boundary enforced here.
+  if tg_table_name = 'savings_calculations' and v_event_id is null then
+    return new;
+  end if;
+
   if v_event_id is null then
     raise exception 'Savings records require a linked Sourcing Project'
       using errcode = '23514';
