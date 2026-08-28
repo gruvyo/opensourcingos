@@ -2297,6 +2297,24 @@ export type Database = {
         Args: { p_execution_note?: string; p_savings_calculation_id: string }
         Returns: undefined
       }
+      replace_savings_schedule: {
+        Args: {
+          p_periods: Json
+          p_savings_calculation_id: string
+          p_schedule_period_type: string
+          p_schedule_start_month: number
+          p_schedule_start_year: number
+        }
+        Returns: undefined
+      }
+      select_baseline: {
+        Args: { p_baseline_id: string }
+        Returns: undefined
+      }
+      set_offer_role: {
+        Args: { p_offer_id: string; p_role?: string }
+        Returns: undefined
+      }
       update_workspace_settings:
         | {
             Args: {
