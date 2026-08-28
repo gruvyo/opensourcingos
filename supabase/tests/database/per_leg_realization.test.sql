@@ -92,7 +92,12 @@ select ok(
   and has_column_privilege('authenticated', 'public.realization_periods', 'realized_avoidance_amount', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.realization_periods', 'realized_savings', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.realization_periods', 'leakage_amount', 'UPDATE')
-  and not has_column_privilege('authenticated', 'public.realization_periods', 'realization_status', 'UPDATE'),
+  and not has_column_privilege('authenticated', 'public.realization_periods', 'realization_status', 'UPDATE')
+  and has_function_privilege(
+    'authenticated',
+    'public.derive_realization_status(numeric,numeric,numeric,numeric)',
+    'EXECUTE'
+  ),
   'signed-in commercial editors write only per-leg inputs, never derived outputs'
 );
 

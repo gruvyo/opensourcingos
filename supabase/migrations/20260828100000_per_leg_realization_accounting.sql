@@ -104,8 +104,11 @@ $$;
 
 revoke all on function public.derive_realization_status(numeric, numeric, numeric, numeric)
   from public, anon, authenticated;
+-- The trigger and CHECK constraint evaluate this pure immutable helper as the
+-- calling role. It exposes no rows or side effects and is part of the reviewed
+-- authenticated RPC allowlist solely so ordinary realization updates work.
 grant execute on function public.derive_realization_status(numeric, numeric, numeric, numeric)
-  to service_role;
+  to authenticated, service_role;
 
 create function public.derive_realization_period_fields()
 returns trigger

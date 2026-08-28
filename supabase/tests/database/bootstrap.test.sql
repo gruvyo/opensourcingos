@@ -3731,6 +3731,7 @@ select is(
         ('confirm_business_equivalency(p_scope_line_id uuid, p_confirmed boolean)'),
         ('current_org_id()'),
         ('correct_savings_execution(p_calc_id uuid, p_note text, p_calculation jsonb, p_periods jsonb)'),
+        ('derive_realization_status(p_projected_reduction numeric, p_projected_avoidance numeric, p_realized_reduction numeric, p_realized_avoidance numeric)'),
         ('mark_savings_schedule_executed(p_savings_calculation_id uuid, p_execution_note text)'),
         ('replace_savings_schedule(p_savings_calculation_id uuid, p_schedule_start_month integer, p_schedule_start_year integer, p_schedule_period_type text, p_periods jsonb)'),
         ('reverse_savings_execution(p_calc_id uuid, p_note text, p_disposition_action text)'),
