@@ -120,17 +120,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "award_lines_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "award_lines_award_id_fkey"
             columns: ["award_id"]
             isOneToOne: false
             referencedRelation: "awards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "award_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -351,17 +351,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "baseline_lines_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "baseline_lines_baseline_id_fkey"
             columns: ["baseline_id"]
             isOneToOne: false
             referencedRelation: "baselines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "baseline_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2408,6 +2408,10 @@ export type Database = {
         Args: { p_owner: string; p_source: string; p_target: string }
         Returns: number
       }
+      confirm_business_equivalency: {
+        Args: { p_confirmed: boolean; p_scope_line_id: string }
+        Returns: undefined
+      }
       correct_savings_execution: {
         Args: {
           p_calc_id: string
@@ -2415,10 +2419,6 @@ export type Database = {
           p_note: string
           p_periods: Json
         }
-        Returns: undefined
-      }
-      confirm_business_equivalency: {
-        Args: { p_confirmed: boolean; p_scope_line_id: string }
         Returns: undefined
       }
       current_org_id: { Args: never; Returns: string }
