@@ -11,6 +11,7 @@
     "lint": "eslint",
     "test:env": "node --test scripts/verify-supabase-env.test.mjs",
     "test:final-anchor": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/final-anchor.test.mts",
+    "test:load-state": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/load-state.test.mts",
     "test:portfolio-queries": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/portfolio-query-pagination.test.mts",
     "test:audit-display": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/audit-display.test.mts",
     "test:supplier-readiness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/supplier-readiness.test.mts",

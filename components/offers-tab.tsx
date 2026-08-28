@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Input, Select } from '@/components/ui/input'
+import { LoadErrorState } from '@/components/load-error-state'
+import { resolveLoadedRows } from '@/lib/load-state'
 
 type Supplier = { id: string; supplier_name: string }
 
@@ -79,6 +81,10 @@ export function OffersTab({
   const [editingTotalId, setEditingTotalId] = useState<string | null>(null)
   const [editTotalValue, setEditTotalValue] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [offersLoadError, setOffersLoadError] = useState<string | null>(null)
+  const [supplierLoadError, setSupplierLoadError] = useState<string | null>(null)
+  const [offerLineErrors, setOfferLineErrors] = useState<Record<string, string>>({})
+  const [offerLinesLoading, setOfferLinesLoading] = useState<Record<string, boolean>>({})
   const [offerToDelete, setOfferToDelete] = useState<Offer | null>(null)
   const supabase = createClient()
   const canEdit = currentUserRole === 'admin' || currentUserRole === 'procurement_user'
@@ -93,9 +99,18 @@ export function OffersTab({
   ).sort((a, b) => a.supplier_name.localeCompare(b.supplier_name))
 
   const refreshSuppliers = useCallback(async () => {
-    const { data } = await supabase
+    const result = await supabase
       .from('suppliers').select('id, supplier_name').order('supplier_name')
-    if (data) setRefreshedSuppliers(data as Supplier[])
+    const resolved = resolveLoadedRows<Supplier>('The supplier list', {
+      data: result.data as Supplier[] | null,
+      error: result.error,
+    })
+    if (resolved.status === 'error') {
+      setSupplierLoadError(resolved.message)
+      return
+    }
+    setSupplierLoadError(null)
+    setRefreshedSuppliers(resolved.rows)
   }, [supabase])
 
   // An offer's role IS the decision: marking one 'final' replaces the whole
@@ -120,7 +135,8 @@ export function OffersTab({
   }
 
   const fetchOffers = useCallback(async () => {
-    const { data } = await supabase
+    setLoading(true)
+    const result = await supabase
       .from('supplier_offers')
       .select(`
         *,
@@ -128,7 +144,17 @@ export function OffersTab({
       `)
       .eq('event_id', eventId)
       .order('offer_round', { ascending: true })
-    setOffers(data || [])
+    const resolved = resolveLoadedRows<Offer>('Supplier offers', {
+      data: result.data as Offer[] | null,
+      error: result.error,
+    })
+    if (resolved.status === 'error') {
+      setOffersLoadError(resolved.message)
+      setLoading(false)
+      return
+    }
+    setOffersLoadError(null)
+    setOffers(resolved.rows)
     setLoading(false)
   }, [eventId, supabase])
 
@@ -145,7 +171,13 @@ export function OffersTab({
 
   const fetchOfferLines = async (offerId: string) => {
     if (offerLines[offerId]) return
-    const { data } = await supabase
+    setOfferLinesLoading(current => ({ ...current, [offerId]: true }))
+    setOfferLineErrors(current => {
+      const next = { ...current }
+      delete next[offerId]
+      return next
+    })
+    const result = await supabase
       .from('supplier_offer_lines')
       .select(`
         *,
@@ -153,7 +185,17 @@ export function OffersTab({
       `)
       .eq('offer_id', offerId)
       .order('line_number', { ascending: true })
-    setOfferLines(prev => ({ ...prev, [offerId]: data || [] }))
+    const resolved = resolveLoadedRows<OfferLine>('Offer lines', {
+      data: result.data as OfferLine[] | null,
+      error: result.error,
+    })
+    if (resolved.status === 'error') {
+      setOfferLineErrors(current => ({ ...current, [offerId]: resolved.message }))
+      setOfferLinesLoading(current => ({ ...current, [offerId]: false }))
+      return
+    }
+    setOfferLines(prev => ({ ...prev, [offerId]: resolved.rows }))
+    setOfferLinesLoading(current => ({ ...current, [offerId]: false }))
   }
 
   const toggleExpand = (offerId: string) => {
@@ -188,6 +230,14 @@ export function OffersTab({
     return <div className="p-8 text-center text-sm text-[var(--text-3)]">Loading offers...</div>
   }
 
+  if (offersLoadError) {
+    return <LoadErrorState title="Supplier offers are unavailable" message={offersLoadError} onRetry={fetchOffers} />
+  }
+
+  if (supplierLoadError) {
+    return <LoadErrorState title="The supplier list is unavailable" message={supplierLoadError} onRetry={refreshSuppliers} />
+  }
+
   return (
     <div>
       {/* Header */}
@@ -200,7 +250,10 @@ export function OffersTab({
           {offers.length >= 2 && (
             <button
               type="button"
-              onClick={() => setShowCompare(!showCompare)}
+              onClick={() => {
+                if (!showCompare) offers.forEach(offer => { void fetchOfferLines(offer.id) })
+                setShowCompare(!showCompare)
+              }}
               className="flex items-center gap-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 px-4 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
             >
               <GitCompare className="h-4 w-4" />
@@ -224,9 +277,22 @@ export function OffersTab({
       )}
 
       {/* Comparison View */}
-      {showCompare && offers.length >= 2 && (
-        <ComparisonView offers={offers} offerLines={offerLines} fetchOfferLines={fetchOfferLines} eventId={eventId} />
-      )}
+      {showCompare && offers.length >= 2 && (() => {
+        const failed = offers.find(offer => offerLineErrors[offer.id])
+        if (failed) {
+          return (
+            <LoadErrorState
+              title="Offer comparison details are unavailable"
+              message={offerLineErrors[failed.id]}
+              onRetry={() => fetchOfferLines(failed.id)}
+            />
+          )
+        }
+        if (offers.some(offer => offerLinesLoading[offer.id] || !offerLines[offer.id])) {
+          return <Card className="p-8 text-center text-sm text-[var(--text-3)]">Loading offer comparison details...</Card>
+        }
+        return <ComparisonView offers={offers} offerLines={offerLines} fetchOfferLines={fetchOfferLines} eventId={eventId} />
+      })()}
 
       {/* Add Offer Form */}
       {canEdit && showForm && (
@@ -400,15 +466,26 @@ export function OffersTab({
                     </div>
 
                     {/* Offer Lines Table */}
-                    <OfferLinesTable
-                      offerId={offer.id}
-                      eventId={eventId}
-                      scopeLines={scopeLines}
-                      lines={lines}
-                      onLinesChanged={(freshLines) => handleOfferLinesChanged(offer.id, freshLines)}
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                    />
+                    {offerLinesLoading[offer.id] ? (
+                      <div className="p-6 text-center text-sm text-[var(--text-3)]">Loading offer lines...</div>
+                    ) : offerLineErrors[offer.id] ? (
+                      <LoadErrorState
+                        compact
+                        title="Offer lines are unavailable"
+                        message={offerLineErrors[offer.id]}
+                        onRetry={() => fetchOfferLines(offer.id)}
+                      />
+                    ) : (
+                      <OfferLinesTable
+                        offerId={offer.id}
+                        eventId={eventId}
+                        scopeLines={scopeLines}
+                        lines={lines}
+                        onLinesChanged={(freshLines) => handleOfferLinesChanged(offer.id, freshLines)}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                      />
+                    )}
                   </div>
                 )}
               </Card>
@@ -717,8 +794,12 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged, 
       `)
       .eq('offer_id', offerId)
       .order('line_number', { ascending: true })
-    if (error) { setLineError(error.message); return null }
-    return data || []
+    const resolved = resolveLoadedRows<OfferLine>('Offer lines', {
+      data: data as OfferLine[] | null,
+      error,
+    })
+    if (resolved.status === 'error') { setLineError(resolved.message); return null }
+    return resolved.rows
   }
 
   const handleAddLine = async (e: React.FormEvent) => {

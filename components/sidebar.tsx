@@ -50,22 +50,33 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const supabase = createClient()
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [signOutError, setSignOutError] = useState<string | null>(null)
-  const [savingsRealizationEnabled, setSavingsRealizationEnabled] = useState(false)
+  const [savingsRealizationEnabled, setSavingsRealizationEnabled] = useState<boolean | null>(null)
+  const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null)
+  const [settingsRetryKey, setSettingsRetryKey] = useState(0)
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) {
+        setSettingsLoadError(`Workspace settings could not be checked (${userError.message}).`)
+        return
+      }
       if (user) {
         setUserEmail(user.email ?? null)
-        const { data: settings } = await supabase
+        const { data: settings, error: settingsError } = await supabase
           .from('organization_settings')
           .select('savings_realization_enabled')
           .maybeSingle()
-        setSavingsRealizationEnabled(settings?.savings_realization_enabled ?? false)
+        if (settingsError || !settings) {
+          setSettingsLoadError(`Workspace settings could not be checked (${settingsError?.message || 'no settings record was returned'}).`)
+          return
+        }
+        setSettingsLoadError(null)
+        setSavingsRealizationEnabled(settings.savings_realization_enabled)
       }
     }
     getUser()
-  }, [supabase])
+  }, [settingsRetryKey, supabase])
 
   // Lock body scroll when drawer is open + close on Escape
   useEffect(() => {
@@ -110,7 +121,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 {group.label}
               </h2>
               <ul className="space-y-1">
-                {group.items.filter(item => item.href !== '/realization' || savingsRealizationEnabled).map((item) => {
+                {group.items.filter(item => item.href !== '/realization' || savingsRealizationEnabled !== false).map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
@@ -137,6 +148,15 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           ))}
         </div>
       </nav>
+
+      {settingsLoadError && (
+        <div role="alert" className="mx-3 mb-3 rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-200">
+          <p>{settingsLoadError} Navigation keeps the last known setting; if none was loaded, Realization remains visible.</p>
+          <button type="button" className="mt-1 font-semibold underline" onClick={() => setSettingsRetryKey(key => key + 1)}>
+            Try again
+          </button>
+        </div>
+      )}
 
       <div className="shrink-0 border-t border-[var(--nav-border)] p-4">
         {userEmail && (
