@@ -35,11 +35,11 @@ select ok(
 select lives_ok(
   $$
     update public.savings_periods
-    set opening_amount = 900,
-        cost_avoidance_amount = -100,
+    set opening_amount = 900000,
+        cost_avoidance_amount = -100000,
         total_savings_amount = 0,
-        executed_opening_amount = 900,
-        executed_cost_avoidance_amount = -100,
+        executed_opening_amount = 900000,
+        executed_cost_avoidance_amount = -100000,
         executed_total_savings_amount = 0
     where id = '00000000-0000-4000-8000-000000000061'
   $$,
@@ -47,11 +47,11 @@ select lives_ok(
 );
 
 select ok(
-  (select cost_avoidance_amount = -100 and total_savings_amount = 0
+  (select cost_avoidance_amount = -100000 and total_savings_amount = 0
    from public.savings_periods
    where id = '00000000-0000-4000-8000-000000000061')
   and
-  (select executed_cost_avoidance_amount = -100
+  (select executed_cost_avoidance_amount = -100000
       and executed_total_savings_amount = 0
    from public.savings_periods
    where id = '00000000-0000-4000-8000-000000000061'),

@@ -380,7 +380,10 @@ select throws_ok(
   'a second reversal is refused'
 );
 update public.savings_calculations
-set gross_savings_amount = 151
+set award_total_amount = 449,
+    cost_reduction_amount = 51,
+    gross_savings_amount = 151,
+    net_savings_amount = 151
 where id = 'b3000000-0000-4000-8000-000000000002';
 select is(
   (select gross_savings_amount from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000002'),
