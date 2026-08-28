@@ -179,20 +179,21 @@ select ok(
   'execution records every coupled entity in the immutable audit stream'
 );
 
+update public.savings_calculations
+set calculation_name = 'Tampered calculation'
+where id = 'b3000000-0000-4000-8000-000000000001';
 select is(
-  (with changed as (
-    update public.savings_calculations set gross_savings_amount = 999
-    where id = 'b3000000-0000-4000-8000-000000000001' returning id
-  ) select count(*)::bigint from changed),
-  0::bigint,
+  (select calculation_name from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000001'),
+  'Correction schedule',
   'ordinary authenticated calculation edits cannot change an executed record'
 );
+
+update public.savings_periods
+set final_amount = 1
+where id = 'b4000000-0000-4000-8000-000000000001';
 select is(
-  (with changed as (
-    update public.savings_periods set final_amount = 1
-    where id = 'b4000000-0000-4000-8000-000000000001' returning id
-  ) select count(*)::bigint from changed),
-  0::bigint,
+  (select final_amount from public.savings_periods where id = 'b4000000-0000-4000-8000-000000000001'),
+  450::numeric,
   'ordinary authenticated period edits cannot change an executed estimate'
 );
 
@@ -369,20 +370,21 @@ select throws_ok(
   'P0001', 'savings schedule is not executed',
   'a second reversal is refused'
 );
+update public.savings_calculations
+set gross_savings_amount = 151
+where id = 'b3000000-0000-4000-8000-000000000002';
 select is(
-  (with changed as (
-    update public.savings_calculations set gross_savings_amount = 151
-    where id = 'b3000000-0000-4000-8000-000000000002' returning id
-  ) select count(*)::bigint from changed),
-  1::bigint,
+  (select gross_savings_amount from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000002'),
+  151::numeric,
   'ordinary calculation edits remain available while the record is estimated'
 );
+
+update public.savings_periods
+set final_amount = 449, cost_reduction_amount = 51, total_savings_amount = 151
+where id = 'b4000000-0000-4000-8000-000000000003';
 select is(
-  (with changed as (
-    update public.savings_periods set final_amount = 449, cost_reduction_amount = 51, total_savings_amount = 151
-    where id = 'b4000000-0000-4000-8000-000000000003' returning id
-  ) select count(*)::bigint from changed),
-  1::bigint,
+  (select total_savings_amount from public.savings_periods where id = 'b4000000-0000-4000-8000-000000000003'),
+  151::numeric,
   'ordinary period edits remain available while the record is estimated'
 );
 
