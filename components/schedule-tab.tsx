@@ -57,11 +57,11 @@ const toAnchor = (v: string): number | null => (v.trim() === '' ? null : roundMo
  */
 export function ScheduleTab({
   eventId,
-  eventStatus,
+  statusRequiresSavingsDisposition,
   currentUserRole,
 }: {
   eventId: string
-  eventStatus: string
+  statusRequiresSavingsDisposition: boolean
   currentUserRole: string | null
 }) {
   const supabase = createClient()
@@ -509,7 +509,7 @@ export function ScheduleTab({
     const { error: reversalError } = await supabase.rpc('reverse_savings_execution', {
       p_calc_id: calc.id,
       p_note: reversalNote.trim(),
-      p_disposition_action: eventStatus === 'Complete' ? 'no_executed_savings' : 'clear',
+      p_disposition_action: statusRequiresSavingsDisposition ? 'no_executed_savings' : 'clear',
     })
     setBusy(false)
     if (reversalError) {
@@ -668,7 +668,7 @@ export function ScheduleTab({
                   placeholder="Explain why the execution was premature."
                 />
               </label>
-              {eventStatus === 'Complete' && (
+              {statusRequiresSavingsDisposition && (
                 <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
                   This completed project will be recorded as “no executed savings.” The explanation
                   must contain at least 10 characters.
@@ -681,7 +681,7 @@ export function ScheduleTab({
                 <Button
                   variant="danger"
                   onClick={() => setShowReverseConfirm(true)}
-                  disabled={busy || reversalNote.trim() === '' || (eventStatus === 'Complete' && reversalNote.trim().length < 10)}
+                  disabled={busy || reversalNote.trim() === '' || (statusRequiresSavingsDisposition && reversalNote.trim().length < 10)}
                 >
                   Review reversal
                 </Button>

@@ -1,7 +1,10 @@
+import { isTerminalStatus, type TerminalStatusOption } from './terminal-status.ts'
+
 export type AttentionProject = {
   id: string
   name: string | null
   status: string | null
+  projectType: string | null
   dueDate: string | null
 }
 
@@ -33,7 +36,6 @@ export type AttentionQueue = {
   items: AttentionItem[]
 }
 
-const INACTIVE_PROJECT_STATUSES = new Set(['Cancelled', 'Complete'])
 const INACTIVE_SUPPLIER_STATUSES = new Set(['Inactive'])
 
 function issueReason(count: number, severity: 'critical' | 'high'): string {
@@ -50,6 +52,7 @@ export function buildAttentionQueue(
   projects: AttentionProject[],
   suppliers: AttentionSupplier[],
   asOfDate: string,
+  terminalStatuses: TerminalStatusOption[] = [],
   dueSoonDays = 30,
 ): AttentionQueue {
   const dueSoonThrough = addDays(asOfDate, dueSoonDays)
@@ -59,7 +62,7 @@ export function buildAttentionQueue(
   let dueSoonProjects = 0
 
   for (const project of projects) {
-    if (!project.dueDate || INACTIVE_PROJECT_STATUSES.has(project.status || '')) continue
+    if (!project.dueDate || isTerminalStatus(project.status, project.projectType, terminalStatuses)) continue
 
     let reason: string | null = null
     let priority = 2

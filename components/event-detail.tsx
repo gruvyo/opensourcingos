@@ -45,7 +45,10 @@ type SupplierOption = Pick<Tables<'suppliers'>, 'id' | 'supplier_name'>
 type CategoryOption = Pick<Tables<'categories'>, 'id' | 'category_name' | 'active_flag'>
 type BusinessUnitOption = Pick<Tables<'business_units'>, 'id' | 'business_unit_name' | 'active_flag'>
 type CostCenterOption = Pick<Tables<'cost_centers'>, 'id' | 'cost_center_name' | 'active_flag'>
-type ChoiceOption = Pick<Tables<'project_choice_options'>, 'id' | 'choice_type' | 'project_type' | 'label' | 'active_flag'>
+type ChoiceOption = Pick<
+  Tables<'project_choice_options'>,
+  'id' | 'choice_type' | 'project_type' | 'label' | 'active_flag' | 'is_terminal' | 'requires_savings_disposition'
+>
 
 function getFirst<T>(obj: ToOneRelation<T>): T | null {
   if (!obj) return null
@@ -258,7 +261,12 @@ export function EventDetail({
         {!isSupport && activeTab === 'schedule' && (
           <ScheduleTab
             eventId={event.id}
-            eventStatus={event.event_status}
+            statusRequiresSavingsDisposition={choiceOptions.some(option => (
+              option.choice_type === 'event_status'
+              && option.project_type === event.project_type
+              && option.requires_savings_disposition
+              && option.label.trim().toLocaleLowerCase('en-US') === event.event_status.trim().toLocaleLowerCase('en-US')
+            ))}
             currentUserRole={currentProfile.role}
           />
         )}

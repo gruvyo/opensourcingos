@@ -36,6 +36,7 @@ const optionSchema = z.object({
   kind: kindSchema,
   projectType: z.enum(['Sourcing', 'Support', '']).default(''),
   label: z.string().trim().min(1, 'Enter a choice name.').max(120),
+  isTerminal: z.enum(['true', 'false']).default('false'),
 })
 
 const toggleSchema = z.object({
@@ -60,12 +61,13 @@ export async function saveClassificationOption(
       kind: formData.get('kind'),
       projectType: formData.get('projectType') || '',
       label: formData.get('label'),
+      isTerminal: formData.get('isTerminal') === 'true' ? 'true' : 'false',
     })
     if (!parsed.success) {
       return { status: 'error', message: parsed.error.issues[0]?.message || 'Check this choice.' }
     }
 
-    const { id, kind, projectType, label } = parsed.data
+    const { id, kind, projectType, label, isTerminal } = parsed.data
     let result: MutationResult
 
     if (kind === 'event_type' || kind === 'event_status' || kind === 'owner') {
@@ -77,6 +79,7 @@ export async function saveClassificationOption(
         choice_type: kind,
         project_type: kind === 'owner' ? null : projectType || null,
         label,
+        is_terminal: kind === 'event_status' && isTerminal === 'true',
         updated_by: user.id,
       }
       result = id

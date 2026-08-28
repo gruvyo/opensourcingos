@@ -929,9 +929,11 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_terminal: boolean
           label: string
           organization_id: string
           project_type: string | null
+          requires_savings_disposition: boolean
           sort_order: number
           updated_at: string
           updated_by: string | null
@@ -942,9 +944,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_terminal?: boolean
           label: string
           organization_id: string
           project_type?: string | null
+          requires_savings_disposition?: boolean
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
@@ -955,9 +959,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_terminal?: boolean
           label?: string
           organization_id?: string
           project_type?: string | null
+          requires_savings_disposition?: boolean
           sort_order?: number
           updated_at?: string
           updated_by?: string | null

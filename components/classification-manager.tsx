@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
+import { useActionState, useRef, useState } from 'react'
 import { Archive, Plus, RotateCcw, Save } from 'lucide-react'
 import {
   saveClassificationOption,
@@ -16,6 +16,8 @@ export type ManagedClassificationOption = {
   kind: ClassificationKind
   label: string
   active: boolean
+  isTerminal?: boolean
+  requiresSavingsDisposition?: boolean
   projectType?: 'Sourcing' | 'Support' | null
   sortOrder?: number
 }
@@ -52,11 +54,12 @@ function StateMessage({ state }: { state: ClassificationActionState }) {
 function ChoiceRow({ option, canEdit }: { option: ManagedClassificationOption; canEdit: boolean }) {
   const [saveState, saveAction, saving] = useActionState(saveClassificationOption, initialState)
   const [toggleState, toggleAction, toggling] = useActionState(toggleClassificationOption, initialState)
+  const [finished, setFinished] = useState(Boolean(option.isTerminal))
 
   return (
     <div className="border-t border-[var(--border)] py-3 first:border-t-0">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <form action={saveAction} className="flex min-w-0 flex-1 gap-2">
+        <form action={saveAction} className="flex min-w-0 flex-1 flex-wrap gap-2">
           <input type="hidden" name="id" value={option.id} />
           <input type="hidden" name="kind" value={option.kind} />
           <input type="hidden" name="projectType" value={option.projectType || ''} />
@@ -65,9 +68,23 @@ function ChoiceRow({ option, canEdit }: { option: ManagedClassificationOption; c
             aria-label={`Rename ${option.label}`}
             defaultValue={option.label}
             disabled={!canEdit || !option.active || saving || toggling}
-            className={!option.active ? 'text-[var(--text-3)] line-through' : ''}
+            className={`min-w-0 flex-1 ${!option.active ? 'text-[var(--text-3)] line-through' : ''}`}
             required
           />
+          {option.kind === 'event_status' ? (
+            <label className="flex items-center gap-2 rounded-md border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-2)]">
+              {option.requiresSavingsDisposition ? <input type="hidden" name="isTerminal" value="true" /> : null}
+              <input
+                type="checkbox"
+                name="isTerminal"
+                value="true"
+                checked={finished}
+                onChange={event => setFinished(event.target.checked)}
+                disabled={!canEdit || !option.active || saving || toggling || option.requiresSavingsDisposition}
+              />
+              {option.requiresSavingsDisposition ? 'Finished status (required)' : 'Finished status'}
+            </label>
+          ) : null}
           {canEdit && option.active ? (
             <Button type="submit" variant="secondary" size="sm" disabled={saving || toggling} title="Save name">
               <Save className="h-4 w-4" aria-hidden="true" />
@@ -75,7 +92,11 @@ function ChoiceRow({ option, canEdit }: { option: ManagedClassificationOption; c
             </Button>
           ) : null}
         </form>
-        {canEdit ? (
+        {canEdit && option.requiresSavingsDisposition ? (
+          <span className="rounded-md border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-3)]">
+            Required workflow status
+          </span>
+        ) : canEdit ? (
           <form action={toggleAction}>
             <input type="hidden" name="id" value={option.id} />
             <input type="hidden" name="kind" value={option.kind} />
@@ -94,12 +115,19 @@ function ChoiceRow({ option, canEdit }: { option: ManagedClassificationOption; c
 }
 
 function AddChoiceForm({ section }: { section: Section }) {
-  const [state, action, pending] = useActionState(saveClassificationOption, initialState)
   const formRef = useRef<HTMLFormElement>(null)
-
-  useEffect(() => {
-    if (state.status === 'success') formRef.current?.reset()
-  }, [state.status])
+  const [finished, setFinished] = useState(false)
+  const [state, action, pending] = useActionState(async (
+    previous: ClassificationActionState,
+    formData: FormData,
+  ) => {
+    const next = await saveClassificationOption(previous, formData)
+    if (next.status === 'success') {
+      formRef.current?.reset()
+      setFinished(false)
+    }
+    return next
+  }, initialState)
 
   return (
     <div className="mt-3 border-t border-[var(--border)] pt-3">
@@ -107,7 +135,20 @@ function AddChoiceForm({ section }: { section: Section }) {
         <input type="hidden" name="id" value="" />
         <input type="hidden" name="kind" value={section.kind} />
         <input type="hidden" name="projectType" value={section.projectType || ''} />
-        <Input name="label" aria-label={`Add ${section.title} choice`} placeholder="Add a choice" disabled={pending} required />
+        <Input name="label" aria-label={`Add ${section.title} choice`} placeholder="Add a choice" disabled={pending} className="min-w-0 flex-1" required />
+        {section.kind === 'event_status' ? (
+          <label className="flex items-center gap-2 rounded-md border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-2)]">
+            <input
+              type="checkbox"
+              name="isTerminal"
+              value="true"
+              checked={finished}
+              onChange={event => setFinished(event.target.checked)}
+              disabled={pending}
+            />
+            Finished
+          </label>
+        ) : null}
         <Button type="submit" size="sm" disabled={pending}>
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add
@@ -130,7 +171,7 @@ export function ClassificationManager({
       <div>
         <h2 className="text-sm font-semibold text-[var(--text)]">Workspace choices</h2>
         <p className="mt-1 text-xs leading-5 text-[var(--text-3)]">
-          Rename, add, or archive the choices used by project forms. Archived choices stay visible on historical projects but are unavailable for new selections.
+          Rename, add, or archive the choices used by project forms. Mark a status as Finished to remove projects in that status from active pipeline and deadline views. The required Sourcing completion status may be renamed, but it always keeps its executed/no-savings decision guard. New custom statuses are not Finished by default.
         </p>
       </div>
 

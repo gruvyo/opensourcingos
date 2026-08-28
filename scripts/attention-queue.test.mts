@@ -2,14 +2,19 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { buildAttentionQueue } from '../lib/attention-queue.ts'
 
+const terminalStatuses = [
+  { label: 'Complete', project_type: 'Sourcing', is_terminal: true },
+  { label: 'Cancelled', project_type: 'Sourcing', is_terminal: true },
+]
+
 test('separates overdue and upcoming active project deadlines', () => {
   const queue = buildAttentionQueue([
-    { id: 'late', name: 'Late project', status: 'In Market', dueDate: '2026-08-07' },
-    { id: 'today', name: 'Today project', status: 'Negotiation', dueDate: '2026-08-08' },
-    { id: 'soon', name: 'Soon project', status: 'Pipeline', dueDate: '2026-09-07' },
-    { id: 'later', name: 'Later project', status: 'Pipeline', dueDate: '2026-09-08' },
-    { id: 'done', name: 'Done project', status: 'Complete', dueDate: '2026-08-01' },
-  ], [], '2026-08-08')
+    { id: 'late', name: 'Late project', status: 'In Market', projectType: 'Sourcing', dueDate: '2026-08-07' },
+    { id: 'today', name: 'Today project', status: 'Negotiation', projectType: 'Sourcing', dueDate: '2026-08-08' },
+    { id: 'soon', name: 'Soon project', status: 'Pipeline', projectType: 'Sourcing', dueDate: '2026-09-07' },
+    { id: 'later', name: 'Later project', status: 'Pipeline', projectType: 'Sourcing', dueDate: '2026-09-08' },
+    { id: 'done', name: 'Done project', status: 'Complete', projectType: 'Sourcing', dueDate: '2026-08-01' },
+  ], [], '2026-08-08', terminalStatuses)
 
   assert.equal(queue.overdueProjects, 1)
   assert.equal(queue.dueSoonProjects, 2)
@@ -54,8 +59,8 @@ test('keeps relationship and performance review plans distinct', () => {
 test('sorts overdue projects before supplier alerts and upcoming deadlines', () => {
   const queue = buildAttentionQueue(
     [
-      { id: 'soon', name: 'Soon', status: 'Pipeline', dueDate: '2026-08-10' },
-      { id: 'late', name: 'Late', status: 'Pipeline', dueDate: '2026-08-01' },
+      { id: 'soon', name: 'Soon', status: 'Pipeline', projectType: 'Sourcing', dueDate: '2026-08-10' },
+      { id: 'late', name: 'Late', status: 'Pipeline', projectType: 'Sourcing', dueDate: '2026-08-01' },
     ],
     [{ id: 'risk', name: 'Risk', status: 'Active', risk: 'High', nextReviewDate: null }],
     '2026-08-08',

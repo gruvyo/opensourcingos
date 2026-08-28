@@ -83,6 +83,16 @@ values
   ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'Complete', 40),
   ('00000000-0000-4000-8000-000000000001', 'event_status', 'Support', 'Cancelled', 50);
 
+update public.project_choice_options
+set
+  is_terminal = true,
+  requires_savings_disposition = (
+    project_type = 'Sourcing' and label = 'Complete'
+  )
+where organization_id = '00000000-0000-4000-8000-000000000001'
+  and choice_type = 'event_status'
+  and label in ('Complete', 'Cancelled');
+
 insert into public.categories (id, organization_id, category_name, default_baseline_type)
 values
   ('000000c1-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'Technology & Telecom', 'Current Contract'),
