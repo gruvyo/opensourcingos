@@ -355,7 +355,10 @@ export default async function DashboardPage({
     terminalStatuses,
   )
 
-  const rollup = portfolioRollup(calcList, sourcingEvents, { topCategories: 8 })
+  const rollup = portfolioRollup(calcList, sourcingEvents, {
+    topCategories: 8,
+    timeZone: settings?.timezone || 'America/Chicago',
+  })
   const lifecycle = scheduleLifecycleRollup(
     calcList,
     sourcingPeriodRows,

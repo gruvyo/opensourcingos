@@ -15,6 +15,7 @@ export default async function SavingsPage() {
     { data: savingsCalcs, error: savingsCalcsError },
     { data: events, error: eventsError },
     { data: periodRows, error: periodsError },
+    { data: settings, error: settingsError },
   ] = await Promise.all([
     fetchPortfolioRows('Savings calculations', (from, to) => (
       supabase.from('savings_calculations').select(`
@@ -47,11 +48,12 @@ export default async function SavingsPage() {
         .order('period_number')
         .range(from, to)
     )),
+    supabase.from('organization_settings').select('timezone').maybeSingle(),
   ])
 
   // A failed query here would render as "$0 savings", which is indistinguishable
   // from a genuinely empty portfolio. Say which one it is.
-  const loadError = savingsCalcsError?.message || eventsError?.message || periodsError?.message || null
+  const loadError = savingsCalcsError?.message || eventsError?.message || periodsError?.message || settingsError?.message || null
 
   const eventList = events || []
   const population = sourcingSavingsPopulation(
@@ -65,7 +67,10 @@ export default async function SavingsPage() {
   const now = new Date()
 
   // Single source of truth for every headline/breakdown number.
-  const rollup = portfolioRollup(calcs, sourcingEvents, { now })
+  const rollup = portfolioRollup(calcs, sourcingEvents, {
+    now,
+    timeZone: settings?.timezone || 'America/Chicago',
+  })
   const lifecycle = scheduleLifecycleRollup(
     calcs,
     sourcingPeriodRows,
