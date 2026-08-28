@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
+import { validateFinalAnchor } from '@/lib/final-anchor'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) }))
 
@@ -90,6 +91,8 @@ export function ScheduleTab({
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState({ baseline: '', opening: '', final: '' })
+  const [finalError, setFinalError] = useState<string | null>(null)
+  const [pendingZeroFinalRow, setPendingZeroFinalRow] = useState<SavedScheduleRow | null>(null)
 
   const load = useCallback(async () => {
     const [bases, offers, calcs] = await Promise.all([
@@ -301,6 +304,7 @@ export function ScheduleTab({
   // -------------------------------------------------------------------
   const startEdit = (r: SavedScheduleRow) => {
     if (isExecuted && !correctionMode) return
+    setFinalError(null)
     setEditingId(r.id)
     setDraft({
       baseline: r.baseline_amount === null || r.baseline_amount === undefined ? '' : String(r.baseline_amount),
@@ -309,17 +313,33 @@ export function ScheduleTab({
     })
   }
 
+  const draftFinal = validateFinalAnchor(draft.final, { zeroConfirmed: true })
   const draftChain = chainSavings({
-    baseline: toAnchor(draft.baseline), opening: toAnchor(draft.opening), final: roundMoney(Number(draft.final) || 0),
+    baseline: toAnchor(draft.baseline),
+    opening: toAnchor(draft.opening),
+    final: draftFinal.status === 'valid' ? draftFinal.value : null,
   })
 
-  const saveRow = async (r: SavedScheduleRow) => {
+  const saveRow = async (r: SavedScheduleRow, zeroConfirmed = false) => {
+    const finalValidation = validateFinalAnchor(draft.final, { zeroConfirmed })
+    if (finalValidation.status === 'error') {
+      setFinalError(finalValidation.message)
+      return
+    }
+    if (finalValidation.status === 'confirm-zero') {
+      setFinalError(null)
+      setPendingZeroFinalRow(r)
+      return
+    }
+    const finalAmount = finalValidation.value
+    setFinalError(null)
+
     if (correctionMode) {
       setRows(current => current.map(row => row.id === r.id ? {
         ...row,
         baseline_amount: toAnchor(draft.baseline),
         opening_amount: toAnchor(draft.opening),
-        final_amount: roundMoney(Number(draft.final) || 0),
+        final_amount: finalAmount,
         cost_reduction_amount: draftChain.reduction === null ? null : roundMoney(draftChain.reduction),
         cost_avoidance_amount: roundMoney(draftChain.avoidance),
         total_savings_amount: roundMoney(draftChain.total),
@@ -333,7 +353,7 @@ export function ScheduleTab({
     const res = await supabase.from('savings_periods').update({
       baseline_amount: toAnchor(draft.baseline),
       opening_amount: toAnchor(draft.opening),
-      final_amount: roundMoney(Number(draft.final) || 0),
+      final_amount: finalAmount,
       cost_reduction_amount: draftChain.reduction === null ? null : roundMoney(draftChain.reduction),
       cost_avoidance_amount: roundMoney(draftChain.avoidance),
       total_savings_amount: roundMoney(draftChain.total),
@@ -864,13 +884,32 @@ export function ScheduleTab({
                                     className="px-2 py-1 text-right text-xs" />
                                 </td>
                                 <td className="py-1 pr-3">
-                                  <Input aria-label={`Final amount for ${monthName(r.period_month)} ${r.period_year}`} type="number" step="0.01" value={draft.final}
-                                    onChange={e => setDraft(d => ({ ...d, final: e.target.value }))}
+                                  <Input
+                                    aria-label={`Final amount for ${monthName(r.period_month)} ${r.period_year}`}
+                                    aria-invalid={Boolean(finalError)}
+                                    aria-describedby={finalError ? `final-error-${r.id}` : undefined}
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={draft.final}
+                                    onChange={e => {
+                                      setDraft(d => ({ ...d, final: e.target.value }))
+                                      setFinalError(null)
+                                    }}
                                     className="px-2 py-1 text-right text-xs" />
+                                  {finalError && (
+                                    <p id={`final-error-${r.id}`} role="alert" className="mt-1 max-w-48 text-left text-[11px] text-red-600 dark:text-red-400">
+                                      {finalError}
+                                    </p>
+                                  )}
                                 </td>
-                                <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{money(draftChain.reduction)}</td>
+                                <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">
+                                  {draftFinal.status === 'valid' ? money(draftChain.reduction) : '—'}
+                                </td>
                                 <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(draftChain.avoidance)}</td>
-                                <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatCurrency(draftChain.total)}</td>
+                                <td className="py-2 pr-3 text-right font-semibold tabular-nums text-[var(--text)]">
+                                  {draftFinal.status === 'valid' ? formatCurrency(draftChain.total) : '—'}
+                                </td>
                                 <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-3)]">—</td>
                                 <td className="py-2">
                                   <div className="flex justify-end gap-1">
@@ -878,7 +917,7 @@ export function ScheduleTab({
                                       onClick={() => saveRow(r)} title="Save this period" aria-label="Save this period">
                                       <Check className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}
+                                    <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setFinalError(null) }}
                                       title="Cancel" aria-label="Cancel">
                                       <X className="h-3.5 w-3.5" />
                                     </Button>
@@ -976,6 +1015,16 @@ export function ScheduleTab({
           pendingLabel="Reversing execution..."
           onConfirm={reverseExecution}
           onCancel={() => setShowReverseConfirm(false)}
+        />
+      )}
+      {pendingZeroFinalRow && (
+        <ConfirmDialog
+          title="Confirm a $0.00 Final amount?"
+          description="A zero Final books the full baseline as savings for this period. Continue only if the signed Final amount is truly $0.00."
+          confirmLabel="Confirm $0.00 Final"
+          pendingLabel="Saving..."
+          onConfirm={() => saveRow(pendingZeroFinalRow, true)}
+          onCancel={() => setPendingZeroFinalRow(null)}
         />
       )}
     </div>

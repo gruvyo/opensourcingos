@@ -14,7 +14,9 @@ import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/input'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { calculationLoadError } from '@/lib/calculation-integrity'
+import { validateFinalAnchor } from '@/lib/final-anchor'
 
 type Anchor = {
   label: string
@@ -61,6 +63,7 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
   const [error, setError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [showZeroFinalConfirm, setShowZeroFinalConfirm] = useState(false)
 
   const [baseline, setBaseline] = useState<CalculationBaseline | null>(null)
   const [opening, setOpening] = useState<CalculationOffer | null>(null)
@@ -186,9 +189,19 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
 
   const basisLabel = basis === 'perMonth' ? 'per month' : basis === 'perYear' ? 'per year' : `over the ${dealMonths}-month term`
 
-  const save = async () => {
+  const save = async (zeroConfirmed = false) => {
     if (loadError) { setError('Saving remains disabled until the calculation loads successfully.'); return }
     if (!final) { setError('Select a Final offer before saving.'); return }
+    const finalValidation = validateFinalAnchor(final.offer_total_amount, { zeroConfirmed })
+    if (finalValidation.status === 'error') {
+      setError(finalValidation.message)
+      return
+    }
+    if (finalValidation.status === 'confirm-zero') {
+      setError(null)
+      setShowZeroFinalConfirm(true)
+      return
+    }
     // Without the Final offer's term there is no deal term, so nothing here is
     // derivable. Refuse rather than publish a figure built on a guessed 12.
     if (!fRates.known) {
@@ -461,7 +474,7 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
                   <Check className="h-3.5 w-3.5" /> Saved
                 </span>
               )}
-              {canEdit && <Button onClick={save} disabled={saving || !!loadError || existing?.calculation_status === 'executed'}>
+              {canEdit && <Button onClick={() => void save()} disabled={saving || !!loadError || existing?.calculation_status === 'executed'}>
                 {saving ? 'Saving...' : existing ? 'Update savings record' : 'Save savings record'}
               </Button>}
             </div>
@@ -472,6 +485,16 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
             </p>
           </Card>
         </>
+      )}
+      {showZeroFinalConfirm && (
+        <ConfirmDialog
+          title="Confirm a $0.00 Final offer?"
+          description="A zero Final books the full eligible baseline as savings. Continue only if the signed Final offer is truly $0.00."
+          confirmLabel="Confirm $0.00 Final"
+          pendingLabel="Saving..."
+          onConfirm={() => save(true)}
+          onCancel={() => setShowZeroFinalConfirm(false)}
+        />
       )}
     </div>
   )
