@@ -377,28 +377,25 @@ select throws_ok(
   'P0001', 'savings schedule is not executed',
   'a second reversal is refused'
 );
-update public.savings_calculations
-set baseline_total_amount = 500,
-    opening_proposal_amount = 600,
-    award_total_amount = 449,
-    cost_reduction_amount = 51,
-    cost_avoidance_amount = 100,
-    gross_savings_amount = 151,
-    net_savings_amount = 151
-where id = 'b3000000-0000-4000-8000-000000000002';
+do $atomic_estimate$
+begin
+  perform public.replace_savings_schedule(
+    'b3000000-0000-4000-8000-000000000002', 8, 2026, 'monthly',
+    '[{"period_number":1,"period_month":8,"period_year":2026,"period_months":1,"baseline_amount":500,"opening_amount":600,"final_amount":449,"cost_reduction_amount":51,"cost_avoidance_amount":100,"total_savings_amount":151,"is_edited":true}]'::jsonb
+  );
+end
+$atomic_estimate$;
 select is(
   (select gross_savings_amount from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000002'),
   151::numeric,
-  'ordinary calculation edits remain available while the record is estimated'
+  'atomic schedule edits republish the calculation while it is estimated'
 );
 
-update public.savings_periods
-set final_amount = 449, cost_reduction_amount = 51, total_savings_amount = 151
-where id = 'b4000000-0000-4000-8000-000000000003';
 select is(
-  (select total_savings_amount from public.savings_periods where id = 'b4000000-0000-4000-8000-000000000003'),
+  (select total_savings_amount from public.savings_periods
+   where savings_calculation_id = 'b3000000-0000-4000-8000-000000000002'),
   151::numeric,
-  'ordinary period edits remain available while the record is estimated'
+  'atomic schedule edits replace the estimated period values'
 );
 
 select lives_ok(
