@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(20);
+select plan(22);
 
 select has_index(
   'public', 'project_choice_options', 'uq_project_choice_options_org_type_label',
@@ -124,14 +124,42 @@ select throws_ok(
   'the pre-existing scope guard independently blocks a scope-transfer bypass'
 );
 
+select lives_ok(
+  $$ update public.project_choice_options
+     set label = '  DoNe Safely  '
+     where organization_id = (
+       select organization_id from public.profiles
+       where id = 'f1000000-0000-4000-8000-000000000001'
+     ) and requires_savings_disposition $$,
+  'completion-label history normalizes a renamed case and surrounding whitespace'
+);
+
 select ok(
-  (select completion_label_history @> array['complete', 'finished safely']
+  (select completion_label_history @> array['complete', 'finished safely', 'done safely']
    from public.project_choice_options
    where organization_id = (
      select organization_id from public.profiles
      where id = 'f1000000-0000-4000-8000-000000000001'
    ) and requires_savings_disposition),
   'the server preserves every guarded completion spelling'
+);
+
+insert into public.project_choice_options (
+  organization_id, choice_type, project_type, label, active_flag
+)
+select organization_id, 'event_status', 'Sourcing', 'Ordinary status', true
+from public.profiles where id = 'f1000000-0000-4000-8000-000000000001';
+
+select throws_ok(
+  $$ update public.project_choice_options
+     set label = ' cOmPlEtE '
+     where organization_id = (
+       select organization_id from public.profiles
+       where id = 'f1000000-0000-4000-8000-000000000001'
+     ) and choice_type = 'event_status' and project_type = 'Sourcing'
+       and label = 'Ordinary status' $$,
+  '42501', 'that label is reserved for the guarded completion status',
+  'an ordinary status cannot be updated to a historic reserved label'
 );
 
 select throws_ok(

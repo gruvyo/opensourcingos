@@ -21,7 +21,7 @@ export function formatCurrency(
   }).format(value)
 }
 
-/** Compact whole-dollar presentation reserved for dashboard summaries. */
+/** Cent-exact dashboard formatter retained as the dashboard API boundary. */
 export function formatDashboardCurrency(
   amount: number | null | undefined,
   currencyCode: string = 'USD',

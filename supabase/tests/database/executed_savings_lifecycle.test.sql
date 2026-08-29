@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(40);
+select plan(41);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -80,10 +80,26 @@ values
     'b2000000-0000-4000-8000-000000000004',
     (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000002'),
     'Procurement correction project', 'Contract Renewal', 'Pipeline', 'Sourcing'
+  ),
+  (
+    'b2000000-0000-4000-8000-000000000005',
+    (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
+    'Soft correction project', 'Contract Renewal', 'Pipeline', 'Sourcing'
   );
 
+insert into public.baselines (
+  id, organization_id, event_id, baseline_name, baseline_type,
+  baseline_total_amount, is_selected
+)
+values
+  ('b2500000-0000-4000-8000-000000000001', (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'), 'b2000000-0000-4000-8000-000000000001', 'Correction contract', 'Current Contract', 1000, true),
+  ('b2500000-0000-4000-8000-000000000002', (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'), 'b2000000-0000-4000-8000-000000000002', 'Reversal contract', 'Current Contract', 500, true),
+  ('b2500000-0000-4000-8000-000000000003', (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'), 'b2000000-0000-4000-8000-000000000003', 'Complete contract', 'Current Contract', 500, true),
+  ('b2500000-0000-4000-8000-000000000004', (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000002'), 'b2000000-0000-4000-8000-000000000004', 'Procurement contract', 'Current Contract', 500, true),
+  ('b2500000-0000-4000-8000-000000000005', (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'), 'b2000000-0000-4000-8000-000000000005', 'Soft budget', 'Approved Budget', 500, true);
+
 insert into public.savings_calculations (
-  id, organization_id, event_id, calculation_name, savings_type,
+  id, organization_id, event_id, baseline_id, calculation_name, savings_type,
   calculation_status, schedule_start_month, schedule_start_year,
   schedule_period_type, schedule_period_count
 )
@@ -91,26 +107,32 @@ values
   (
     'b3000000-0000-4000-8000-000000000001',
     (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
-    'b2000000-0000-4000-8000-000000000001', 'Correction schedule',
+    'b2000000-0000-4000-8000-000000000001', 'b2500000-0000-4000-8000-000000000001', 'Correction schedule',
     'Cost Avoidance', 'estimated', 8, 2026, 'monthly', 2
   ),
   (
     'b3000000-0000-4000-8000-000000000002',
     (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
-    'b2000000-0000-4000-8000-000000000002', 'Open reversal schedule',
+    'b2000000-0000-4000-8000-000000000002', 'b2500000-0000-4000-8000-000000000002', 'Open reversal schedule',
     'Cost Avoidance', 'estimated', 8, 2026, 'monthly', 1
   ),
   (
     'b3000000-0000-4000-8000-000000000003',
     (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
-    'b2000000-0000-4000-8000-000000000003', 'Complete reversal schedule',
+    'b2000000-0000-4000-8000-000000000003', 'b2500000-0000-4000-8000-000000000003', 'Complete reversal schedule',
     'Cost Avoidance', 'estimated', 8, 2026, 'monthly', 1
   ),
   (
     'b3000000-0000-4000-8000-000000000004',
     (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000002'),
-    'b2000000-0000-4000-8000-000000000004', 'Procurement schedule',
+    'b2000000-0000-4000-8000-000000000004', 'b2500000-0000-4000-8000-000000000004', 'Procurement schedule',
     'Cost Avoidance', 'estimated', 8, 2026, 'monthly', 1
+  ),
+  (
+    'b3000000-0000-4000-8000-000000000005',
+    (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
+    'b2000000-0000-4000-8000-000000000005', 'b2500000-0000-4000-8000-000000000005', 'Soft correction schedule',
+    'Cost Reduction', 'estimated', 8, 2026, 'monthly', 1
   );
 
 insert into public.savings_periods (
@@ -148,6 +170,12 @@ values
     'b4000000-0000-4000-8000-000000000005',
     (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000002'),
     'b2000000-0000-4000-8000-000000000004', 'b3000000-0000-4000-8000-000000000004',
+    1, 8, 2026, 1, 500, 600, 450, 50, 100, 150
+  ),
+  (
+    'b4000000-0000-4000-8000-000000000006',
+    (select organization_id from public.profiles where id = 'b1000000-0000-4000-8000-000000000001'),
+    'b2000000-0000-4000-8000-000000000005', 'b3000000-0000-4000-8000-000000000005',
     1, 8, 2026, 1, 500, 600, 450, 50, 100, 150
   );
 
@@ -213,6 +241,26 @@ select is(
   (select sum(executed_total_savings_amount) from public.savings_periods where savings_calculation_id = 'b3000000-0000-4000-8000-000000000001'),
   300::numeric,
   'a rejected correction leaves the executed values unchanged'
+);
+
+do $$
+begin
+  perform public.mark_savings_schedule_executed(
+    'b3000000-0000-4000-8000-000000000005',
+    'Execute soft-baseline correction fixture'
+  );
+end
+$$;
+select throws_ok(
+  $$
+    select public.correct_savings_execution(
+      'b3000000-0000-4000-8000-000000000005', 'Attempt hard correction against soft baseline', '{}'::jsonb,
+      '[{"id":"b4000000-0000-4000-8000-000000000006","period_number":1,"period_month":8,"period_year":2026,"period_months":1,"baseline_amount":500,"opening_amount":600,"final_amount":440,"cost_reduction_amount":60,"cost_avoidance_amount":100,"total_savings_amount":160,"is_edited":true}]'::jsonb
+    )
+  $$,
+  '23514',
+  'Soft baselines cannot book hard cost reduction. Use cost avoidance or approve a documented hard-baseline override.',
+  'the correction RPC enforces the executed calculation baseline quality'
 );
 
 select lives_ok(
