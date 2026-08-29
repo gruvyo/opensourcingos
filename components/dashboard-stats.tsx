@@ -1,4 +1,4 @@
-import { formatDashboardCurrency } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 import { Card } from '@/components/ui/card'
 import { ArrowDownRight, ArrowUpRight, CircleDollarSign, Gauge, CalendarCheck } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -64,6 +64,7 @@ function StatCard({ card }: { card: CardDef }) {
 }
 
 export function DashboardStats({ stats }: { stats: Stats }) {
+  const { formatDashboardCurrency } = useWorkspaceFormat()
   const cards: CardDef[] = [
     {
       label: 'Spend Addressed',

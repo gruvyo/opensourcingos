@@ -25,24 +25,26 @@ export function formatCurrency(
 export function formatDashboardCurrency(
   amount: number | null | undefined,
   currencyCode: string = 'USD',
+  locale: string = 'en-US',
 ): string {
   const value = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode || 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: MONEY_DECIMAL_PLACES,
+    maximumFractionDigits: MONEY_DECIMAL_PLACES,
   }).format(value)
 }
 
 export function formatDashboardReduction(
   amount: number | null | undefined,
   currencyCode: string = 'USD',
+  locale: string = 'en-US',
 ): string {
   if (amount === null || amount === undefined || !Number.isFinite(amount)) return 'n/a'
   return amount < 0
-    ? `(${formatDashboardCurrency(Math.abs(amount), currencyCode)})`
-    : formatDashboardCurrency(amount, currencyCode)
+    ? `(${formatDashboardCurrency(Math.abs(amount), currencyCode, locale)})`
+    : formatDashboardCurrency(amount, currencyCode, locale)
 }
 
 /**

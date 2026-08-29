@@ -68,15 +68,16 @@ export function canonicalCalculationsByEvent<T extends CalculationIdentity>(
 
 export type CalculationReadResult = {
   label: string
+  data?: unknown
   error?: { message: string } | null
 }
 
 export function calculationLoadError(results: CalculationReadResult[]): string | null {
-  const failures = results.filter(result => result.error)
+  const failures = results.filter(result => result.error || result.data === null)
   if (failures.length === 0) return null
 
   const details = failures
-    .map(result => `${result.label}: ${result.error?.message || 'unknown read error'}`)
+    .map(result => `${result.label}: ${result.error?.message || 'query returned null data without an error'}`)
     .join('; ')
 
   return `The calculation could not be loaded safely (${details}). Saving is disabled so a second savings record cannot be created.`

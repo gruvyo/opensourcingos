@@ -8,7 +8,8 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, CheckCircle, XCircle,
   Award, GitCompare, Users, Pencil
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
+import { useRouter } from 'next/navigation'
 import { grossSavings, savingsPct as savingsPctOf, termRates } from '@/lib/savings'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
@@ -32,7 +33,6 @@ type Offer = {
   offer_role: string | null
   offer_valid_until: string | null
   compliant_bid_flag: boolean
-  selected_for_award_flag: boolean
   notes: string | null
   supplier: { supplier_name: string } | null
 }
@@ -71,6 +71,8 @@ export function OffersTab({
   suppliers: Supplier[]
   currentUserRole: string | null
 }) {
+  const { formatCurrency, formatDate } = useWorkspaceFormat()
+  const router = useRouter()
   const [offers, setOffers] = useState<Offer[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -121,7 +123,8 @@ export function OffersTab({
     // decision. Unsetting the final offer also clears the pointer there.
     const { error } = await setOfferRoleAtomically(supabase, offerId, role)
     if (error) { setActionError(error.message); return }
-    fetchOffers()
+    await fetchOffers()
+    router.refresh()
   }
 
   const saveOfferTotal = async (offerId: string) => {
@@ -519,6 +522,7 @@ function AddOfferForm({ eventId, suppliers, existing, onSupplierAdded, onSaved, 
   onSaved: () => void
   onCancel: () => void
 }) {
+  const { formatCurrency } = useWorkspaceFormat()
   const isEdit = !!existing
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -764,6 +768,7 @@ function OfferLinesTable({ offerId, eventId, scopeLines, lines, onLinesChanged, 
   canEdit: boolean
   canDelete: boolean
 }) {
+  const { formatCurrency } = useWorkspaceFormat()
   const supabase = createClient()
   const [lineError, setLineError] = useState<string | null>(null)
   const [lineToDelete, setLineToDelete] = useState<OfferLine | null>(null)
@@ -1068,6 +1073,7 @@ function ComparisonView({ offers, offerLines, fetchOfferLines, eventId }: {
   fetchOfferLines: (id: string) => void
   eventId: string
 }) {
+  const { formatCurrency } = useWorkspaceFormat()
   const supabase = createClient()
   const [baselines, setBaselines] = useState<ComparisonBaseline[]>([])
   const [baselineError, setBaselineError] = useState<string | null>(null)

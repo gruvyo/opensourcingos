@@ -5,6 +5,7 @@ import { ClassificationManager, type ManagedClassificationOption } from '@/compo
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
+import { DEFAULT_WORKSPACE_TIMEZONE } from '@/lib/workspace-settings'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -64,7 +65,7 @@ export default async function SettingsPage() {
     fullName: profile?.full_name || user?.user_metadata?.full_name || '',
     currencyCode: settings?.currency_code || 'USD',
     locale: settings?.locale || 'en-US',
-    timezone: settings?.timezone || 'America/Chicago',
+    timezone: settings?.timezone || DEFAULT_WORKSPACE_TIMEZONE,
     fiscalYearStartMonth: settings?.fiscal_year_start_month || 1,
     dateFormat: settings?.date_format || 'MMM D, YYYY',
     defaultRecognitionMethod: settings?.default_recognition_method || 'monthly',

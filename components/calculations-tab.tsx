@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Tables, TablesInsert } from '@/lib/database.types'
 import { Calculator, ArrowRight, AlertCircle, Check } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 import { roundMoney } from '@/lib/money'
 import {
-  chainWithBaselineQuality, baselineQuality, termRates,
+  anchorsWithBaselineQuality, chainSavings, chainWithBaselineQuality, baselineQuality, termRates,
   reportableSavingsPct, type RateBasis,
 } from '@/lib/savings'
 import { clsx } from 'clsx'
@@ -17,6 +17,7 @@ import { Select } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { calculationLoadError } from '@/lib/calculation-integrity'
 import { validateFinalAnchor } from '@/lib/final-anchor'
+import { saveEstimatedSavingsCalculationAtomically } from '@/lib/atomic-money-writers'
 
 type Anchor = {
   label: string
@@ -57,6 +58,7 @@ type CalculationOffer = Pick<Tables<'supplier_offers'>,
  * savings record (which is what every dashboard and report reads).
  */
 export function CalculationsTab({ eventId, currentUserRole }: { eventId: string; currentUserRole: string | null }) {
+  const { formatCurrency } = useWorkspaceFormat()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -102,9 +104,9 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
         if (cancelled) return
 
         const readError = calculationLoadError([
-          { label: 'baselines', error: basesResult.error },
-          { label: 'supplier offers', error: offersResult.error },
-          { label: 'savings record', error: calcsResult.error },
+          { label: 'baselines', data: basesResult.data, error: basesResult.error },
+          { label: 'supplier offers', data: offersResult.data, error: offersResult.error },
+          { label: 'savings record', data: calcsResult.data, error: calcsResult.error },
         ])
 
         setBaseline((basesResult.data || []).find(b => b.is_selected) ?? null)
@@ -210,16 +212,6 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
     }
     setSaving(true); setError(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Not logged in'); setSaving(false); return }
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles').select('organization_id').eq('id', user.id).single()
-    if (profileError || !profile?.organization_id) {
-      setError(profileError?.message || 'Your workspace could not be identified.')
-      setSaving(false)
-      return
-    }
-
     // WHAT GETS PUBLISHED IS ALWAYS THE WHOLE DEAL TERM, whatever basis is on
     // screen. The basis switch is a lens for reading the numbers, not a claim
     // about what the deal is worth: publishing the displayed basis meant the
@@ -234,7 +226,8 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
       baseline: exactAnchor(overTerm(bRates, !!baseline)),
       final: roundMoney(overTerm(fRates, !!final) ?? 0),
     }
-    const rawTermChain = chainWithBaselineQuality(termAnchors, quality.isHard)
+    const publishedAnchors = anchorsWithBaselineQuality(termAnchors, quality.isHard)
+    const rawTermChain = chainSavings(publishedAnchors)
     const termChain = {
       reduction: rawTermChain.reduction === null ? null : roundMoney(rawTermChain.reduction),
       avoidance: roundMoney(rawTermChain.avoidance),
@@ -251,9 +244,9 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
       // records which one carried the deal. The dashboard splits on the two
       // amount columns, not on this.
       savings_type: (termChain.reduction ?? 0) >= termChain.avoidance ? 'Cost Reduction' : 'Cost Avoidance',
-      baseline_total_amount: termAnchors.baseline,
-      opening_proposal_amount: termAnchors.opening,
-      award_total_amount: termAnchors.final,
+      baseline_total_amount: publishedAnchors.baseline == null ? null : Number(publishedAnchors.baseline),
+      opening_proposal_amount: publishedAnchors.opening == null ? null : Number(publishedAnchors.opening),
+      award_total_amount: publishedAnchors.final == null ? null : Number(publishedAnchors.final),
       gross_savings_amount: termChain.total,
       cost_reduction_amount: termChain.reduction,
       cost_avoidance_amount: termChain.avoidance,
@@ -262,14 +255,12 @@ export function CalculationsTab({ eventId, currentUserRole }: { eventId: string;
       recognition_notes: `Derived from the selected anchors over the ${dealMonths}-month deal term.`,
     }
 
-    const res = existing
-      ? await supabase.from('savings_calculations').update(payload).eq('id', existing.id)
-      : await supabase.from('savings_calculations')
-          .insert({
-            ...payload,
-            event_id: eventId,
-            organization_id: profile?.organization_id,
-          })
+    const res = await saveEstimatedSavingsCalculationAtomically(
+      supabase,
+      eventId,
+      existing?.id || null,
+      payload,
+    )
 
     setSaving(false)
     if (res.error) {

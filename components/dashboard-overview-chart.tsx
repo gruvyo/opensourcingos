@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatDashboardCurrency } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 
 export type DashboardTrendPoint = {
   year: number
@@ -22,13 +22,6 @@ const AXIS_TICK = { fontSize: 11, fill: '#94a3b8' }
 const GRID_STROKE = 'rgba(148,163,184,0.18)'
 const AXIS_STROKE = 'rgba(148,163,184,0.35)'
 
-function compactCurrency(value: number): string {
-  const amount = Number(value) || 0
-  if (Math.abs(amount) >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}m`
-  if (Math.abs(amount) >= 1_000) return `$${(amount / 1_000).toFixed(0)}k`
-  return formatDashboardCurrency(amount)
-}
-
 export function DashboardOverviewChart({
   data,
   selectedYear,
@@ -36,6 +29,14 @@ export function DashboardOverviewChart({
   data: DashboardTrendPoint[]
   selectedYear: number | null
 }) {
+  const { currencyCode, locale, formatDashboardCurrency } = useWorkspaceFormat()
+  const compactCurrency = (value: number): string => new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currencyCode,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(Number(value) || 0)
+
   if (data.length === 0) {
     return (
       <div className="grid h-64 place-items-center text-sm text-[var(--text-3)]">

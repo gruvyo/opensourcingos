@@ -3,6 +3,7 @@ import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { ReportsView } from '@/components/reports-view'
 import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 import type { TerminalStatusOption } from '@/lib/terminal-status'
+import { DEFAULT_WORKSPACE_TIMEZONE } from '@/lib/workspace-settings'
 
 export default async function ReportsPage() {
   const supabase = await createClient()
@@ -70,7 +71,7 @@ export default async function ReportsPage() {
     fetchPortfolioRows('Realization periods', (from, to) => (
       supabase.from('realization_periods').select(`
         id, event_id, projected_savings, projected_reduction_amount, projected_avoidance_amount,
-        realized_savings, realized_reduction_amount, realized_avoidance_amount
+        realized_savings, realized_reduction_amount, realized_avoidance_amount, leakage_amount
       `, { count: 'exact' })
         .order('id', { ascending: true })
         .range(from, to)
@@ -84,7 +85,7 @@ export default async function ReportsPage() {
   // A failed query here would render as an empty report, which is indistinguishable
   // from a genuinely empty portfolio. Say which one it is.
   const loadError = eventsError?.message || savingsCalcsError?.message || suppliersError?.message || supplierReviewsError?.message || supplierRisksError?.message || realizationError?.message || terminalStatusesError?.message || settingsError?.message || null
-  const timezone = settings?.timezone || 'America/Chicago'
+  const timezone = settings?.timezone || DEFAULT_WORKSPACE_TIMEZONE
   const asOfDate = dateKeyInTimeZone(new Date(), timezone)
 
   return (

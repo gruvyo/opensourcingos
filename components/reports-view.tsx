@@ -25,7 +25,7 @@ import {
   type ReportSavingsTotals,
 } from '@/lib/report-savings'
 import { isTerminalStatus, type TerminalStatusOption } from '@/lib/terminal-status'
-import { formatReportValue, reportColumnLabel, reportCsvMoney, type ReportDisplayFormat } from '@/lib/report-format'
+import { formatReportValue, reportColumnLabel, reportCsvCell, reportCsvMoney, type ReportDisplayFormat } from '@/lib/report-format'
 
 type NamedRelation = { category_name?: string; business_unit_name?: string; supplier_name?: string; full_name?: string; email?: string }
 
@@ -146,9 +146,9 @@ function csvReportValue(value: ReportValue, column: ReportColumn, row: ReportRow
 function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[], currencyCode: string) {
   const csvRows = [
     columns.map(column => csvCell(reportColumnLabel(column.label, column.format, currencyCode))).join(','),
-    ...rows.map(row => columns.map(column => csvCell(
+    ...rows.map(row => columns.map(column => reportCsvCell(
       csvReportValue(row[column.key], column, row),
-      column.format !== 'currency' && column.format !== 'reduction',
+      column.format,
     )).join(',')),
   ]
   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })

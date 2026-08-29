@@ -2483,6 +2483,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_estimated_savings_calculation: {
+        Args: {
+          p_calculation: Json
+          p_calculation_id: string | null
+          p_event_id: string
+        }
+        Returns: string
+      }
       select_baseline: { Args: { p_baseline_id: string }; Returns: undefined }
       set_finance_validation: {
         Args: { p_realization_period_id: string; p_validated: boolean }

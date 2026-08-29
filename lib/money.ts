@@ -15,7 +15,9 @@ export function moneyToCents(amount: number): number {
   // Values such as 1.005 can land just below their decimal half-cent in binary.
   // The tolerance only cancels representation noise; it is many orders of
   // magnitude smaller than a real fraction of a cent.
-  const tolerance = Number.EPSILON * Math.max(1, scaled) * 4
+  // Never let the representation tolerance grow into a business-significant
+  // fraction of a cent at very large magnitudes.
+  const tolerance = Math.min(Number.EPSILON * Math.max(1, scaled) * 4, 1e-7)
   const cents = Math.floor(scaled + 0.5 + tolerance)
   if (!Number.isSafeInteger(cents)) throw new RangeError('Money exceeds safe cent precision')
   return sign * cents

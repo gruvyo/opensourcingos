@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { SafeExternalLink } from '@/components/safe-external-link'
-import { formatDate } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 
 export type SupplierCertification = {
   id: string
@@ -23,6 +23,7 @@ export type SupplierCertification = {
 const initialState: CertificationActionState = { status: 'idle', message: '' }
 
 export function SupplierCertifications({ supplierId, certifications, canEdit, today }: { supplierId: string; certifications: SupplierCertification[]; canEdit: boolean; today: string }) {
+  const { formatDate } = useWorkspaceFormat()
   const [editor, setEditor] = useState<'new' | string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SupplierCertification | null>(null)
   const [deleteError, setDeleteError] = useState('')

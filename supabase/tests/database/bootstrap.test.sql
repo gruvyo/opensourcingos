@@ -3737,6 +3737,7 @@ select is(
         ('mark_savings_schedule_executed(p_savings_calculation_id uuid, p_execution_note text)'),
         ('replace_savings_schedule(p_savings_calculation_id uuid, p_schedule_start_month integer, p_schedule_start_year integer, p_schedule_period_type text, p_periods jsonb)'),
         ('reverse_savings_execution(p_calc_id uuid, p_note text, p_disposition_action text)'),
+        ('save_estimated_savings_calculation(p_event_id uuid, p_calculation_id uuid, p_calculation jsonb)'),
         ('select_baseline(p_baseline_id uuid)'),
         ('set_finance_validation(p_realization_period_id uuid, p_validated boolean)'),
         ('set_hard_reduction_override(p_baseline_id uuid, p_enabled boolean, p_reason text)'),
@@ -3784,6 +3785,7 @@ select ok(
      'public.mark_savings_schedule_executed(uuid,text)'::regprocedure,
      'public.correct_savings_execution(uuid,text,jsonb,jsonb)'::regprocedure,
      'public.reverse_savings_execution(uuid,text,text)'::regprocedure,
+     'public.save_estimated_savings_calculation(uuid,uuid,jsonb)'::regprocedure,
      'public.set_hard_reduction_override(uuid,boolean,text)'::regprocedure,
      'public.confirm_business_equivalency(uuid,boolean)'::regprocedure,
      'public.set_finance_validation(uuid,boolean)'::regprocedure,
@@ -3828,8 +3830,10 @@ select ok(
   and not has_table_privilege('authenticated', 'public.realization_periods', 'INSERT')
   and has_column_privilege('authenticated', 'public.baselines', 'baseline_total_amount', 'UPDATE')
   and has_column_privilege('authenticated', 'public.supplier_offers', 'offer_total_amount', 'UPDATE')
-  and has_column_privilege('authenticated', 'public.savings_periods', 'final_amount', 'UPDATE'),
-  'protected tuple columns are RPC-only while ordinary money edits remain available'
+  and not has_any_column_privilege('authenticated', 'public.savings_calculations', 'INSERT')
+  and not has_any_column_privilege('authenticated', 'public.savings_calculations', 'UPDATE')
+  and not has_any_column_privilege('authenticated', 'public.savings_periods', 'UPDATE'),
+  'protected and estimated tuples are RPC-only while anchor inputs remain available'
 );
 
 select is(

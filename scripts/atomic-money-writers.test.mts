@@ -5,6 +5,7 @@ import {
   completeSourcingProjectAtomically,
   deleteBaselineLineAtomically,
   replaceSavingsScheduleAtomically,
+  saveEstimatedSavingsCalculationAtomically,
   selectBaselineAtomically,
   setOfferRoleAtomically,
   syncRealizationPeriodsAtomically,
@@ -124,6 +125,38 @@ test('schedule replacement sends only calculation settings and period values', a
       p_schedule_start_year: 2026,
       p_schedule_period_type: 'monthly',
       p_periods: periods,
+    },
+  }])
+  assert.equal(JSON.stringify(calls).includes('organization_id'), false)
+  assert.equal(JSON.stringify(calls).includes('created_by'), false)
+  assert.equal(JSON.stringify(calls).includes('updated_by'), false)
+})
+
+test('estimated calculation save sends only project, calculation, and reviewed values', async () => {
+  const { client, calls } = recordingClient()
+  const calculation = {
+    baseline_id: 'baseline-1',
+    calculation_name: 'Deal savings',
+    savings_type: 'Cost Reduction',
+    baseline_total_amount: 100,
+    opening_proposal_amount: 110,
+    award_total_amount: 90,
+    gross_savings_amount: 20,
+    cost_reduction_amount: 10,
+    cost_avoidance_amount: 10,
+    savings_percentage: 20,
+    net_savings_amount: 20,
+    recognition_notes: null,
+  }
+  await saveEstimatedSavingsCalculationAtomically(
+    client, 'event-1', 'calculation-1', calculation,
+  )
+  assert.deepEqual(calls, [{
+    name: 'save_estimated_savings_calculation',
+    args: {
+      p_event_id: 'event-1',
+      p_calculation_id: 'calculation-1',
+      p_calculation: calculation,
     },
   }])
   assert.equal(JSON.stringify(calls).includes('organization_id'), false)

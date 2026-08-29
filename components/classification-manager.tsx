@@ -52,9 +52,16 @@ function StateMessage({ state }: { state: ClassificationActionState }) {
 }
 
 function ChoiceRow({ option, canEdit }: { option: ManagedClassificationOption; canEdit: boolean }) {
-  const [saveState, saveAction, saving] = useActionState(saveClassificationOption, initialState)
-  const [toggleState, toggleAction, toggling] = useActionState(toggleClassificationOption, initialState)
   const [finished, setFinished] = useState(Boolean(option.isTerminal))
+  const [saveState, saveAction, saving] = useActionState(async (
+    previous: ClassificationActionState,
+    formData: FormData,
+  ) => {
+    const next = await saveClassificationOption(previous, formData)
+    if (next.status === 'error') setFinished(Boolean(option.isTerminal))
+    return next
+  }, initialState)
+  const [toggleState, toggleAction, toggling] = useActionState(toggleClassificationOption, initialState)
 
   return (
     <div className="border-t border-[var(--border)] py-3 first:border-t-0">

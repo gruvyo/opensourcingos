@@ -5,8 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { replaceSavingsScheduleAtomically } from '@/lib/atomic-money-writers'
 import type { Tables } from '@/lib/database.types'
 import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X, BadgeCheck } from 'lucide-react'
-import { formatCurrency, formatReduction as money } from '@/lib/utils'
-import { roundMoney } from '@/lib/money'
+import { roundMoney, hasCentPrecision } from '@/lib/money'
 import {
   anchorsWithBaselineQuality, chainSavings, baselineQuality,
   termRates, generateSchedule, scheduleTotals, scheduleByYear,
@@ -21,6 +20,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import { validateFinalAnchor } from '@/lib/final-anchor'
 import { localDateKey } from '@/lib/date-key'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
+import { LoadErrorState } from '@/components/load-error-state'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) }))
 
@@ -43,7 +44,30 @@ type ScheduleCalculation = Tables<'savings_calculations'>
 type SavedScheduleRow = Tables<'savings_periods'>
 
 /** Money as typed: '' means the anchor is not captured, never zero. */
-const toAnchor = (v: string): number | null => (v.trim() === '' ? null : roundMoney(Number(v)))
+const toAnchor = (value: string): number | null => {
+  if (value.trim() === '') return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount) || amount < 0 || !hasCentPrecision(amount)) return null
+  try {
+    return roundMoney(amount)
+  } catch {
+    return null
+  }
+}
+
+function optionalAnchorError(value: string, label: string): string | null {
+  if (value.trim() === '') return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return `Enter a valid ${label} amount.`
+  if (amount < 0) return `The ${label} amount cannot be negative.`
+  try {
+    if (!hasCentPrecision(amount)) return `Use no more than two decimal places for the ${label} amount.`
+    roundMoney(amount)
+  } catch {
+    return `The ${label} amount is outside the supported money range.`
+  }
+  return null
+}
 
 /**
  * The savings schedule. The chain gives one number for the whole deal; nobody
@@ -64,10 +88,12 @@ export function ScheduleTab({
   statusRequiresSavingsDisposition: boolean
   currentUserRole: string | null
 }) {
+  const { formatCurrency, formatReduction: money } = useWorkspaceFormat()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false)
   const [showReverseConfirm, setShowReverseConfirm] = useState(false)
@@ -96,6 +122,8 @@ export function ScheduleTab({
   const [pendingZeroFinalRow, setPendingZeroFinalRow] = useState<SavedScheduleRow | null>(null)
 
   const load = useCallback(async () => {
+    setLoading(true)
+    setLoadFailed(false)
     const [bases, offers, calcs] = await Promise.all([
       supabase.from('baselines')
         .select('id, baseline_total_amount, baseline_term_months, baseline_type, baseline_source, is_selected, hard_reduction_override, hard_reduction_override_reason')
@@ -108,7 +136,7 @@ export function ScheduleTab({
     ])
 
     const firstError = bases.error || offers.error || calcs.error
-    if (firstError) { setError(firstError.message); setLoading(false); return }
+    if (firstError) { setError(firstError.message); setLoadFailed(true); setLoading(false); return }
 
     const b = (bases.data || []).find(x => x.is_selected) ?? null
     const o = (offers.data || []).find(x => x.offer_role === 'opening') ?? null
@@ -128,7 +156,7 @@ export function ScheduleTab({
 
       const periods = await supabase.from('savings_periods').select('*')
         .eq('savings_calculation_id', c.id).order('period_number', { ascending: true })
-      if (periods.error) { setError(periods.error.message); setLoading(false); return }
+      if (periods.error) { setError(periods.error.message); setLoadFailed(true); setLoading(false); return }
       setRows(periods.data || [])
     } else {
       setRows([])
@@ -154,7 +182,7 @@ export function ScheduleTab({
       if (cancelled) return
 
       const firstError = bases.error || offers.error || calcs.error
-      if (firstError) { setError(firstError.message); setLoading(false); return }
+      if (firstError) { setError(firstError.message); setLoadFailed(true); setLoading(false); return }
 
       const b = (bases.data || []).find(x => x.is_selected) ?? null
       const o = (offers.data || []).find(x => x.offer_role === 'opening') ?? null
@@ -170,7 +198,7 @@ export function ScheduleTab({
           .eq('savings_calculation_id', c.id).order('period_number', { ascending: true })
 
         if (cancelled) return
-        if (periods.error) { setError(periods.error.message); setLoading(false); return }
+        if (periods.error) { setError(periods.error.message); setLoadFailed(true); setLoading(false); return }
 
         setPeriodType(type)
         setPeriodCount(Number(c.schedule_period_count) || defaultPeriodCount(type, dealMonths))
@@ -327,6 +355,12 @@ export function ScheduleTab({
   const saveRow = async (r: SavedScheduleRow, zeroConfirmed = false) => {
     if (!calc) {
       setError('Save the savings calculation before editing its schedule.')
+      return
+    }
+    const anchorError = optionalAnchorError(draft.baseline, 'Baseline')
+      || optionalAnchorError(draft.opening, 'Opening')
+    if (anchorError) {
+      setFinalError(anchorError)
       return
     }
     const finalValidation = validateFinalAnchor(draft.final, { zeroConfirmed })
@@ -518,6 +552,10 @@ export function ScheduleTab({
     return <div className="p-8 text-center text-sm text-[var(--text-3)]">Loading schedule...</div>
   }
 
+  if (loadFailed) {
+    return <LoadErrorState title="The savings schedule could not be loaded" message={error || 'A schedule read failed.'} onRetry={load} />
+  }
+
   return (
     <div>
       <div className="mb-4">
@@ -548,6 +586,13 @@ export function ScheduleTab({
 
       {error && (
         <div role="alert" className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>
+      )}
+
+      {calc?.legacy_execution_actor_missing && (
+        <div role="status" className="mb-4 rounded bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          This executed record was imported without its original actor. Its money is preserved, and
+          the next saved correction will attribute the corrected record to the person making it.
+        </div>
       )}
 
       {!calc ? (

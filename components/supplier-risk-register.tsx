@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { SafeExternalLink } from '@/components/safe-external-link'
-import { formatDate } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 
 type Person = { full_name: string | null; email: string }
 export type SupplierRisk = {
@@ -39,6 +39,7 @@ function severityTone(severity: SupplierRisk['severity']): BadgeTone {
 }
 
 export function SupplierRiskRegister({ supplierId, risks, canEdit, today }: { supplierId: string; risks: SupplierRisk[]; canEdit: boolean; today: string }) {
+  const { formatDate } = useWorkspaceFormat()
   const [editor, setEditor] = useState<'new' | string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SupplierRisk | null>(null)
   const [deleteError, setDeleteError] = useState('')

@@ -5,7 +5,7 @@ import { CalendarDays, MessageSquareText } from 'lucide-react'
 import { addSupplierNote, type SupplierNoteActionState } from '@/app/suppliers/note-actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatDate } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 
 export type SupplierNote = {
   id: string
@@ -33,6 +33,7 @@ export function SupplierNotes({
   canEdit: boolean
   today: string
 }) {
+  const { formatDate } = useWorkspaceFormat()
   const formRef = useRef<HTMLFormElement>(null)
   const action = addSupplierNote.bind(null, supplierId)
   const [state, formAction, pending] = useActionState(action, initialState)

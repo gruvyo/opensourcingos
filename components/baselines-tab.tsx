@@ -10,7 +10,7 @@ import {
 import {
   Plus, Star, Trash2, ChevronDown, Pencil,
   ChevronRight, Shield, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 import { termRates, baselineQuality } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -87,6 +87,7 @@ const BASELINE_TYPE_DEFENSIBILITY: Record<string, string> = {
 }
 
 export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId: string; scopeLines: ScopeLine[]; currentUserRole: string | null }) {
+  const { formatCurrency } = useWorkspaceFormat()
   const [baselines, setBaselines] = useState<Baseline[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -522,6 +523,7 @@ function HardReductionOverride({
   onChanged: () => void
   onError: (m: string | null) => void
 }) {
+  const { formatDate } = useWorkspaceFormat()
   const supabase = createClient()
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState(baseline.hard_reduction_override_reason || '')
@@ -626,6 +628,7 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
   onSaved: () => void
   onCancel: () => void
 }) {
+  const { formatCurrency } = useWorkspaceFormat()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -783,6 +786,7 @@ function BaselineLinesTable({ baselineId, scopeLines, lines: initialLines, onLin
   canEdit: boolean
   canDelete: boolean
 }) {
+  const { formatCurrency } = useWorkspaceFormat()
   const supabase = createClient()
   const [lines, setLines] = useState(initialLines)
   const [showAddLine, setShowAddLine] = useState(false)

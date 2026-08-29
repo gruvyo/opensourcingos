@@ -13,8 +13,14 @@ import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
 import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
-import { formatCurrency, formatDate, formatReduction } from '@/lib/utils'
 import { supplierAttributionTotals } from '@/lib/supplier-portfolio'
+import { WorkspaceFormatProvider } from '@/components/workspace-format-provider'
+import {
+  DEFAULT_WORKSPACE_CURRENCY,
+  DEFAULT_WORKSPACE_LOCALE,
+  DEFAULT_WORKSPACE_TIMEZONE,
+  workspaceFormatters,
+} from '@/lib/workspace-settings'
 
 type PageProps = { params: Promise<{ supplierId: string }> }
 type EventRow = { id: string; event_name: string; event_status: string | null; project_type: string | null; awarded_supplier_id: string | null; event_start_date: string | null; contract_start_date: string | null }
@@ -34,10 +40,10 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     ? await supabase.from('profiles').select('organization_id, role').eq('id', authData.user.id).maybeSingle()
     : { data: null }
 
-  const [{ data: supplier, error: supplierError }, { data: owners }, { data: currencySettings }, { data: contacts, error: contactsError }, { data: certifications, error: certificationsError }, { data: reviews, error: reviewsError }, { data: risks, error: risksError }, { data: notes, error: notesError }] = await Promise.all([
+  const [{ data: supplier, error: supplierError }, { data: owners }, { data: currencySettings, error: settingsError }, { data: contacts, error: contactsError }, { data: certifications, error: certificationsError }, { data: reviews, error: reviewsError }, { data: risks, error: risksError }, { data: notes, error: notesError }] = await Promise.all([
     supabase.from('suppliers').select('*').eq('id', supplierId).maybeSingle(),
     profile?.organization_id ? supabase.from('profiles').select('id, full_name, email').eq('organization_id', profile.organization_id).order('full_name') : Promise.resolve({ data: [] }),
-    profile?.organization_id ? supabase.from('organization_settings').select('currency_code, savings_realization_enabled, timezone').eq('organization_id', profile.organization_id).maybeSingle() : Promise.resolve({ data: null }),
+    profile?.organization_id ? supabase.from('organization_settings').select('currency_code, locale, savings_realization_enabled, timezone').eq('organization_id', profile.organization_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from('supplier_contacts').select('id, contact_name, job_title, email, phone, is_primary').eq('supplier_id', supplierId).order('is_primary', { ascending: false }).order('contact_name'),
     supabase.from('supplier_certifications').select('id, certification_name, issuer, certificate_number, issued_on, expires_on, evidence_url').eq('supplier_id', supplierId).order('expires_on', { ascending: true, nullsFirst: false }).order('certification_name'),
     supabase.from('supplier_performance_reviews').select('id, review_title, review_date, overall_score, delivery_score, quality_score, commercial_score, compliance_score, summary, next_review_date, reviewer:profiles!supplier_performance_reviews_created_by_fkey(full_name, email)').eq('supplier_id', supplierId).order('review_date', { ascending: false }).order('created_at', { ascending: false }),
@@ -63,7 +69,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
     supabase.from('audit_log').select('id, action, actor_id, before_data, after_data, created_at').eq('entity_type', 'supplier').eq('entity_id', supplierId).order('created_at', { ascending: false }).limit(20),
   ])
 
-  const loadError = contactsError?.message || certificationsError?.message || reviewsError?.message || risksError?.message || notesError?.message || eventsError?.message || calculationsError?.message || periodsError?.message || auditError?.message
+  const loadError = settingsError?.message || contactsError?.message || certificationsError?.message || reviewsError?.message || risksError?.message || notesError?.message || eventsError?.message || calculationsError?.message || periodsError?.message || auditError?.message
   const calculationRows = (calculations || []) as Array<Record<string, unknown>>
   const periodRows = (periods || []) as Array<Record<string, unknown>>
   const attributedMoney = supplierAttributionTotals(
@@ -85,10 +91,12 @@ export default async function SupplierProfilePage({ params }: PageProps) {
   )
   const eventMap = new Map(events.map(event => [event.id, event.event_name]))
   const ownerMap = new Map((owners || []).map(owner => [owner.id, owner.full_name || owner.email || 'Workspace member']))
-  const currency = currencySettings?.currency_code || 'USD'
+  const currency = currencySettings?.currency_code || DEFAULT_WORKSPACE_CURRENCY
+  const locale = currencySettings?.locale || DEFAULT_WORKSPACE_LOCALE
+  const { formatCurrency, formatDate, formatReduction } = workspaceFormatters(currency, locale)
   const savingsRealizationEnabled = currencySettings?.savings_realization_enabled ?? false
   const canEdit = profile?.role === 'admin' || profile?.role === 'procurement_user'
-  const todayKey = dateKeyInTimeZone(new Date(), currencySettings?.timezone || 'UTC')
+  const todayKey = dateKeyInTimeZone(new Date(), currencySettings?.timezone || DEFAULT_WORKSPACE_TIMEZONE)
   const values: SupplierFormValues = {
     supplierName: supplier.supplier_name,
     supplierStatus: supplier.supplier_status || 'Active',
@@ -103,6 +111,7 @@ export default async function SupplierProfilePage({ params }: PageProps) {
   }
 
   return (
+    <WorkspaceFormatProvider currencyCode={currency} locale={locale}>
     <div className="mx-auto w-full max-w-[1500px] p-4 sm:p-6 lg:p-8">
       <Link href="/suppliers" className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--text-2)] hover:text-[var(--text)]"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to suppliers</Link>
       <PageHeader
@@ -118,8 +127,8 @@ export default async function SupplierProfilePage({ params }: PageProps) {
         {[
           { label: 'Linked projects', value: events.length, icon: Building2 },
           { label: 'Awards', value: events.filter(event => event.awarded_supplier_id === supplierId).length, icon: Landmark },
-          { label: 'Negotiated savings', value: formatCurrency(attributedMoney.negotiatedSavings, currency), icon: PiggyBank },
-          ...(savingsRealizationEnabled ? [{ label: 'Realized savings', value: formatCurrency(attributedMoney.realizedSavings, currency), icon: TrendingUp }] : []),
+          { label: 'Negotiated savings', value: formatCurrency(attributedMoney.negotiatedSavings), icon: PiggyBank },
+          ...(savingsRealizationEnabled ? [{ label: 'Realized savings', value: formatCurrency(attributedMoney.realizedSavings), icon: TrendingUp }] : []),
         ].map(item => <Card key={item.label} className="p-5"><item.icon className="h-5 w-5 text-[var(--brand-ink)]" aria-hidden="true" /><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">{item.label}</p><p className="mt-1 text-xl font-bold text-[var(--text)]">{item.value}</p></Card>)}
       </section>
 
@@ -151,13 +160,13 @@ export default async function SupplierProfilePage({ params }: PageProps) {
           </Card>
 
           <Card className="overflow-hidden">
-            <div className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--text)]">Savings history</h2></div>
-            {calculationRows.length ? <div className="divide-y divide-[var(--border)]">{calculationRows.map(row => <div key={String(row.id)} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto_auto]"><div><p className="font-medium text-[var(--text)]">{String(row.calculation_name)}</p><p className="mt-1 text-xs text-[var(--text-3)]">{eventMap.get(String(row.event_id)) || 'Project'} · {String(row.calculation_status)}</p></div><div className="sm:text-right"><p className="text-xs text-[var(--text-3)]">Cost reduction</p><p className="font-semibold text-[var(--text)]">{formatReduction(row.cost_reduction_amount as number | null, currency)}</p></div><div className="sm:text-right"><p className="text-xs text-[var(--text-3)]">Total</p><p className="font-semibold text-[var(--text)]">{formatCurrency(Number(row.gross_savings_amount), currency)}</p></div></div>)}</div> : <p className="p-6 text-sm text-[var(--text-2)]">No savings calculations are linked yet.</p>}
+            <div className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--text)]">Linked-project savings history</h2><p className="mt-1 text-xs text-[var(--text-3)]">Includes projects where this supplier was the incumbent or the award winner. Summary tiles above attribute savings only to awarded suppliers.</p></div>
+            {calculationRows.length ? <div className="divide-y divide-[var(--border)]">{calculationRows.map(row => <div key={String(row.id)} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto_auto]"><div><p className="font-medium text-[var(--text)]">{String(row.calculation_name)}</p><p className="mt-1 text-xs text-[var(--text-3)]">{eventMap.get(String(row.event_id)) || 'Project'} · {String(row.calculation_status)}</p></div><div className="sm:text-right"><p className="text-xs text-[var(--text-3)]">Cost reduction</p><p className="font-semibold text-[var(--text)]">{formatReduction(row.cost_reduction_amount as number | null)}</p></div><div className="sm:text-right"><p className="text-xs text-[var(--text-3)]">Total</p><p className="font-semibold text-[var(--text)]">{formatCurrency(Number(row.gross_savings_amount))}</p></div></div>)}</div> : <p className="p-6 text-sm text-[var(--text-2)]">No savings calculations are linked yet.</p>}
           </Card>
 
           {savingsRealizationEnabled ? <Card className="overflow-hidden">
             <div className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--text)]">Realization history</h2></div>
-            {periodRows.length ? <div className="divide-y divide-[var(--border)]">{periodRows.map(row => <div key={String(row.id)} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center"><CalendarDays className="h-4 w-4 text-[var(--text-3)]" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="font-medium text-[var(--text)]">{String(row.period_name)}</p><p className="text-xs text-[var(--text-3)]">{eventMap.get(String(row.event_id)) || 'Project'} · through {formatDate(String(row.period_end_date))}</p></div><Badge tone={row.finance_validated ? 'success' : 'neutral'}>{row.finance_validated ? 'Finance validated' : String(row.realization_status)}</Badge><p className="font-semibold text-[var(--text)] sm:w-28 sm:text-right">{formatCurrency(Number(row.realized_savings), currency)}</p></div>)}</div> : <p className="p-6 text-sm text-[var(--text-2)]">No realization periods are linked yet.</p>}
+            {periodRows.length ? <div className="divide-y divide-[var(--border)]">{periodRows.map(row => <div key={String(row.id)} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center"><CalendarDays className="h-4 w-4 text-[var(--text-3)]" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="font-medium text-[var(--text)]">{String(row.period_name)}</p><p className="text-xs text-[var(--text-3)]">{eventMap.get(String(row.event_id)) || 'Project'} · through {formatDate(String(row.period_end_date))}</p></div><Badge tone={row.finance_validated ? 'success' : 'neutral'}>{row.finance_validated ? 'Finance validated' : String(row.realization_status)}</Badge><p className="font-semibold text-[var(--text)] sm:w-28 sm:text-right">{formatCurrency(Number(row.realized_savings))}</p></div>)}</div> : <p className="p-6 text-sm text-[var(--text-2)]">No realization periods are linked yet.</p>}
           </Card> : null}
         </div>
 
@@ -168,5 +177,6 @@ export default async function SupplierProfilePage({ params }: PageProps) {
         </aside>
       </div>
     </div>
+    </WorkspaceFormatProvider>
   )
 }

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { clsx } from 'clsx'
-import { formatDashboardCurrency, formatDashboardReduction } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 import { yearOverYear, type PortfolioByYear } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { TrendingUp, TrendingDown, Minus, Info } from 'lucide-react'
@@ -31,6 +31,7 @@ export function FiscalYearPanel({
   /** Route the filter links point at, e.g. "/dashboard". */
   basePath: string
 }) {
+  const { formatDashboardCurrency, formatDashboardReduction } = useWorkspaceFormat()
   const rows = yearOverYear(data.years)
   const selected = selectedYear === null ? null : data.years.find(y => y.year === selectedYear) ?? null
   const shown = selectedYear === null ? rows : rows.filter(r => r.year === selectedYear)
@@ -166,6 +167,7 @@ function Figure({ label, value, accent }: { label: string; value: string; accent
  * word travel with it, so this reads correctly without colour vision.
  */
 function Movement({ delta, pct }: { delta: number | null; pct: number | null }) {
+  const { formatDashboardCurrency } = useWorkspaceFormat()
   if (delta === null) {
     return <span className="text-xs text-[var(--text-3)]">no prior year</span>
   }
@@ -184,6 +186,7 @@ function Movement({ delta, pct }: { delta: number | null; pct: number | null }) 
 
 /** Say plainly where the numbers came from, including what could not be placed. */
 function Provenance({ data }: { data: PortfolioByYear }) {
+  const { formatDashboardCurrency } = useWorkspaceFormat()
   const parts: string[] = []
   if (data.scheduledProjects) {
     parts.push(`${data.scheduledProjects} project${data.scheduledProjects === 1 ? '' : 's'} from a generated schedule (${formatDashboardCurrency(data.exactTotal)}, exact to the month)`)

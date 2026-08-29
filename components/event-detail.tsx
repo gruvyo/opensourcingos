@@ -7,7 +7,7 @@ import {
   Briefcase, LifeBuoy, MessageSquareText, Send,
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { formatDate, statusColor } from '@/lib/utils'
+import { statusColor } from '@/lib/utils'
 import type { Tables } from '@/lib/database.types'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
@@ -19,6 +19,9 @@ import { CalculationsTab } from './calculations-tab'
 import { ScheduleTab } from './schedule-tab'
 import { RealizationTab } from './realization-tab'
 import { EditProjectModal } from './edit-project-modal'
+import { WorkspaceFormatProvider } from './workspace-format-provider'
+import { useWorkspaceFormat } from './workspace-format-provider'
+import { statusRequiresSavingsDisposition } from '@/lib/terminal-status'
 
 type ToOneRelation<T> = T | T[] | null
 type CategoryRelation = Pick<Tables<'categories'>, 'category_name'>
@@ -145,6 +148,8 @@ export function EventDetail({
   projectUpdatesEnabled,
   projectIncumbentSuppliersEnabled,
   savingsRealizationEnabled,
+  currencyCode,
+  locale,
 }: {
   event: Event
   scopeLines: ScopeLine[]
@@ -163,6 +168,8 @@ export function EventDetail({
   projectUpdatesEnabled: boolean
   projectIncumbentSuppliersEnabled: boolean
   savingsRealizationEnabled: boolean
+  currencyCode: string
+  locale: string
 }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEditModal, setShowEditModal] = useState(false)
@@ -177,6 +184,7 @@ export function EventDetail({
       : SOURCING_TABS
 
   return (
+    <WorkspaceFormatProvider currencyCode={currencyCode} locale={locale}>
     <div className="min-w-0">
       <div className="mb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -261,12 +269,11 @@ export function EventDetail({
         {!isSupport && activeTab === 'schedule' && (
           <ScheduleTab
             eventId={event.id}
-            statusRequiresSavingsDisposition={choiceOptions.some(option => (
-              option.choice_type === 'event_status'
-              && option.project_type === event.project_type
-              && option.requires_savings_disposition
-              && option.label.trim().toLocaleLowerCase('en-US') === event.event_status.trim().toLocaleLowerCase('en-US')
-            ))}
+            statusRequiresSavingsDisposition={statusRequiresSavingsDisposition(
+              event.event_status,
+              event.project_type,
+              choiceOptions,
+            )}
             currentUserRole={currentProfile.role}
           />
         )}
@@ -296,10 +303,12 @@ export function EventDetail({
         />
       )}
     </div>
+    </WorkspaceFormatProvider>
   )
 }
 
 function OverviewTab({ event }: { event: Event }) {
+  const { formatDate } = useWorkspaceFormat()
   const isSupport = event.project_type === 'Support'
 
   const details: { label: string; value: string | null | undefined }[] = [
