@@ -1,19 +1,14 @@
+'use client'
+
 import Link from 'next/link'
 import { CalendarClock, ChevronRight, ShieldAlert, TriangleAlert } from 'lucide-react'
 import type { AttentionQueue as AttentionQueueData } from '@/lib/attention-queue'
 import { Card } from '@/components/ui/card'
-
-function dateLabel(value: string | null): string | null {
-  if (!value) return null
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${value}T00:00:00Z`))
-}
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 
 export function AttentionQueue({ queue }: { queue: AttentionQueueData }) {
+  const { formatDate } = useWorkspaceFormat()
+
   return (
     <Card className="mt-6 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4 sm:px-6">
@@ -55,7 +50,7 @@ export function AttentionQueue({ queue }: { queue: AttentionQueueData }) {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs text-[var(--text-3)]">
-                  {dateLabel(item.date)}
+                  {item.date ? formatDate(item.date) : null}
                   <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </div>
               </Link>

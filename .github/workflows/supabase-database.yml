@@ -5,13 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'supabase/**'
-      - 'lib/database.types.ts'
-      - 'scripts/generate-database-types.sh'
-      - 'scripts/generate-database-schema.sh'
-      - 'package.json'
-      - '.github/workflows/supabase-database.yml'
 
 permissions:
   contents: read

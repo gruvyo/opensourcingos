@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(31);
+select plan(36);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -26,6 +26,11 @@ values
     'a2000000-0000-4000-8000-000000000002',
     (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000002'),
     'Atomic viewer project', 'Contract Renewal', 'Pipeline', 'Sourcing'
+  ),
+  (
+    'a2000000-0000-4000-8000-000000000003',
+    (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'),
+    'Atomic soft-baseline project', 'Contract Renewal', 'Pipeline', 'Sourcing'
   );
 
 insert into public.suppliers (id, organization_id, supplier_name, supplier_normalized_name)
@@ -41,7 +46,8 @@ insert into public.baselines (
 values
   ('a3000000-0000-4000-8000-000000000001', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'), 'a2000000-0000-4000-8000-000000000001', 'Old baseline', 'Current Contract', 1000, true),
   ('a3000000-0000-4000-8000-000000000002', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'), 'a2000000-0000-4000-8000-000000000001', 'New baseline', 'Current Contract', 1200, false),
-  ('a3000000-0000-4000-8000-000000000003', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000002'), 'a2000000-0000-4000-8000-000000000002', 'Viewer baseline', 'Current Contract', 800, true);
+  ('a3000000-0000-4000-8000-000000000003', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000002'), 'a2000000-0000-4000-8000-000000000002', 'Viewer baseline', 'Current Contract', 800, true),
+  ('a3000000-0000-4000-8000-000000000004', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'), 'a2000000-0000-4000-8000-000000000003', 'Approved budget', 'Approved Budget', 1000, true);
 
 insert into public.supplier_offers (
   id, organization_id, event_id, supplier_id, offer_type,
@@ -60,7 +66,8 @@ insert into public.savings_calculations (
 )
 values
   ('a6000000-0000-4000-8000-000000000001', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'), 'a2000000-0000-4000-8000-000000000001', 'Prior schedule', 'Cost Reduction', 'estimated', 100, 125, 100, 0, 25, 25, 25),
-  ('a6000000-0000-4000-8000-000000000002', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000002'), 'a2000000-0000-4000-8000-000000000002', 'Viewer schedule', 'Cost Reduction', 'estimated', 100, 110, 100, 0, 10, 10, 10);
+  ('a6000000-0000-4000-8000-000000000002', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000002'), 'a2000000-0000-4000-8000-000000000002', 'Viewer schedule', 'Cost Reduction', 'estimated', 100, 110, 100, 0, 10, 10, 10),
+  ('a6000000-0000-4000-8000-000000000003', (select organization_id from public.profiles where id = 'a1000000-0000-4000-8000-000000000001'), 'a2000000-0000-4000-8000-000000000003', 'Soft schedule', 'Cost Avoidance', 'estimated', null, 1000, 900, null, 100, 100, 100);
 
 insert into public.savings_periods (
   id, organization_id, event_id, savings_calculation_id,
@@ -183,6 +190,58 @@ select is(
   (select count(*)::bigint from public.savings_periods where savings_calculation_id = 'a6000000-0000-4000-8000-000000000001'),
   2::bigint,
   'idempotent schedule replacement does not duplicate periods'
+);
+select throws_ok(
+  $$
+    select public.replace_savings_schedule(
+      'a6000000-0000-4000-8000-000000000001', 8, 2026, 'monthly',
+      '[
+        {"period_number":1,"period_month":8,"period_year":2026,"period_months":1,"baseline_amount":500,"opening_amount":600,"final_amount":450,"cost_reduction_amount":50,"cost_avoidance_amount":100,"total_savings_amount":150,"is_edited":true},
+        {"period_number":2,"period_month":9,"period_year":2026,"period_months":1,"baseline_amount":null,"opening_amount":600,"final_amount":450,"cost_reduction_amount":null,"cost_avoidance_amount":150,"total_savings_amount":150,"is_edited":true}
+      ]'::jsonb
+    )
+  $$,
+  '23514',
+  'A schedule cannot mix captured and missing baseline amounts. Capture every period or clear every period.',
+  'mixed baseline capture is rejected before the aggregate constraint can leak'
+);
+select ok(
+  (select count(*) = 2 and sum(total_savings_amount) = 300
+   from public.savings_periods
+   where savings_calculation_id = 'a6000000-0000-4000-8000-000000000001'),
+  'a rejected mixed-baseline edit preserves the prior schedule'
+);
+select throws_ok(
+  $$
+    select public.replace_savings_schedule(
+      'a6000000-0000-4000-8000-000000000003', 8, 2026, 'monthly',
+      '[{"period_number":1,"period_month":8,"period_year":2026,"period_months":1,"baseline_amount":1000,"opening_amount":1000,"final_amount":900,"cost_reduction_amount":100,"cost_avoidance_amount":0,"total_savings_amount":100,"is_edited":false}]'::jsonb
+    )
+  $$,
+  '23514',
+  'Soft baselines cannot book hard cost reduction. Use cost avoidance or approve a documented hard-baseline override.',
+  'a direct RPC cannot book hard reduction against a soft baseline'
+);
+select lives_ok(
+  $$
+    select public.replace_savings_schedule(
+      'a6000000-0000-4000-8000-000000000003', 8, 2026, 'monthly',
+      '[{"period_number":1,"period_month":8,"period_year":2026,"period_months":1,"baseline_amount":null,"opening_amount":1000,"final_amount":900,"cost_reduction_amount":null,"cost_avoidance_amount":100,"total_savings_amount":100,"is_edited":false}]'::jsonb
+    )
+  $$,
+  'a soft baseline can publish a pure cost-avoidance schedule'
+);
+select throws_ok(
+  $$
+    select public.save_estimated_savings_calculation(
+      'a2000000-0000-4000-8000-000000000003',
+      '{"baseline_id":"a3000000-0000-4000-8000-000000000004","calculation_name":"Forged hard savings","savings_type":"Cost Reduction","baseline_total_amount":1000,"opening_proposal_amount":1000,"award_total_amount":900,"gross_savings_amount":100,"cost_reduction_amount":100,"cost_avoidance_amount":0,"savings_percentage":10,"net_savings_amount":100}'::jsonb,
+      'a6000000-0000-4000-8000-000000000003'
+    )
+  $$,
+  '23514',
+  'Soft baselines cannot book hard cost reduction. Use cost avoidance or approve a documented hard-baseline override.',
+  'the estimated-calculation RPC also rejects forged hard savings against a soft baseline'
 );
 select throws_ok(
   $$

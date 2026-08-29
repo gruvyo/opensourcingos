@@ -90,19 +90,17 @@ select throws_ok(
   'the database rejects a calculation headline that disagrees with its legs'
 );
 
-select throws_ok(
-  $$ delete from public.sourcing_events
-     where id = '00000000-0000-4000-8000-000000000021' $$,
-  'P0001', 'reverse executed savings before deleting the project',
-  'an executed calculation blocks project cascade deletion without realization rows'
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  'e1000000-0000-4000-8000-000000000001',
+  'money-integrity-admin@example.test',
+  '{"full_name":"Money Integrity Admin"}'
 );
 
-select throws_ok(
-  $$ delete from public.baselines
-     where id = '00000000-0000-4000-8000-000000000031' $$,
-  'P0001', 'reverse executed savings before deleting the baseline',
-  'an executed calculation blocks baseline SET NULL without realization rows'
-);
+update public.profiles
+set organization_id = '00000000-0000-4000-8000-000000000001',
+    role = 'admin'
+where id = 'e1000000-0000-4000-8000-000000000001';
 
 insert into public.awards (
   id, organization_id, event_id, award_name, award_total_amount
@@ -118,6 +116,23 @@ update public.savings_calculations
 set award_id = '00000000-0000-4000-8000-000000000071'
 where id = '00000000-0000-4000-8000-000000000051';
 
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'e1000000-0000-4000-8000-000000000001', true);
+
+select throws_ok(
+  $$ delete from public.sourcing_events
+     where id = '00000000-0000-4000-8000-000000000021' $$,
+  'P0001', 'reverse executed savings before deleting the project',
+  'an executed calculation blocks project cascade deletion without realization rows'
+);
+
+select throws_ok(
+  $$ delete from public.baselines
+     where id = '00000000-0000-4000-8000-000000000031' $$,
+  'P0001', 'reverse executed savings before deleting the baseline',
+  'an executed calculation blocks baseline SET NULL without realization rows'
+);
+
 select throws_ok(
   $$ delete from public.awards
      where id = '00000000-0000-4000-8000-000000000071' $$,
@@ -125,5 +140,6 @@ select throws_ok(
   'an executed calculation blocks award SET NULL without realization rows'
 );
 
+reset role;
 select * from finish();
 rollback;

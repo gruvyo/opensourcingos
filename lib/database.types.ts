@@ -2433,6 +2433,18 @@ export type Database = {
         Args: { p_fields: string[]; p_items: Json }
         Returns: undefined
       }
+      assert_savings_calculation_baseline_quality: {
+        Args: { p_calculation: Json; p_event_id: string }
+        Returns: undefined
+      }
+      assert_savings_schedule_baseline_quality: {
+        Args: {
+          p_periods: Json
+          p_savings_calculation_id: string
+          p_use_selected_baseline: boolean
+        }
+        Returns: undefined
+      }
       clone_org_data: {
         Args: { p_owner: string; p_source: string; p_target: string }
         Returns: number
@@ -2510,6 +2522,14 @@ export type Database = {
         Returns: undefined
       }
       save_estimated_savings_calculation: {
+        Args: {
+          p_calculation: Json
+          p_calculation_id?: string
+          p_event_id: string
+        }
+        Returns: string
+      }
+      save_estimated_savings_calculation_unchecked: {
         Args: {
           p_calculation: Json
           p_calculation_id?: string
