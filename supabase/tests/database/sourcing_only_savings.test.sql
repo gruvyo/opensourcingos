@@ -80,8 +80,9 @@ select set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000001
 
 select lives_ok(
   $$ select public.save_estimated_savings_calculation(
-       'd2000000-0000-4000-8000-000000000001', null,
-       '{"baseline_id":null,"calculation_name":"Allowed Sourcing calculation","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":null,"award_total_amount":0,"gross_savings_amount":100,"cost_reduction_amount":100,"cost_avoidance_amount":0,"savings_percentage":100,"net_savings_amount":100,"recognition_notes":null}'::jsonb
+       'd2000000-0000-4000-8000-000000000001',
+       '{"baseline_id":null,"calculation_name":"Allowed Sourcing calculation","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":null,"award_total_amount":0,"gross_savings_amount":100,"cost_reduction_amount":100,"cost_avoidance_amount":0,"savings_percentage":100,"net_savings_amount":100,"recognition_notes":null}'::jsonb,
+       null
      ) $$,
   'an administrator can create savings for a Sourcing Project through the atomic writer'
 );
@@ -96,8 +97,9 @@ select ok(
 
 select throws_ok(
   $$ select public.save_estimated_savings_calculation(
-       'd2000000-0000-4000-8000-000000000002', null,
-       '{"baseline_id":null,"calculation_name":"Blocked Support calculation","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":null,"award_total_amount":0,"gross_savings_amount":100,"cost_reduction_amount":100,"cost_avoidance_amount":0,"savings_percentage":100,"net_savings_amount":100,"recognition_notes":null}'::jsonb
+       'd2000000-0000-4000-8000-000000000002',
+       '{"baseline_id":null,"calculation_name":"Blocked Support calculation","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":null,"award_total_amount":0,"gross_savings_amount":100,"cost_reduction_amount":100,"cost_avoidance_amount":0,"savings_percentage":100,"net_savings_amount":100,"recognition_notes":null}'::jsonb,
+       null
      ) $$,
   'P0001', 'sourcing project not found',
   'Support / Non-Commercial projects cannot receive savings calculations'

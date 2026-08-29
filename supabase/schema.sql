@@ -2721,7 +2721,7 @@ $$;
 ALTER FUNCTION "public"."reverse_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_disposition_action" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") RETURNS "uuid"
+CREATE OR REPLACE FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation" "jsonb", "p_calculation_id" "uuid" DEFAULT NULL::"uuid") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
@@ -2854,7 +2854,7 @@ end
 $$;
 
 
-ALTER FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation" "jsonb", "p_calculation_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."select_baseline"("p_baseline_id" "uuid") RETURNS "void"
@@ -7406,9 +7406,9 @@ GRANT ALL ON FUNCTION "public"."reverse_savings_execution"("p_calc_id" "uuid", "
 
 
 
-REVOKE ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") TO "service_role";
-GRANT ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation" "jsonb", "p_calculation_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation" "jsonb", "p_calculation_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation" "jsonb", "p_calculation_id" "uuid") TO "authenticated";
 
 
 

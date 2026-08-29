@@ -151,14 +151,24 @@ test('estimated calculation save sends only project, calculation, and reviewed v
   await saveEstimatedSavingsCalculationAtomically(
     client, 'event-1', 'calculation-1', calculation,
   )
-  assert.deepEqual(calls, [{
-    name: 'save_estimated_savings_calculation',
-    args: {
-      p_event_id: 'event-1',
-      p_calculation_id: 'calculation-1',
-      p_calculation: calculation,
+  await saveEstimatedSavingsCalculationAtomically(client, 'event-2', null, calculation)
+  assert.deepEqual(calls, [
+    {
+      name: 'save_estimated_savings_calculation',
+      args: {
+        p_event_id: 'event-1',
+        p_calculation_id: 'calculation-1',
+        p_calculation: calculation,
+      },
     },
-  }])
+    {
+      name: 'save_estimated_savings_calculation',
+      args: {
+        p_event_id: 'event-2',
+        p_calculation: calculation,
+      },
+    },
+  ])
   assert.equal(JSON.stringify(calls).includes('organization_id'), false)
   assert.equal(JSON.stringify(calls).includes('created_by'), false)
   assert.equal(JSON.stringify(calls).includes('updated_by'), false)

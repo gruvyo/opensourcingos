@@ -29,8 +29,8 @@ select ok(
 );
 
 select ok(
-  has_function_privilege('authenticated', 'public.save_estimated_savings_calculation(uuid,uuid,jsonb)', 'EXECUTE')
-  and not has_function_privilege('anon', 'public.save_estimated_savings_calculation(uuid,uuid,jsonb)', 'EXECUTE'),
+  has_function_privilege('authenticated', 'public.save_estimated_savings_calculation(uuid,jsonb,uuid)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.save_estimated_savings_calculation(uuid,jsonb,uuid)', 'EXECUTE'),
   'the estimated-calculation writer is authenticated only'
 );
 
@@ -86,8 +86,9 @@ select set_config('request.jwt.claim.sub', 'f1000000-0000-4000-8000-000000000001
 
 select throws_ok(
   $$ select public.save_estimated_savings_calculation(
-       gen_random_uuid(), null,
-       '{"award_total_amount":99.999,"gross_savings_amount":0,"cost_avoidance_amount":0,"net_savings_amount":0,"savings_percentage":null,"savings_type":"Cost Reduction"}'::jsonb
+       gen_random_uuid(),
+       '{"award_total_amount":99.999,"gross_savings_amount":0,"cost_avoidance_amount":0,"net_savings_amount":0,"savings_percentage":null,"savings_type":"Cost Reduction"}'::jsonb,
+       null
      ) $$,
   '22003', 'award_total_amount must have no more than two decimal places',
   'the calculation RPC rejects rather than rounds sub-cent money'
@@ -154,8 +155,9 @@ select throws_ok(
 
 select throws_ok(
   $$ select public.save_estimated_savings_calculation(
-       'f2000000-0000-4000-8000-000000000002', null,
-       '{"baseline_id":null,"calculation_name":"Viewer calc","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":100,"award_total_amount":90,"gross_savings_amount":10,"cost_reduction_amount":10,"cost_avoidance_amount":0,"savings_percentage":10,"net_savings_amount":10,"recognition_notes":"test"}'::jsonb
+       'f2000000-0000-4000-8000-000000000002',
+       '{"baseline_id":null,"calculation_name":"Viewer calc","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":100,"award_total_amount":90,"gross_savings_amount":10,"cost_reduction_amount":10,"cost_avoidance_amount":0,"savings_percentage":10,"net_savings_amount":10,"recognition_notes":"test"}'::jsonb,
+       null
      ) $$,
   'P0001', 'administrator or procurement role required',
   'a viewer cannot use the estimated-calculation writer'

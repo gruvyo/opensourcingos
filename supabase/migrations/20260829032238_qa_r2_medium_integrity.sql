@@ -119,8 +119,8 @@ grant execute on function public.replace_savings_schedule(uuid, integer, integer
 
 create function public.save_estimated_savings_calculation(
   p_event_id uuid,
-  p_calculation_id uuid,
-  p_calculation jsonb
+  p_calculation jsonb,
+  p_calculation_id uuid default null
 )
 returns uuid
 language plpgsql
@@ -255,9 +255,9 @@ begin
 end
 $$;
 
-revoke all on function public.save_estimated_savings_calculation(uuid, uuid, jsonb)
+revoke all on function public.save_estimated_savings_calculation(uuid, jsonb, uuid)
   from public, anon, authenticated;
-grant execute on function public.save_estimated_savings_calculation(uuid, uuid, jsonb)
+grant execute on function public.save_estimated_savings_calculation(uuid, jsonb, uuid)
   to authenticated;
 
 -- The role matrix grants these at column scope. A table-scope REVOKE alone
