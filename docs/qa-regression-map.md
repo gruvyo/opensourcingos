@@ -32,7 +32,16 @@ runs every pgTAP file below against a disposable database.
 | U-TZ-PERSIST | Schedule end dates persist the user's local calendar date without a UTC day shift | `scripts/schedule-date-persistence.test.mts` |
 | U-ATTENTION | Supplier lists, readiness reports, and the dashboard share one actionable attention definition | `scripts/supplier-readiness.test.mts`; `scripts/attention-queue.test.mts` |
 | U-CURRENCY | Reports use workspace currency and locale; CSV money headers identify the currency while cells retain exact numeric values | `scripts/report-currency.test.mts`; `scripts/csv.test.mts` |
+| R2-V1 | TypeScript and Postgres accept the same signed Opening − Baseline − Final chain, including negative avoidance, and calculation headlines remain additive | `scripts/verify-savings.mts`; `supabase/tests/database/qa_r2_money_integrity.test.sql`; `supabase/tests/database/two_decimal_money.test.sql` |
+| R2-V2 | Executed calculations cannot be removed or detached through event cascades or baseline/award `SET NULL` actions, even with zero realization rows | `supabase/tests/database/qa_r2_money_integrity.test.sql`; `supabase/tests/database/executed_savings_lifecycle.test.sql` |
+| R2-V3 | Unchanged realization inputs do not issue destructive blur writes | `scripts/money-precision.test.mts`; `scripts/realization.test.mts` |
+| R2-V5 | Historical null project types retain Sourcing compatibility at both application and database boundaries | `scripts/savings-population.test.mts`; `supabase/tests/database/qa_r2_remaining_core.test.sql`; `supabase/tests/database/sourcing_only_savings.test.sql` |
+| R2-V6 | Baseline-line totals and every estimated schedule edit are written and republished atomically | `scripts/atomic-money-writers.test.mts`; `supabase/tests/database/atomic_money_writers.test.sql`; `supabase/tests/database/executed_savings_lifecycle.test.sql` |
+| R2-V7 | Soft baselines cannot publish hard reduction through generated or hand-edited schedule rows | `scripts/verify-savings.mts`; `supabase/tests/database/qa_r2_remaining_core.test.sql` |
+| R2-V8 | Portable realization backfill preserves untouched legacy rows instead of classifying them as leakage | `supabase/tests/database/qa_r2_remaining_core.test.sql`; `supabase/tests/database/per_leg_realization.test.sql` |
+| R2-V9 | Dashboard, Savings, Realization, supplier, and project money surfaces share workspace currency/locale and cent-exact dashboard display; timezone fallbacks share one constant | `scripts/report-currency.test.mts`; `scripts/realization-timezone.test.mts`; `scripts/verify-savings.mts` |
+| R2-M | Managed labels keep a case-insensitive identity; estimated money is cent-exact and RPC-only; finance/deferred invariants fail closed; demo clones classify every org table; legacy corrections gain attributable actors; remaining loaders, CSV numbers, roles, URLs, and refresh paths are guarded | `scripts/atomic-money-writers.test.mts`; `scripts/load-state.test.mts`; `scripts/report-currency.test.mts`; `supabase/tests/database/qa_r2_medium_integrity.test.sql`; `supabase/tests/database/money_core_role_matrix.test.sql`; `supabase/tests/database/bootstrap.test.sql` |
 
-Hardening units not yet merged must add their evidence to this map in the same
-pull request. A test name alone is not sufficient: the test must exercise the
+Future hardening units must add their evidence to this map in the same pull
+request. A test name alone is not sufficient: the test must exercise the
 specific failure mode recorded in the assessment.
