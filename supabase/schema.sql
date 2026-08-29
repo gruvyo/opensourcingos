@@ -139,6 +139,71 @@ $$;
 ALTER FUNCTION "public"."add_baseline_line"("p_baseline_id" "uuid", "p_line" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."assert_jsonb_money_cent_exact"("p_items" "jsonb", "p_fields" "text"[]) RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'pg_catalog'
+    AS $$
+declare
+  v_item jsonb;
+  v_field text;
+  v_amount numeric;
+begin
+  if jsonb_typeof(p_items) is distinct from 'array' then
+    raise exception 'money payload must be a JSON array';
+  end if;
+
+  for v_item in select value from jsonb_array_elements(p_items)
+  loop
+    if jsonb_typeof(v_item) is distinct from 'object' then
+      raise exception 'money payload rows must be JSON objects';
+    end if;
+    foreach v_field in array p_fields
+    loop
+      if v_item ? v_field and v_item->v_field <> 'null'::jsonb then
+        if jsonb_typeof(v_item->v_field) is distinct from 'number' then
+          raise exception '% must be a JSON number or null', v_field;
+        end if;
+        v_amount := (v_item->>v_field)::numeric;
+        if v_amount is distinct from round(v_amount, 2) then
+          raise exception '% must have no more than two decimal places', v_field
+            using errcode = '22003';
+        end if;
+      end if;
+    end loop;
+  end loop;
+end
+$$;
+
+
+ALTER FUNCTION "public"."assert_jsonb_money_cent_exact"("p_items" "jsonb", "p_fields" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."attribute_corrected_legacy_execution"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+begin
+  if old.legacy_execution_actor_missing and (
+    new.baseline_total_amount is distinct from old.baseline_total_amount
+    or new.opening_proposal_amount is distinct from old.opening_proposal_amount
+    or new.award_total_amount is distinct from old.award_total_amount
+    or new.cost_reduction_amount is distinct from old.cost_reduction_amount
+    or new.cost_avoidance_amount is distinct from old.cost_avoidance_amount
+    or new.gross_savings_amount is distinct from old.gross_savings_amount
+  ) then
+    new.executed_by := coalesce(new.executed_by, auth.uid());
+    if new.executed_by is not null then
+      new.legacy_execution_actor_missing := false;
+    end if;
+  end if;
+  return new;
+end
+$$;
+
+
+ALTER FUNCTION "public"."attribute_corrected_legacy_execution"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."capture_workspace_audit"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
@@ -242,14 +307,20 @@ declare
   v_tables text[] := array[
     'categories', 'business_units', 'cost_centers', 'suppliers',
     'project_choice_options',
+    'supplier_contacts', 'supplier_notes', 'supplier_certifications',
+    'supplier_performance_reviews', 'supplier_risks',
     'sourcing_events', 'project_updates', 'event_scope_lines',
     'baselines', 'baseline_lines',
     'supplier_offers', 'supplier_offer_lines',
-    'savings_calculations', 'savings_periods'
+    'awards', 'award_lines',
+    'savings_calculations', 'savings_calculation_lines',
+    'savings_periods', 'realization_periods'
   ];
-  -- Metadata always belongs to the new workspace owner. Ownership and
-  -- decision actors preserve null (no assignment/decision) and otherwise
-  -- move to that owner so no template profile can leak into the clone.
+  v_excluded_tables text[] := array[
+    'audit_log',
+    'organization_settings',
+    'profiles'
+  ];
   v_metadata_person_cols text[] := array['created_by', 'updated_by'];
   v_conditional_person_cols text[] := array[
     'procurement_owner_id', 'business_owner_id', 'finance_owner_id',
@@ -261,6 +332,7 @@ declare
   ];
   v_known_person_cols text[];
   v_unknown_person_cols text;
+  v_unknown_tables text;
   t text;
   v_cols text;
   v_total integer := 0;
@@ -292,6 +364,20 @@ begin
     raise exception 'demo clone owner must belong to the non-template target';
   end if;
 
+  select string_agg(table_name, ', ' order by table_name)
+  into v_unknown_tables
+  from (
+    select distinct column_row.table_name
+    from information_schema.columns column_row
+    where column_row.table_schema = 'public'
+      and column_row.column_name = 'organization_id'
+      and not (column_row.table_name = any(v_tables || v_excluded_tables))
+  ) unclassified;
+
+  if v_unknown_tables is not null then
+    raise exception 'unclassified organization-scoped table in demo clone: %', v_unknown_tables;
+  end if;
+
   v_known_person_cols := v_metadata_person_cols || v_conditional_person_cols;
   select string_agg(
     format('%I.%I', relation.relname, attribute.attname),
@@ -316,9 +402,6 @@ begin
     raise exception 'unclassified profile reference in demo clone: %', v_unknown_person_cols;
   end if;
 
-  -- A direct service invocation receives the same fresh settings guarantee as
-  -- the signup trigger. ON CONFLICT deliberately preserves any explicit target
-  -- settings instead of importing the template's preferences.
   insert into public.organization_settings (organization_id, updated_by)
   values (p_target, p_owner)
   on conflict (organization_id) do nothing;
@@ -328,7 +411,8 @@ begin
   foreach t in array v_tables loop
     execute format(
       'insert into _idmap (old, new) select id, gen_random_uuid() from public.%I where organization_id = $1',
-      t) using p_source;
+      t
+    ) using p_source;
   end loop;
 
   foreach t in array v_tables loop
@@ -361,6 +445,17 @@ begin
     get diagnostics v_count = row_count;
     v_total := v_total + v_count;
   end loop;
+
+  -- A demo clone has a present steward. Do not manufacture actorless-legacy
+  -- warnings in every new workspace from a template's historical import flag.
+  update public.savings_calculations
+  set executed_by = p_owner,
+      legacy_execution_actor_missing = false,
+      updated_by = p_owner,
+      updated_at = now()
+  where organization_id = p_target
+    and calculation_status = 'executed'
+    and legacy_execution_actor_missing;
 
   drop table _idmap;
   return v_total;
@@ -497,6 +592,36 @@ ALTER FUNCTION "public"."confirm_business_equivalency"("p_scope_line_id" "uuid",
 
 
 CREATE OR REPLACE FUNCTION "public"."correct_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+begin
+  perform public.assert_jsonb_money_cent_exact(
+    jsonb_build_array(p_calculation),
+    array[
+      'baseline_total_amount', 'opening_proposal_amount', 'award_total_amount',
+      'gross_savings_amount', 'net_savings_amount',
+      'cost_reduction_amount', 'cost_avoidance_amount', 'savings_percentage'
+    ]
+  );
+  perform public.assert_jsonb_money_cent_exact(
+    p_periods,
+    array[
+      'baseline_amount', 'opening_amount', 'final_amount',
+      'cost_reduction_amount', 'cost_avoidance_amount', 'total_savings_amount'
+    ]
+  );
+  perform public.correct_savings_execution_unchecked(
+    p_calc_id, p_note, p_calculation, p_periods
+  );
+end
+$$;
+
+
+ALTER FUNCTION "public"."correct_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."correct_savings_execution_unchecked"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
@@ -1015,7 +1140,7 @@ end
 $$;
 
 
-ALTER FUNCTION "public"."correct_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."correct_savings_execution_unchecked"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."current_org_id"() RETURNS "uuid"
@@ -1556,7 +1681,7 @@ ALTER FUNCTION "public"."enforce_project_updates_setting"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."enforce_savings_completion_invariant"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
 declare
@@ -1619,7 +1744,7 @@ ALTER FUNCTION "public"."enforce_savings_completion_invariant"() OWNER TO "postg
 
 
 CREATE OR REPLACE FUNCTION "public"."enforce_savings_execution_invariant"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
 declare
@@ -2248,6 +2373,32 @@ CREATE OR REPLACE FUNCTION "public"."replace_savings_schedule"("p_savings_calcul
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
+begin
+  perform public.assert_jsonb_money_cent_exact(
+    p_periods,
+    array[
+      'baseline_amount', 'opening_amount', 'final_amount',
+      'cost_reduction_amount', 'cost_avoidance_amount', 'total_savings_amount'
+    ]
+  );
+  perform public.replace_savings_schedule_unchecked(
+    p_savings_calculation_id,
+    p_schedule_start_month,
+    p_schedule_start_year,
+    p_schedule_period_type,
+    p_periods
+  );
+end
+$$;
+
+
+ALTER FUNCTION "public"."replace_savings_schedule"("p_savings_calculation_id" "uuid", "p_schedule_start_month" integer, "p_schedule_start_year" integer, "p_schedule_period_type" "text", "p_periods" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."replace_savings_schedule_unchecked"("p_savings_calculation_id" "uuid", "p_schedule_start_month" integer, "p_schedule_start_year" integer, "p_schedule_period_type" "text", "p_periods" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
 declare
   v_user uuid := auth.uid();
   v_org uuid;
@@ -2435,7 +2586,7 @@ end
 $$;
 
 
-ALTER FUNCTION "public"."replace_savings_schedule"("p_savings_calculation_id" "uuid", "p_schedule_start_month" integer, "p_schedule_start_year" integer, "p_schedule_period_type" "text", "p_periods" "jsonb") OWNER TO "postgres";
+ALTER FUNCTION "public"."replace_savings_schedule_unchecked"("p_savings_calculation_id" "uuid", "p_schedule_start_month" integer, "p_schedule_start_year" integer, "p_schedule_period_type" "text", "p_periods" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."reverse_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_disposition_action" "text") RETURNS "void"
@@ -2568,6 +2719,142 @@ $$;
 
 
 ALTER FUNCTION "public"."reverse_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_disposition_action" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v_user uuid := auth.uid();
+  v_org uuid;
+  v_role text;
+  v_baseline_id uuid;
+  v_baseline numeric;
+  v_opening numeric;
+  v_final numeric;
+  v_reduction numeric;
+  v_avoidance numeric;
+  v_total numeric;
+  v_percentage numeric;
+  v_savings_type text;
+  v_id uuid;
+begin
+  if v_user is null then raise exception 'authentication required'; end if;
+  if jsonb_typeof(p_calculation) is distinct from 'object' then
+    raise exception 'calculation must be a JSON object';
+  end if;
+  if exists (
+    select 1 from jsonb_object_keys(p_calculation) key(field_name)
+    where key.field_name not in (
+      'baseline_id', 'calculation_name', 'savings_type',
+      'baseline_total_amount', 'opening_proposal_amount', 'award_total_amount',
+      'gross_savings_amount', 'cost_reduction_amount', 'cost_avoidance_amount',
+      'savings_percentage', 'net_savings_amount', 'recognition_notes'
+    )
+  ) then
+    raise exception 'calculation payload contains unsupported fields';
+  end if;
+
+  perform public.assert_jsonb_money_cent_exact(
+    jsonb_build_array(p_calculation),
+    array[
+      'baseline_total_amount', 'opening_proposal_amount', 'award_total_amount',
+      'gross_savings_amount', 'cost_reduction_amount', 'cost_avoidance_amount',
+      'net_savings_amount', 'savings_percentage'
+    ]
+  );
+
+  select organization_id, role into v_org, v_role
+  from public.profiles where id = v_user;
+  if v_org is null then raise exception 'workspace membership required'; end if;
+  if v_role not in ('admin', 'procurement_user') then
+    raise exception 'administrator or procurement role required';
+  end if;
+
+  perform 1 from public.sourcing_events
+  where id = p_event_id and organization_id = v_org and project_type = 'Sourcing'
+  for update;
+  if not found then raise exception 'sourcing project not found'; end if;
+
+  v_baseline_id := nullif(p_calculation->>'baseline_id', '')::uuid;
+  if v_baseline_id is not null and not exists (
+    select 1 from public.baselines
+    where id = v_baseline_id and event_id = p_event_id and organization_id = v_org
+  ) then
+    raise exception 'selected baseline does not belong to the sourcing project';
+  end if;
+
+  v_baseline := (p_calculation->>'baseline_total_amount')::numeric;
+  v_opening := (p_calculation->>'opening_proposal_amount')::numeric;
+  v_final := (p_calculation->>'award_total_amount')::numeric;
+  if v_final is null or v_final < 0 then raise exception 'final amount is required and cannot be negative'; end if;
+  if v_baseline < 0 or v_opening < 0 then raise exception 'baseline and opening amounts cannot be negative'; end if;
+
+  v_reduction := case when v_baseline is null then null else v_baseline - v_final end;
+  v_avoidance := case
+    when v_baseline is not null and v_opening is not null then v_opening - v_baseline
+    when v_baseline is null and v_opening is not null then v_opening - v_final
+    else 0
+  end;
+  v_total := coalesce(v_reduction, 0) + v_avoidance;
+  v_percentage := case when v_baseline > 0 then round((v_total / v_baseline) * 100, 2) end;
+  v_savings_type := case when coalesce(v_reduction, 0) >= v_avoidance
+    then 'Cost Reduction' else 'Cost Avoidance' end;
+
+  if (p_calculation->>'cost_reduction_amount')::numeric is distinct from v_reduction
+    or (p_calculation->>'cost_avoidance_amount')::numeric is distinct from v_avoidance
+    or (p_calculation->>'gross_savings_amount')::numeric is distinct from v_total
+    or (p_calculation->>'net_savings_amount')::numeric is distinct from v_total
+    or (p_calculation->>'savings_percentage')::numeric is distinct from v_percentage
+    or p_calculation->>'savings_type' is distinct from v_savings_type then
+    raise exception 'calculation payload does not match the approved savings chain';
+  end if;
+
+  if p_calculation_id is null then
+    insert into public.savings_calculations (
+      organization_id, event_id, baseline_id, calculation_name, savings_type,
+      baseline_total_amount, opening_proposal_amount, award_total_amount,
+      gross_savings_amount, cost_reduction_amount, cost_avoidance_amount,
+      savings_percentage, net_savings_amount, recognition_notes,
+      created_by, updated_by
+    ) values (
+      v_org, p_event_id, v_baseline_id,
+      coalesce(nullif(btrim(p_calculation->>'calculation_name'), ''), 'Deal savings'),
+      v_savings_type, v_baseline, v_opening, v_final,
+      v_total, v_reduction, v_avoidance, v_percentage, v_total,
+      p_calculation->>'recognition_notes', v_user, v_user
+    ) returning id into v_id;
+  else
+    update public.savings_calculations
+    set baseline_id = v_baseline_id,
+        calculation_name = coalesce(nullif(btrim(p_calculation->>'calculation_name'), ''), calculation_name),
+        savings_type = v_savings_type,
+        baseline_total_amount = v_baseline,
+        opening_proposal_amount = v_opening,
+        award_total_amount = v_final,
+        gross_savings_amount = v_total,
+        cost_reduction_amount = v_reduction,
+        cost_avoidance_amount = v_avoidance,
+        savings_percentage = v_percentage,
+        net_savings_amount = v_total,
+        recognition_notes = p_calculation->>'recognition_notes',
+        updated_by = v_user,
+        updated_at = now()
+    where id = p_calculation_id
+      and event_id = p_event_id
+      and organization_id = v_org
+      and calculation_status = 'estimated'
+    returning id into v_id;
+    if v_id is null then raise exception 'editable savings calculation not found'; end if;
+  end if;
+
+  return v_id;
+end
+$$;
+
+
+ALTER FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."select_baseline"("p_baseline_id" "uuid") RETURNS "void"
@@ -4287,6 +4574,7 @@ CREATE TABLE IF NOT EXISTS "public"."realization_periods" (
     "projected_avoidance_amount" numeric(15,2),
     "realized_reduction_amount" numeric(15,2),
     "realized_avoidance_amount" numeric(15,2),
+    CONSTRAINT "chk_realization_finance_validation_actor" CHECK ((("finance_validated" AND ("finance_validated_by" IS NOT NULL) AND ("finance_validation_date" IS NOT NULL)) OR ((NOT "finance_validated") AND ("finance_validated_by" IS NULL) AND ("finance_validation_date" IS NULL)))),
     CONSTRAINT "chk_realization_status" CHECK (("realization_status" = ANY (ARRAY['Pending'::"text", 'In Progress'::"text", 'Realized'::"text", 'Partially Realized'::"text", 'Not Realized'::"text", 'Leaked'::"text"]))),
     CONSTRAINT "realization_periods_actual_nonnegative" CHECK ((("actual_amount" IS NULL) OR ("actual_amount" >= (0)::numeric))),
     CONSTRAINT "realization_periods_derived_status" CHECK (("realization_status" = "public"."derive_realization_status"("projected_reduction_amount", "projected_avoidance_amount", "realized_reduction_amount", "realized_avoidance_amount"))),
@@ -4628,7 +4916,7 @@ CREATE TABLE IF NOT EXISTS "public"."supplier_certifications" (
     CONSTRAINT "supplier_certifications_issuer_check" CHECK ((("issuer" IS NULL) OR (("char_length"("issuer") >= 1) AND ("char_length"("issuer") <= 200)))),
     CONSTRAINT "supplier_certifications_name_check" CHECK ((("char_length"("btrim"("certification_name")) >= 2) AND ("char_length"("btrim"("certification_name")) <= 200))),
     CONSTRAINT "supplier_certifications_number_check" CHECK ((("certificate_number" IS NULL) OR (("char_length"("certificate_number") >= 1) AND ("char_length"("certificate_number") <= 200)))),
-    CONSTRAINT "supplier_certifications_url_check" CHECK ((("evidence_url" IS NULL) OR (("char_length"("evidence_url") <= 2000) AND ("evidence_url" ~ '^https?://'::"text"))))
+    CONSTRAINT "supplier_certifications_url_check" CHECK ((("evidence_url" IS NULL) OR (("char_length"("evidence_url") <= 2000) AND ("evidence_url" ~* '^https?://'::"text"))))
 );
 
 ALTER TABLE ONLY "public"."supplier_certifications" FORCE ROW LEVEL SECURITY;
@@ -4819,7 +5107,7 @@ CREATE TABLE IF NOT EXISTS "public"."supplier_risks" (
     CONSTRAINT "supplier_risks_status_check" CHECK (("risk_status" = ANY (ARRAY['Open'::"text", 'Monitoring'::"text", 'Resolved'::"text"]))),
     CONSTRAINT "supplier_risks_target_date_check" CHECK ((("target_resolution_date" IS NULL) OR ("target_resolution_date" >= "identified_on"))),
     CONSTRAINT "supplier_risks_title_check" CHECK ((("char_length"("btrim"("risk_title")) >= 2) AND ("char_length"("btrim"("risk_title")) <= 200))),
-    CONSTRAINT "supplier_risks_url_check" CHECK ((("evidence_url" IS NULL) OR (("char_length"("evidence_url") <= 2000) AND ("evidence_url" ~ '^https?://'::"text"))))
+    CONSTRAINT "supplier_risks_url_check" CHECK ((("evidence_url" IS NULL) OR (("char_length"("evidence_url") <= 2000) AND ("evidence_url" ~* '^https?://'::"text"))))
 );
 
 ALTER TABLE ONLY "public"."supplier_risks" FORCE ROW LEVEL SECURITY;
@@ -5444,6 +5732,10 @@ CREATE OR REPLACE TRIGGER "organizations_audit" AFTER UPDATE ON "public"."organi
 
 
 
+CREATE OR REPLACE TRIGGER "project_choice_options_actor" BEFORE INSERT OR UPDATE ON "public"."project_choice_options" FOR EACH ROW EXECUTE FUNCTION "public"."stamp_money_record_actor"();
+
+
+
 CREATE OR REPLACE TRIGGER "project_choice_options_audit" AFTER INSERT OR DELETE OR UPDATE ON "public"."project_choice_options" FOR EACH ROW EXECUTE FUNCTION "public"."capture_workspace_audit"();
 
 
@@ -5509,6 +5801,10 @@ CREATE OR REPLACE TRIGGER "savings_calculation_lines_updated_at" BEFORE UPDATE O
 
 
 CREATE OR REPLACE TRIGGER "savings_calculations_actor" BEFORE INSERT OR UPDATE ON "public"."savings_calculations" FOR EACH ROW EXECUTE FUNCTION "public"."stamp_money_record_actor"();
+
+
+
+CREATE OR REPLACE TRIGGER "savings_calculations_attribute_legacy_correction" BEFORE UPDATE OF "baseline_total_amount", "opening_proposal_amount", "award_total_amount", "cost_reduction_amount", "cost_avoidance_amount", "gross_savings_amount" ON "public"."savings_calculations" FOR EACH ROW EXECUTE FUNCTION "public"."attribute_corrected_legacy_execution"();
 
 
 
@@ -6722,6 +7018,8 @@ ALTER TABLE "public"."project_updates" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "project_updates_insert_org_author" ON "public"."project_updates" FOR INSERT TO "authenticated" WITH CHECK ((("organization_id" = ( SELECT "public"."current_org_id"() AS "current_org_id")) AND ("created_by" = ( SELECT "auth"."uid"() AS "uid")) AND (EXISTS ( SELECT 1
+   FROM "public"."profiles" "profile"
+  WHERE (("profile"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("profile"."organization_id" = "project_updates"."organization_id") AND ("profile"."role" = ANY (ARRAY['admin'::"text", 'procurement_user'::"text"]))))) AND (EXISTS ( SELECT 1
    FROM "public"."sourcing_events" "event"
   WHERE (("event"."id" = "project_updates"."event_id") AND ("event"."organization_id" = "project_updates"."organization_id"))))));
 
@@ -6909,6 +7207,16 @@ GRANT ALL ON FUNCTION "public"."add_baseline_line"("p_baseline_id" "uuid", "p_li
 
 
 
+REVOKE ALL ON FUNCTION "public"."assert_jsonb_money_cent_exact"("p_items" "jsonb", "p_fields" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."assert_jsonb_money_cent_exact"("p_items" "jsonb", "p_fields" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."attribute_corrected_legacy_execution"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."attribute_corrected_legacy_execution"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."capture_workspace_audit"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."capture_workspace_audit"() TO "service_role";
 
@@ -6939,6 +7247,11 @@ GRANT ALL ON FUNCTION "public"."confirm_business_equivalency"("p_scope_line_id" 
 REVOKE ALL ON FUNCTION "public"."correct_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."correct_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") TO "service_role";
 GRANT ALL ON FUNCTION "public"."correct_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."correct_savings_execution_unchecked"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."correct_savings_execution_unchecked"("p_calc_id" "uuid", "p_note" "text", "p_calculation" "jsonb", "p_periods" "jsonb") TO "service_role";
 
 
 
@@ -7082,9 +7395,20 @@ GRANT ALL ON FUNCTION "public"."replace_savings_schedule"("p_savings_calculation
 
 
 
+REVOKE ALL ON FUNCTION "public"."replace_savings_schedule_unchecked"("p_savings_calculation_id" "uuid", "p_schedule_start_month" integer, "p_schedule_start_year" integer, "p_schedule_period_type" "text", "p_periods" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."replace_savings_schedule_unchecked"("p_savings_calculation_id" "uuid", "p_schedule_start_month" integer, "p_schedule_start_year" integer, "p_schedule_period_type" "text", "p_periods" "jsonb") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."reverse_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_disposition_action" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."reverse_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_disposition_action" "text") TO "service_role";
 GRANT ALL ON FUNCTION "public"."reverse_savings_execution"("p_calc_id" "uuid", "p_note" "text", "p_disposition_action" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."save_estimated_savings_calculation"("p_event_id" "uuid", "p_calculation_id" "uuid", "p_calculation" "jsonb") TO "authenticated";
 
 
 
@@ -7671,128 +7995,8 @@ GRANT SELECT,DELETE ON TABLE "public"."savings_calculations" TO "authenticated";
 
 
 
-GRANT INSERT("id") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("organization_id") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("event_id") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("baseline_id"),UPDATE("baseline_id") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("award_id"),UPDATE("award_id") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("calculation_name"),UPDATE("calculation_name") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("savings_type"),UPDATE("savings_type") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("baseline_total_amount"),UPDATE("baseline_total_amount") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("award_total_amount"),UPDATE("award_total_amount") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("gross_savings_amount"),UPDATE("gross_savings_amount") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("savings_percentage"),UPDATE("savings_percentage") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("net_savings_amount"),UPDATE("net_savings_amount") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("recognition_notes"),UPDATE("recognition_notes") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("savings_start_date"),UPDATE("savings_start_date") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("savings_end_date"),UPDATE("savings_end_date") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("cost_reduction_amount"),UPDATE("cost_reduction_amount") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("cost_avoidance_amount"),UPDATE("cost_avoidance_amount") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("opening_proposal_amount"),UPDATE("opening_proposal_amount") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("schedule_start_month"),UPDATE("schedule_start_month") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("schedule_start_year"),UPDATE("schedule_start_year") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("schedule_period_type"),UPDATE("schedule_period_type") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
-GRANT INSERT("schedule_period_count"),UPDATE("schedule_period_count") ON TABLE "public"."savings_calculations" TO "authenticated";
-
-
-
 GRANT ALL ON TABLE "public"."savings_periods" TO "service_role";
 GRANT SELECT ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("baseline_amount") ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("opening_amount") ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("final_amount") ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("cost_reduction_amount") ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("cost_avoidance_amount") ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("total_savings_amount") ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("is_edited") ON TABLE "public"."savings_periods" TO "authenticated";
-
-
-
-GRANT UPDATE("notes") ON TABLE "public"."savings_periods" TO "authenticated";
 
 
 

@@ -47,11 +47,13 @@ jobs:
       - name: Generate public schema snapshot
         run: npm run db:schema
 
-      - name: Upload generated public schema snapshot
+      - name: Upload generated database artifacts
         uses: actions/upload-artifact@v4
         with:
           name: public-schema-snapshot
-          path: supabase/schema.sql
+          path: |
+            supabase/schema.sql
+            lib/database.types.ts
           retention-days: 7
 
       - name: Verify generated public schema snapshot is current
