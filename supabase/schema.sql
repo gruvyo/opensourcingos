@@ -1204,7 +1204,7 @@ begin
 
   select
     coalesce(sum(period_months), 0),
-    coalesce(sum(baseline_amount), 0),
+    case when count(baseline_amount) = 0 then null else sum(baseline_amount) end,
     coalesce(sum(opening_amount), 0),
     coalesce(sum(final_amount), 0),
     case when count(cost_reduction_amount) = 0 then null
@@ -2778,7 +2778,7 @@ begin
 
   select
     coalesce(sum(period_months), 0),
-    coalesce(sum(baseline_amount), 0),
+    case when count(baseline_amount) = 0 then null else sum(baseline_amount) end,
     coalesce(sum(opening_amount), 0),
     coalesce(sum(final_amount), 0),
     case when count(cost_reduction_amount) = 0 then null
@@ -2968,6 +2968,14 @@ CREATE OR REPLACE FUNCTION "public"."save_estimated_savings_calculation"("p_even
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
 begin
+  perform public.assert_jsonb_money_cent_exact(
+    jsonb_build_array(p_calculation),
+    array[
+      'baseline_total_amount', 'opening_proposal_amount', 'award_total_amount',
+      'gross_savings_amount', 'cost_reduction_amount', 'cost_avoidance_amount',
+      'net_savings_amount', 'savings_percentage'
+    ]
+  );
   perform public.assert_savings_calculation_baseline_quality(
     p_event_id, p_calculation
   );

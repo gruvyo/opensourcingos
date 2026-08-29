@@ -220,6 +220,14 @@ security definer
 set search_path to 'pg_catalog', 'public'
 as $$
 begin
+  perform public.assert_jsonb_money_cent_exact(
+    jsonb_build_array(p_calculation),
+    array[
+      'baseline_total_amount', 'opening_proposal_amount', 'award_total_amount',
+      'gross_savings_amount', 'cost_reduction_amount', 'cost_avoidance_amount',
+      'net_savings_amount', 'savings_percentage'
+    ]
+  );
   perform public.assert_savings_calculation_baseline_quality(
     p_event_id, p_calculation
   );
@@ -233,6 +241,56 @@ revoke all on function public.save_estimated_savings_calculation(uuid, jsonb, uu
   from public, anon, authenticated;
 grant execute on function public.save_estimated_savings_calculation(uuid, jsonb, uuid)
   to authenticated;
+
+-- The original atomic writer collapsed an all-null baseline schedule to a
+-- numeric zero in the calculation header. Besides losing the distinction
+-- between "not applicable" and zero, that shape violates the chain constraint
+-- when Cost Reduction is null. Replace exactly that aggregate expression in
+-- the already-reviewed implementation, failing loudly if migration history
+-- does not match the expected definition.
+do $migration$
+declare
+  v_definition text;
+  v_old text := 'coalesce(sum(baseline_amount), 0)';
+  v_new text := 'case when count(baseline_amount) = 0 then null else sum(baseline_amount) end';
+begin
+  select pg_get_functiondef(
+    'public.replace_savings_schedule_unchecked(uuid,integer,integer,text,jsonb)'::regprocedure
+  ) into v_definition;
+
+  if position(v_old in v_definition) = 0 then
+    raise exception 'replace_savings_schedule baseline aggregate definition is unexpected';
+  end if;
+  if length(v_definition) - length(replace(v_definition, v_old, ''))
+       <> length(v_old) then
+    raise exception 'replace_savings_schedule baseline aggregate must have exactly one replacement target';
+  end if;
+
+  execute replace(v_definition, v_old, v_new);
+end
+$migration$;
+
+do $migration$
+declare
+  v_definition text;
+  v_old text := 'coalesce(sum(baseline_amount), 0)';
+  v_new text := 'case when count(baseline_amount) = 0 then null else sum(baseline_amount) end';
+begin
+  select pg_get_functiondef(
+    'public.correct_savings_execution_unchecked(uuid,text,jsonb,jsonb)'::regprocedure
+  ) into v_definition;
+
+  if position(v_old in v_definition) = 0 then
+    raise exception 'correct_savings_execution baseline aggregate definition is unexpected';
+  end if;
+  if length(v_definition) - length(replace(v_definition, v_old, ''))
+       <> length(v_old) then
+    raise exception 'correct_savings_execution baseline aggregate must have exactly one replacement target';
+  end if;
+
+  execute replace(v_definition, v_old, v_new);
+end
+$migration$;
 
 create or replace function public.replace_savings_schedule(
   p_savings_calculation_id uuid,

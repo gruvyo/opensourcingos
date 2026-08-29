@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(41);
+select plan(42);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -261,6 +261,15 @@ select throws_ok(
   '23514',
   'Soft baselines cannot book hard cost reduction. Use cost avoidance or approve a documented hard-baseline override.',
   'the correction RPC enforces the executed calculation baseline quality'
+);
+select lives_ok(
+  $$
+    select public.correct_savings_execution(
+      'b3000000-0000-4000-8000-000000000005', 'Reclassify the soft correction as avoidance', '{}'::jsonb,
+      '[{"id":"b4000000-0000-4000-8000-000000000006","period_number":1,"period_month":8,"period_year":2026,"period_months":1,"baseline_amount":null,"opening_amount":600,"final_amount":440,"cost_reduction_amount":null,"cost_avoidance_amount":160,"total_savings_amount":160,"is_edited":true}]'::jsonb
+    )
+  $$,
+  'the correction RPC preserves a missing baseline and books pure avoidance'
 );
 
 select lives_ok(
