@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
-select plan(15);
+select plan(20);
 
 select has_index(
   'public', 'project_choice_options', 'uq_project_choice_options_org_type_label',
@@ -78,11 +78,61 @@ select throws_ok(
      ) select organization_id, 'event_status', 'Sourcing', ' cLoSaBlE ', true
        from public.profiles where id = 'f1000000-0000-4000-8000-000000000001' $$,
   '23505', 'duplicate key value violates unique constraint "uq_project_choice_options_org_type_label"',
-  'a look-alike label cannot detach terminal metadata'
+  'the current managed label remains case-insensitively unique'
 );
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'f1000000-0000-4000-8000-000000000001', true);
+
+select lives_ok(
+  $$ update public.project_choice_options
+     set label = 'Finished safely'
+     where organization_id = (
+       select organization_id from public.profiles
+       where id = 'f1000000-0000-4000-8000-000000000001'
+     ) and choice_type = 'event_status' and project_type = 'Sourcing'
+       and requires_savings_disposition $$,
+  'the guarded completion status can still be renamed'
+);
+
+select throws_ok(
+  $$ insert into public.project_choice_options (
+       organization_id, choice_type, project_type, label, active_flag
+     ) select organization_id, 'event_status', 'Sourcing', 'Complete', true
+       from public.profiles where id = 'f1000000-0000-4000-8000-000000000001' $$,
+  '42501', 'that label is reserved for the guarded completion status',
+  'a former completion label cannot be recreated as an unguarded option'
+);
+
+select lives_ok(
+  $$ insert into public.project_choice_options (
+       organization_id, choice_type, project_type, label, active_flag
+     ) select organization_id, 'event_type', 'Sourcing', 'Complete', true
+       from public.profiles where id = 'f1000000-0000-4000-8000-000000000001' $$,
+  'the same spelling remains available outside the guarded status scope'
+);
+
+select throws_ok(
+  $$ update public.project_choice_options
+     set choice_type = 'event_status'
+     where organization_id = (
+       select organization_id from public.profiles
+       where id = 'f1000000-0000-4000-8000-000000000001'
+     ) and choice_type = 'event_type' and project_type = 'Sourcing'
+       and label = 'Complete' $$,
+  '23514', 'Project choice scope cannot be changed',
+  'the pre-existing scope guard independently blocks a scope-transfer bypass'
+);
+
+select ok(
+  (select completion_label_history @> array['complete', 'finished safely']
+   from public.project_choice_options
+   where organization_id = (
+     select organization_id from public.profiles
+     where id = 'f1000000-0000-4000-8000-000000000001'
+   ) and requires_savings_disposition),
+  'the server preserves every guarded completion spelling'
+);
 
 select throws_ok(
   $$ select public.save_estimated_savings_calculation(

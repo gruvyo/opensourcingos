@@ -2336,16 +2336,36 @@ CREATE OR REPLACE FUNCTION "public"."protect_sourcing_completion_status"() RETUR
     LANGUAGE "plpgsql"
     SET "search_path" TO 'pg_catalog', 'public'
     AS $$
+declare
+  v_reserved boolean;
 begin
   if current_user in ('postgres', 'service_role', 'supabase_admin') then
     return new;
   end if;
 
-  if tg_op = 'INSERT' and new.requires_savings_disposition then
-    raise exception 'savings completion status metadata is system-managed' using errcode = '42501';
+  if tg_op = 'INSERT' then
+    if new.requires_savings_disposition then
+      raise exception 'savings completion status metadata is system-managed' using errcode = '42501';
+    end if;
+
+    select exists (
+      select 1
+      from public.project_choice_options guarded
+      where guarded.organization_id = new.organization_id
+        and guarded.choice_type = new.choice_type
+        and guarded.project_type is not distinct from new.project_type
+        and guarded.requires_savings_disposition
+        and lower(btrim(new.label)) = any(guarded.completion_label_history)
+    ) into v_reserved;
+    if v_reserved then
+      raise exception 'that label is reserved for the guarded completion status' using errcode = '42501';
+    end if;
+
+    new.completion_label_history := '{}'::text[];
+    return new;
   end if;
 
-  if tg_op = 'UPDATE' and (
+  if (
     (not old.requires_savings_disposition and new.requires_savings_disposition)
     or (
       old.requires_savings_disposition
@@ -2359,6 +2379,36 @@ begin
     )
   ) then
     raise exception 'the required sourcing completion status may be renamed but not disabled' using errcode = '42501';
+  end if;
+
+  if old.requires_savings_disposition then
+    select coalesce(array_agg(distinct lower(btrim(label_value)) order by lower(btrim(label_value))), '{}'::text[])
+    into new.completion_label_history
+    from unnest(
+      coalesce(old.completion_label_history, '{}'::text[])
+      || array[old.label, new.label, 'Complete']
+    ) label_value
+    where btrim(label_value) <> '';
+  else
+    new.completion_label_history := old.completion_label_history;
+    if new.label is distinct from old.label
+       or new.organization_id is distinct from old.organization_id
+       or new.choice_type is distinct from old.choice_type
+       or new.project_type is distinct from old.project_type then
+      select exists (
+        select 1
+        from public.project_choice_options guarded
+        where guarded.organization_id = new.organization_id
+          and guarded.choice_type = new.choice_type
+          and guarded.project_type is not distinct from new.project_type
+          and guarded.requires_savings_disposition
+          and guarded.id <> new.id
+          and lower(btrim(new.label)) = any(guarded.completion_label_history)
+      ) into v_reserved;
+      if v_reserved then
+        raise exception 'that label is reserved for the guarded completion status' using errcode = '42501';
+      end if;
+    end if;
   end if;
 
   return new;
@@ -4500,6 +4550,7 @@ CREATE TABLE IF NOT EXISTS "public"."project_choice_options" (
     "updated_by" "uuid",
     "is_terminal" boolean DEFAULT false NOT NULL,
     "requires_savings_disposition" boolean DEFAULT false NOT NULL,
+    "completion_label_history" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
     CONSTRAINT "project_choice_options_choice_type_check" CHECK (("choice_type" = ANY (ARRAY['event_type'::"text", 'event_status'::"text", 'owner'::"text"]))),
     CONSTRAINT "project_choice_options_label_check" CHECK ((("length"("btrim"("label")) >= 1) AND ("length"("btrim"("label")) <= 120))),
     CONSTRAINT "project_choice_options_project_type_check" CHECK (("project_type" = ANY (ARRAY['Sourcing'::"text", 'Support'::"text"]))),
@@ -4519,6 +4570,10 @@ COMMENT ON COLUMN "public"."project_choice_options"."is_terminal" IS 'True when 
 
 
 COMMENT ON COLUMN "public"."project_choice_options"."requires_savings_disposition" IS 'True for the one Sourcing completion status that requires an executed/no-executed-savings decision. The flag survives status renames.';
+
+
+
+COMMENT ON COLUMN "public"."project_choice_options"."completion_label_history" IS 'Server-owned lowercase labels ever used by the guarded Sourcing completion status. Former labels cannot be recreated as unguarded options.';
 
 
 
