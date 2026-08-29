@@ -811,20 +811,27 @@ export function baselineQuality(
  *
  * Consequently TOTAL IS IDENTICAL either way. Only the split moves.
  */
-export function chainWithBaselineQuality(
+export function anchorsWithBaselineQuality(
   { opening, baseline, final }: ChainAnchors,
   isHard: boolean,
-): ChainResult {
-  if (isHard) return chainSavings({ opening, baseline, final })
+): ChainAnchors {
+  if (isHard) return { opening, baseline, final }
 
   const present = (v: unknown) =>
     v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v))
 
-  return chainSavings({
+  return {
     opening: present(opening) ? opening : (present(baseline) ? baseline : null),
     baseline: null,
     final,
-  })
+  }
+}
+
+export function chainWithBaselineQuality(
+  anchors: ChainAnchors,
+  isHard: boolean,
+): ChainResult {
+  return chainSavings(anchorsWithBaselineQuality(anchors, isHard))
 }
 
 // ---- Realized vs Accrued (ONE rule for the whole app) -----------------

@@ -33,6 +33,35 @@ export function selectBaselineAtomically(client: Client, baselineId: string) {
   return client.rpc('select_baseline', { p_baseline_id: baselineId })
 }
 
+export type BaselineLineWrite = {
+  scope_line_id: string | null
+  baseline_unit_price: number
+  baseline_quantity: number
+  baseline_extended_amount: number
+  baseline_recurring_amount: number
+  baseline_one_time_amount: number
+  baseline_term_months: number
+  annualized_baseline_amount: number
+  normalized_quantity: number
+  normalized_unit_price: number
+  normalized_extended_amount: number
+}
+
+export function addBaselineLineAtomically(
+  client: Client,
+  baselineId: string,
+  line: BaselineLineWrite,
+) {
+  return client.rpc('add_baseline_line', {
+    p_baseline_id: baselineId,
+    p_line: line as Json,
+  })
+}
+
+export function deleteBaselineLineAtomically(client: Client, baselineLineId: string) {
+  return client.rpc('delete_baseline_line', { p_baseline_line_id: baselineLineId })
+}
+
 export function setOfferRoleAtomically(
   client: Client,
   offerId: string,

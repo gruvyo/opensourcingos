@@ -73,7 +73,7 @@ type Event = {
   recognition_end_date: string | null
   official_reporting_basis: string | null
   currency_code: string
-  project_type: string | null
+  project_type: string
   buyer_name: string | null
   notes: string | null
   savings_disposition: string | null

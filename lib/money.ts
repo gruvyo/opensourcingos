@@ -35,6 +35,18 @@ export function hasCentPrecision(amount: number): boolean {
   return Math.abs(amount - roundMoney(amount)) < 1e-9
 }
 
+/**
+ * Compare an uncontrolled money input with its saved value. This prevents a
+ * focus/blur cycle on an empty companion field from issuing a destructive
+ * clearing update, while still sending invalid edits through normal validation.
+ */
+export function moneyInputChanged(value: string, saved: number | null): boolean {
+  const trimmed = value.trim()
+  if (trimmed === '') return saved !== null
+  const parsed = Number(trimmed)
+  return !Number.isFinite(parsed) || saved === null || parsed !== saved
+}
+
 export interface AllocateMoneyOptions {
   /** Exact column total to preserve. Defaults to the sum of the raw values. */
   target?: number

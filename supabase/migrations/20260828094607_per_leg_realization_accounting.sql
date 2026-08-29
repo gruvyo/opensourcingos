@@ -27,6 +27,23 @@ set
 from public.savings_periods period
 where realization.savings_period_id = period.id;
 
+-- Before per-leg fields existed, untouched shells inherited the original zero
+-- defaults. Zero was not evidence: these rows were still Pending and carried no
+-- validation, document, note, or leakage explanation. Normalize that legacy
+-- placeholder to NULL so the derivation below preserves Pending rather than
+-- silently reclassifying the full reduction as Leaked.
+update public.realization_periods
+set actual_amount = null,
+    realized_savings = null,
+    leakage_amount = null
+where actual_amount = 0
+  and realized_savings = 0
+  and realization_status = 'Pending'
+  and not finance_validated
+  and evidence_document_id is null
+  and notes is null
+  and leakage_reason is null;
+
 -- A historical direct total cannot be split between reduction and avoidance
 -- without human evidence. Refuse silent allocation. The production audit for
 -- this release found zero realization rows, so no manual classification is

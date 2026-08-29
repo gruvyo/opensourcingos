@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  addBaselineLineAtomically,
   completeSourcingProjectAtomically,
+  deleteBaselineLineAtomically,
   replaceSavingsScheduleAtomically,
   selectBaselineAtomically,
   setOfferRoleAtomically,
@@ -52,6 +54,38 @@ test('baseline selection uses the single reviewed RPC and sends no actor or work
     name: 'select_baseline',
     args: { p_baseline_id: 'baseline-1' },
   }])
+})
+
+test('baseline line mutations send values only through the two atomic APIs', async () => {
+  const { client, calls } = recordingClient()
+  const line = {
+    scope_line_id: null,
+    baseline_unit_price: 25,
+    baseline_quantity: 4,
+    baseline_extended_amount: 100,
+    baseline_recurring_amount: 100,
+    baseline_one_time_amount: 0,
+    baseline_term_months: 12,
+    annualized_baseline_amount: 100,
+    normalized_quantity: 4,
+    normalized_unit_price: 25,
+    normalized_extended_amount: 100,
+  }
+  await addBaselineLineAtomically(client, 'baseline-1', line)
+  await deleteBaselineLineAtomically(client, 'line-1')
+  assert.deepEqual(calls, [
+    {
+      name: 'add_baseline_line',
+      args: { p_baseline_id: 'baseline-1', p_line: line },
+    },
+    {
+      name: 'delete_baseline_line',
+      args: { p_baseline_line_id: 'line-1' },
+    },
+  ])
+  assert.equal(JSON.stringify(calls).includes('organization_id'), false)
+  assert.equal(JSON.stringify(calls).includes('created_by'), false)
+  assert.equal(JSON.stringify(calls).includes('updated_by'), false)
 })
 
 test('offer role changes use the single reviewed RPC, including an explicit unset', async () => {
