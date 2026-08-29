@@ -182,22 +182,20 @@ select ok(
   'execution records every coupled entity in the immutable audit stream'
 );
 
-update public.savings_calculations
-set calculation_name = 'Tampered calculation'
-where id = 'b3000000-0000-4000-8000-000000000001';
-select is(
-  (select calculation_name from public.savings_calculations where id = 'b3000000-0000-4000-8000-000000000001'),
-  'Correction schedule',
-  'ordinary authenticated calculation edits cannot change an executed record'
+select throws_ok(
+  $$ update public.savings_calculations
+     set calculation_name = 'Tampered calculation'
+     where id = 'b3000000-0000-4000-8000-000000000001' $$,
+  '42501', 'permission denied for table savings_calculations',
+  'ordinary authenticated calculation edits cannot reach an executed record'
 );
 
-update public.savings_periods
-set final_amount = 1
-where id = 'b4000000-0000-4000-8000-000000000001';
-select is(
-  (select final_amount from public.savings_periods where id = 'b4000000-0000-4000-8000-000000000001'),
-  450::numeric,
-  'ordinary authenticated period edits cannot change an executed estimate'
+select throws_ok(
+  $$ update public.savings_periods
+     set final_amount = 1
+     where id = 'b4000000-0000-4000-8000-000000000001' $$,
+  '42501', 'permission denied for table savings_periods',
+  'ordinary authenticated period edits cannot reach an executed estimate'
 );
 
 select throws_ok(

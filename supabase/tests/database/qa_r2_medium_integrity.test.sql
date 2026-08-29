@@ -72,12 +72,12 @@ insert into public.project_choice_options (
 select organization_id, 'event_status', 'Sourcing', 'Closable', true
 from public.profiles where id = 'f1000000-0000-4000-8000-000000000001';
 
-select throws_like(
+select throws_ok(
   $$ insert into public.project_choice_options (
        organization_id, choice_type, project_type, label, active_flag
      ) select organization_id, 'event_status', 'Sourcing', ' cLoSaBlE ', true
        from public.profiles where id = 'f1000000-0000-4000-8000-000000000001' $$,
-  '23505', '%uq_project_choice_options_org_type_label%',
+  '23505', 'duplicate key value violates unique constraint "uq_project_choice_options_org_type_label"',
   'a look-alike label cannot detach terminal metadata'
 );
 
