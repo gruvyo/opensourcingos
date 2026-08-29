@@ -148,7 +148,6 @@ function downloadCSV(filename: string, columns: ReportColumn[], rows: ReportRow[
     columns.map(column => csvCell(reportColumnLabel(column.label, column.format, currencyCode))).join(','),
     ...rows.map(row => columns.map(column => reportCsvCell(
       csvReportValue(row[column.key], column, row),
-      column.format,
     )).join(',')),
   ]
   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })

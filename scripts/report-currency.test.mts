@@ -15,9 +15,21 @@ test('identifies the workspace currency in CSV money headers', () => {
   assert.equal(reportColumnLabel('Projects', 'number', 'EUR'), 'Projects')
   assert.equal(reportCsvMoney(1234.5), '1234.50')
   assert.equal(reportCsvMoney(-1234.5), '-1234.50')
-  assert.equal(reportCsvCell(-12.5, 'percent'), '"-12.5"')
-  assert.equal(reportCsvCell('-12.5', 'percent'), '"-12.5"')
-  assert.equal(reportCsvCell('=HYPERLINK("https://example.com")', 'text'), '"\'=HYPERLINK(""https://example.com"")"')
+  assert.equal(reportCsvCell(-12.5), '"-12.5"')
+  assert.equal(reportCsvCell('-12.5'), '"-12.5"')
+  assert.equal(reportCsvCell('=HYPERLINK("https://example.com")'), '"\'=HYPERLINK(""https://example.com"")"')
+})
+
+test('CSV formula exemption keys on the runtime value, not the column format', () => {
+  // Numeric-exporter output stays numeric, negatives and annotations included.
+  assert.equal(reportCsvCell('-1234.56'), '"-1234.56"')
+  assert.equal(reportCsvCell('-1234.56 (partial)'), '"-1234.56 (partial)"')
+  assert.equal(reportCsvCell('n/a'), '"n/a"')
+  assert.equal(reportCsvCell(null), '""')
+  // A string that merely sits in a numeric column earns no trust.
+  assert.equal(reportCsvCell('=SUM(A1:A2)'), '"\'=SUM(A1:A2)"')
+  assert.equal(reportCsvCell('-2+cmd|calc'), '"\'-2+cmd|calc"')
+  assert.equal(reportCsvCell('-12.5%'), '"\'-12.5%"')
 })
 
 test('attention queue dates use the workspace formatter', () => {

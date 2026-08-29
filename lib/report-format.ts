@@ -25,16 +25,17 @@ export function reportCsvMoney(value: ReportDisplayValue): string {
   return fixedMoney(numeric(value))
 }
 
-const TRUSTED_NUMERIC_FORMATS = new Set<ReportDisplayFormat>([
-  'number', 'currency', 'reduction', 'percent', 'score',
-])
+// Exactly the text our numeric exporters emit: fixedMoney and
+// reportReductionExport (whose only non-numeric suffix is " (partial)").
+const TRUSTED_NUMERIC_TEXT = /^-?\d+(\.\d+)?( \(partial\))?$/
 
-/** Numeric report cells stay numeric in spreadsheets, including negatives. */
-export function reportCsvCell(
-  value: ReportDisplayValue,
-  format: ReportDisplayFormat | undefined,
-): string {
-  return csvCell(value, !format || !TRUSTED_NUMERIC_FORMATS.has(format))
+/**
+ * Numeric report cells stay numeric in spreadsheets, including negatives.
+ * The formula exemption keys on the runtime value, never the column format:
+ * any string that is not provably numeric-exporter output is neutralized.
+ */
+export function reportCsvCell(value: ReportDisplayValue): string {
+  return csvCell(value, typeof value === 'string' && !TRUSTED_NUMERIC_TEXT.test(value))
 }
 
 export function formatReportValue(
