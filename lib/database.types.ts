@@ -926,6 +926,7 @@ export type Database = {
         Row: {
           active_flag: boolean
           choice_type: string
+          completion_label_history: string[]
           created_at: string
           created_by: string | null
           id: string
@@ -941,6 +942,7 @@ export type Database = {
         Insert: {
           active_flag?: boolean
           choice_type: string
+          completion_label_history?: string[]
           created_at?: string
           created_by?: string | null
           id?: string
@@ -956,6 +958,7 @@ export type Database = {
         Update: {
           active_flag?: boolean
           choice_type?: string
+          completion_label_history?: string[]
           created_at?: string
           created_by?: string | null
           id?: string
