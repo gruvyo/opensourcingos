@@ -29,7 +29,14 @@ import {
   type SchedulePeriod,
   type SchedulePeriodRow,
 } from '@/lib/savings'
-import { formatDashboardCurrency, statusColor } from '@/lib/utils'
+import { statusColor } from '@/lib/utils'
+import { WorkspaceFormatProvider } from '@/components/workspace-format-provider'
+import {
+  DEFAULT_WORKSPACE_CURRENCY,
+  DEFAULT_WORKSPACE_LOCALE,
+  DEFAULT_WORKSPACE_TIMEZONE,
+  workspaceFormatters,
+} from '@/lib/workspace-settings'
 import { Card } from '@/components/ui/card'
 import { AttentionQueue } from '@/components/attention-queue'
 import { buildAttentionQueue } from '@/lib/attention-queue'
@@ -290,7 +297,7 @@ export default async function DashboardPage({
     supabase.from('project_choice_options')
       .select('label, project_type, is_terminal')
       .eq('choice_type', 'event_status'),
-    supabase.from('organization_settings').select('savings_realization_enabled, timezone').maybeSingle(),
+    supabase.from('organization_settings').select('savings_realization_enabled, timezone, currency_code, locale').maybeSingle(),
   ])
 
   const loadError = eventsError?.message
@@ -329,12 +336,15 @@ export default async function DashboardPage({
     else count.high += 1
     riskIssueCounts.set(risk.supplier_id, count)
   }
-  const asOfDate = dateKeyInTimeZone(new Date(), settings?.timezone || 'America/Chicago')
+  const currencyCode = settings?.currency_code || DEFAULT_WORKSPACE_CURRENCY
+  const locale = settings?.locale || DEFAULT_WORKSPACE_LOCALE
+  const { formatDashboardCurrency } = workspaceFormatters(currencyCode, locale)
+  const asOfDate = dateKeyInTimeZone(new Date(), settings?.timezone || DEFAULT_WORKSPACE_TIMEZONE)
   const attentionQueue = buildAttentionQueue(
     eventList.map(event => ({
       id: event.id,
       name: event.event_name || null,
-      status: event.event_status || null,
+      status: event.event_status || 'Pipeline',
       projectType: event.project_type || null,
       dueDate: event.project_due_date || null,
     })),
@@ -343,7 +353,7 @@ export default async function DashboardPage({
       return {
         id: supplier.id,
         name: supplier.supplier_name || null,
-        status: supplier.supplier_status || null,
+        status: supplier.supplier_status || 'Active',
         risk: supplier.risk_rating || null,
         nextReviewDate: supplier.next_review_date || null,
         performanceNextReviewDate: supplierGovernance.get(supplier.id)?.performanceNextReviewDate || null,
@@ -357,7 +367,7 @@ export default async function DashboardPage({
 
   const rollup = portfolioRollup(calcList, sourcingEvents, {
     topCategories: 8,
-    timeZone: settings?.timezone || 'America/Chicago',
+    timeZone: settings?.timezone || DEFAULT_WORKSPACE_TIMEZONE,
   })
   const lifecycle = scheduleLifecycleRollup(
     calcList,
@@ -444,6 +454,7 @@ export default async function DashboardPage({
   ]
 
   return (
+    <WorkspaceFormatProvider currencyCode={currencyCode} locale={locale}>
     <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -486,7 +497,7 @@ export default async function DashboardPage({
             href="/suppliers"
             linkLabel="View suppliers"
           />
-          <TopSuppliersTable suppliers={suppliers.slice(0, 5)} />
+          <TopSuppliersTable suppliers={suppliers.slice(0, 5)} formatMoney={formatDashboardCurrency} />
         </Card>
 
         <Card className="p-5 sm:p-6">
@@ -510,7 +521,7 @@ export default async function DashboardPage({
           href="/events"
           linkLabel="View all events"
         />
-        <ActiveEventsTable events={activeEvents.slice(0, 6)} />
+        <ActiveEventsTable events={activeEvents.slice(0, 6)} formatMoney={formatDashboardCurrency} />
       </Card>
 
       <DashboardActivityBreakdowns cards={activityCards} />
@@ -531,6 +542,7 @@ export default async function DashboardPage({
         </div>
       </section>
     </div>
+    </WorkspaceFormatProvider>
   )
 }
 
@@ -592,7 +604,7 @@ function PanelHeader({
   )
 }
 
-function TopSuppliersTable({ suppliers }: { suppliers: SupplierSummary[] }) {
+function TopSuppliersTable({ suppliers, formatMoney }: { suppliers: SupplierSummary[]; formatMoney: (amount: number) => string }) {
   if (suppliers.length === 0) {
     return (
       <div className="grid min-h-64 place-items-center px-6 text-center">
@@ -621,7 +633,7 @@ function TopSuppliersTable({ suppliers }: { suppliers: SupplierSummary[] }) {
           {suppliers.map(supplier => (
             <tr key={supplier.id} className="transition-colors hover:bg-[var(--surface-2)]">
               <th scope="row" className="px-5 py-3 text-left font-medium text-[var(--text)] sm:px-6">{supplier.name}</th>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatDashboardCurrency(supplier.savings)}</td>
+              <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--text)]">{formatMoney(supplier.savings)}</td>
               <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{supplier.share.toFixed(1)}%</td>
               <td className="px-5 py-3 text-right tabular-nums text-[var(--text-2)] sm:px-6">{supplier.projects}</td>
             </tr>
@@ -632,7 +644,7 @@ function TopSuppliersTable({ suppliers }: { suppliers: SupplierSummary[] }) {
   )
 }
 
-function ActiveEventsTable({ events }: { events: EventSummary[] }) {
+function ActiveEventsTable({ events, formatMoney }: { events: EventSummary[]; formatMoney: (amount: number) => string }) {
   if (events.length === 0) {
     return (
       <div className="grid min-h-56 place-items-center px-6 text-center">
@@ -670,9 +682,9 @@ function ActiveEventsTable({ events }: { events: EventSummary[] }) {
                 </Link>
               </th>
               <td className="px-4 py-3 text-[var(--text-2)]">{event.category}</td>
-              <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{event.baseline > 0 ? formatDashboardCurrency(event.baseline) : '—'}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{event.baseline > 0 ? formatMoney(event.baseline) : '—'}</td>
               <td className="px-4 py-3 text-right">
-                <p className="font-semibold tabular-nums text-[var(--text)]">{formatDashboardCurrency(event.savings)}</p>
+                <p className="font-semibold tabular-nums text-[var(--text)]">{formatMoney(event.savings)}</p>
                 <p className="text-[11px] tabular-nums text-[var(--text-3)]">
                   {event.savingsPercent === null ? 'No baseline %' : `${event.savingsPercent.toFixed(1)}% of baseline`}
                 </p>

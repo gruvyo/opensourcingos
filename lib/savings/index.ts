@@ -12,6 +12,7 @@
 
 import { allocateMoney, centsToMoney, moneyToCents, roundMoney } from '../money.ts'
 import { dateKeyInTimeZone } from '../supplier-readiness.ts'
+import { DEFAULT_WORKSPACE_TIMEZONE } from '../workspace-settings.ts'
 
 // ---- Loose row shapes (match the DB columns; tolerate nulls) ----------
 
@@ -848,7 +849,7 @@ export function classifyRealization(
   c: SavingsCalcRow,
   contractStartByEventId: Map<string, string | null>,
   now: Date = new Date(),
-  timeZone = 'UTC',
+  timeZone = DEFAULT_WORKSPACE_TIMEZONE,
 ): RealizationClass {
   let effective = c.savings_start_date || null
   if (!effective && c.event_id) effective = contractStartByEventId.get(c.event_id) || null

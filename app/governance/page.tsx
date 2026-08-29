@@ -17,6 +17,7 @@ import { requireWorkspace, type WorkspaceRole } from '@/lib/authz'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
+import { DEFAULT_WORKSPACE_TIMEZONE } from '@/lib/workspace-settings'
 
 const PAGE_SIZE = 50
 
@@ -98,7 +99,7 @@ export default async function GovernancePage({ searchParams }: PageProps) {
   const members = (membersResult.data || []) as MemberRow[]
   const auditRows = (auditResult.data || []) as AuditRow[]
   const memberById = new Map(members.map(member => [member.id, member]))
-  const timezone = settingsResult.data?.timezone || 'America/Chicago'
+  const timezone = settingsResult.data?.timezone || DEFAULT_WORKSPACE_TIMEZONE
   const loadError = membersResult.error?.message || organizationResult.error?.message
     || settingsResult.error?.message || auditResult.error?.message || null
   const adminCount = members.filter(member => member.role === 'admin').length

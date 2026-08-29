@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate, formatReduction } from './utils.ts'
 import { fixedMoney } from './money.ts'
+import { csvCell } from './csv.ts'
 
 export type ReportDisplayFormat = 'text' | 'number' | 'currency' | 'reduction' | 'date' | 'status' | 'percent' | 'score'
 export type ReportDisplayValue = string | number | null
@@ -22,6 +23,18 @@ export function reportColumnLabel(
 /** Locale-neutral numeric text keeps CSV money exact and summable. */
 export function reportCsvMoney(value: ReportDisplayValue): string {
   return fixedMoney(numeric(value))
+}
+
+const TRUSTED_NUMERIC_FORMATS = new Set<ReportDisplayFormat>([
+  'number', 'currency', 'reduction', 'percent', 'score',
+])
+
+/** Numeric report cells stay numeric in spreadsheets, including negatives. */
+export function reportCsvCell(
+  value: ReportDisplayValue,
+  format: ReportDisplayFormat | undefined,
+): string {
+  return csvCell(value, !format || !TRUSTED_NUMERIC_FORMATS.has(format))
 }
 
 export function formatReportValue(

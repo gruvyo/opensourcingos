@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
-import { formatDashboardCurrency } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 import { Card } from '@/components/ui/card'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
@@ -22,18 +22,14 @@ const TOOLTIP_STYLE = {
   color: 'var(--text)',
 }
 
-function currencyFormatter(value: unknown): string {
-  return formatDashboardCurrency(Number(value) || 0)
-}
-
-function compactFormatter(value: unknown): string {
-  const num = Number(value) || 0
-  return `$${(num / 1000).toFixed(0)}k`
-}
-
 const titleClass = 'mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-3)]'
 
 export function SavingsByCategoryChart({ data }: { data: { name: string; value: number }[] }) {
+  const { currencyCode, locale, formatDashboardCurrency } = useWorkspaceFormat()
+  const currencyFormatter = (value: unknown) => formatDashboardCurrency(Number(value) || 0)
+  const compactFormatter = (value: unknown) => new Intl.NumberFormat(locale, {
+    style: 'currency', currency: currencyCode, notation: 'compact', maximumFractionDigits: 1,
+  }).format(Number(value) || 0)
   if (!data || data.length === 0) {
     return <EmptyChart message="No savings data by category yet" />
   }
@@ -84,6 +80,11 @@ export function EventsByStatusChart({ data }: { data: { name: string; value: num
 }
 
 export function SavingsByTypeChart({ data }: { data: { name: string; value: number }[] }) {
+  const { currencyCode, locale, formatDashboardCurrency } = useWorkspaceFormat()
+  const currencyFormatter = (value: unknown) => formatDashboardCurrency(Number(value) || 0)
+  const compactFormatter = (value: unknown) => new Intl.NumberFormat(locale, {
+    style: 'currency', currency: currencyCode, notation: 'compact', maximumFractionDigits: 1,
+  }).format(Number(value) || 0)
   if (!data || data.length === 0) {
     return <EmptyChart message="No savings type data yet" />
   }
@@ -118,6 +119,11 @@ export function SavingsByYearChart({
   data: { year: number; reduction: number | null; avoidance: number; total: number }[]
   selectedYear?: number | null
 }) {
+  const { currencyCode, locale, formatDashboardCurrency } = useWorkspaceFormat()
+  const currencyFormatter = (value: unknown) => formatDashboardCurrency(Number(value) || 0)
+  const compactFormatter = (value: unknown) => new Intl.NumberFormat(locale, {
+    style: 'currency', currency: currencyCode, notation: 'compact', maximumFractionDigits: 1,
+  }).format(Number(value) || 0)
   if (!data || data.length === 0) {
     return <EmptyChart message="No savings placed in a year yet" />
   }

@@ -89,6 +89,21 @@ export function replaceSavingsScheduleAtomically(
   })
 }
 
+export function saveEstimatedSavingsCalculationAtomically(
+  client: Client,
+  eventId: string,
+  calculationId: string | null,
+  calculation: Record<string, Json | undefined>,
+) {
+  const args = {
+    p_event_id: eventId,
+    p_calculation: calculation as Json,
+  }
+  return client.rpc('save_estimated_savings_calculation', calculationId === null
+    ? args
+    : { ...args, p_calculation_id: calculationId })
+}
+
 export function syncRealizationPeriodsAtomically(client: Client, eventId: string) {
   return client.rpc('sync_realization_periods', { p_event_id: eventId })
 }

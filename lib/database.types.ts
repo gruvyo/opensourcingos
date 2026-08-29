@@ -2426,6 +2426,10 @@ export type Database = {
         Args: { p_baseline_id: string; p_line: Json }
         Returns: string
       }
+      assert_jsonb_money_cent_exact: {
+        Args: { p_fields: string[]; p_items: Json }
+        Returns: undefined
+      }
       clone_org_data: {
         Args: { p_owner: string; p_source: string; p_target: string }
         Returns: number
@@ -2439,6 +2443,15 @@ export type Database = {
         Returns: undefined
       }
       correct_savings_execution: {
+        Args: {
+          p_calc_id: string
+          p_calculation: Json
+          p_note: string
+          p_periods: Json
+        }
+        Returns: undefined
+      }
+      correct_savings_execution_unchecked: {
         Args: {
           p_calc_id: string
           p_calculation: Json
@@ -2475,6 +2488,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      replace_savings_schedule_unchecked: {
+        Args: {
+          p_periods: Json
+          p_savings_calculation_id: string
+          p_schedule_period_type: string
+          p_schedule_start_month: number
+          p_schedule_start_year: number
+        }
+        Returns: undefined
+      }
       reverse_savings_execution: {
         Args: {
           p_calc_id: string
@@ -2482,6 +2505,14 @@ export type Database = {
           p_note: string
         }
         Returns: undefined
+      }
+      save_estimated_savings_calculation: {
+        Args: {
+          p_calculation: Json
+          p_calculation_id?: string
+          p_event_id: string
+        }
+        Returns: string
       }
       select_baseline: { Args: { p_baseline_id: string }; Returns: undefined }
       set_finance_validation: {

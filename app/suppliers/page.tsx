@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import { SuppliersView, type SupplierSummary } from '@/components/suppliers-view'
 import { PageHeader } from '@/components/ui/page-header'
-import { formatDate } from '@/lib/utils'
+import { DEFAULT_WORKSPACE_LOCALE, DEFAULT_WORKSPACE_TIMEZONE, workspaceFormatters } from '@/lib/workspace-settings'
 import { dateKeyInTimeZone } from '@/lib/supplier-readiness'
 import { assessSupplierAttention } from '@/lib/supplier-attention'
 import {
@@ -63,7 +63,7 @@ export default async function SuppliersPage() {
         .order('id', { ascending: true })
         .range(from, to)
     )),
-    supabase.from('organization_settings').select('timezone').maybeSingle(),
+    supabase.from('organization_settings').select('timezone, locale').maybeSingle(),
   ])
 
   const loadError = suppliersError?.message
@@ -72,7 +72,8 @@ export default async function SuppliersPage() {
     || supplierRisksError?.message
     || settingsError?.message
     || null
-  const asOfDate = dateKeyInTimeZone(new Date(), settings?.timezone || 'America/Chicago')
+  const asOfDate = dateKeyInTimeZone(new Date(), settings?.timezone || DEFAULT_WORKSPACE_TIMEZONE)
+  const { formatDate } = workspaceFormatters(undefined, settings?.locale || DEFAULT_WORKSPACE_LOCALE)
   const governance = supplierGovernanceSummaries(
     (supplierReviews || []) as SupplierPerformanceReviewSummaryRow[],
     (supplierRisks || []) as SupplierRiskSummaryRow[],

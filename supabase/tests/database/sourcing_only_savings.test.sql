@@ -79,38 +79,33 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000001', true);
 
 select lives_ok(
-  $$ insert into public.savings_calculations (
-       id, organization_id, event_id, calculation_name, savings_type,
-       baseline_total_amount, award_total_amount, cost_reduction_amount,
-       gross_savings_amount, net_savings_amount
-     ) values (
-       'd3000000-0000-4000-8000-000000000001',
-       (select organization_id from public.profiles where id = auth.uid()),
+  $$ select public.save_estimated_savings_calculation(
        'd2000000-0000-4000-8000-000000000001',
-       'Allowed Sourcing calculation', 'Cost Reduction', 100, 0, 100, 100, 100
+       '{"baseline_id":null,"calculation_name":"Allowed Sourcing calculation","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":null,"award_total_amount":0,"gross_savings_amount":100,"cost_reduction_amount":100,"cost_avoidance_amount":0,"savings_percentage":100,"net_savings_amount":100,"recognition_notes":null}'::jsonb,
+       null
      ) $$,
-  'an administrator can create savings for a Sourcing Project'
+  'an administrator can create savings for a Sourcing Project through the atomic writer'
 );
 
 select ok(
   (select created_by = 'd1000000-0000-4000-8000-000000000001'
        and updated_by = 'd1000000-0000-4000-8000-000000000001'
    from public.savings_calculations
-   where id = 'd3000000-0000-4000-8000-000000000001'),
+   where event_id = 'd2000000-0000-4000-8000-000000000001'),
   'an allowed Sourcing calculation retains server-owned actor stamping'
 );
 
 select throws_ok(
-  $$ insert into public.savings_calculations (
-       organization_id, event_id, calculation_name, savings_type
-     ) values (
-       (select organization_id from public.profiles where id = auth.uid()),
+  $$ select public.save_estimated_savings_calculation(
        'd2000000-0000-4000-8000-000000000002',
-       'Blocked Support calculation', 'Cost Reduction'
+       '{"baseline_id":null,"calculation_name":"Blocked Support calculation","savings_type":"Cost Reduction","baseline_total_amount":100,"opening_proposal_amount":null,"award_total_amount":0,"gross_savings_amount":100,"cost_reduction_amount":100,"cost_avoidance_amount":0,"savings_percentage":100,"net_savings_amount":100,"recognition_notes":null}'::jsonb,
+       null
      ) $$,
-  '23514', 'Savings records require a Sourcing Project',
+  'P0001', 'sourcing project not found',
   'Support / Non-Commercial projects cannot receive savings calculations'
 );
+
+reset role;
 
 select lives_ok(
   $$ insert into public.savings_calculations (
@@ -133,6 +128,9 @@ select throws_ok(
   '23514', 'Savings records must use the project workspace',
   'a savings calculation cannot claim another workspace'
 );
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000001', true);
 
 select throws_ok(
   $$ update public.sourcing_events
@@ -226,7 +224,8 @@ select throws_ok(
   $$ insert into public.savings_calculation_lines (
        organization_id, savings_calculation_id, event_id, line_number, savings_type
      ) select organization_id,
-       'd3000000-0000-4000-8000-000000000001',
+       (select id from public.savings_calculations
+        where event_id = 'd2000000-0000-4000-8000-000000000001'),
        'd2000000-0000-4000-8000-000000000002', 2, 'Cost Reduction'
      from public.profiles
      where id = 'd1000000-0000-4000-8000-000000000001' $$,
@@ -237,7 +236,7 @@ select throws_ok(
 select throws_ok(
   $$ update public.savings_calculations
      set event_id = 'd2000000-0000-4000-8000-000000000002'
-     where id = 'd3000000-0000-4000-8000-000000000001' $$,
+     where event_id = 'd2000000-0000-4000-8000-000000000001' $$,
   '23514', 'Savings records require a Sourcing Project',
   'an existing calculation cannot be reassigned to a Support project'
 );

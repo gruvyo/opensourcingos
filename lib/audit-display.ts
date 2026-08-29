@@ -1,4 +1,5 @@
 import type { Json } from '@/lib/database.types'
+import { DEFAULT_WORKSPACE_TIMEZONE } from './workspace-settings.ts'
 
 export const AUDIT_ENTITY_FILTERS = [
   'organization',
@@ -180,7 +181,7 @@ export function auditChanges(beforeData: Json | null, afterData: Json | null, li
     }))
 }
 
-export function formatAuditTimestamp(timestamp: string, timeZone = 'America/Chicago'): string {
+export function formatAuditTimestamp(timestamp: string, timeZone = DEFAULT_WORKSPACE_TIMEZONE): string {
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return '—'
   try {

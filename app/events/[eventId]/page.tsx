@@ -3,6 +3,7 @@ import { EventDetail } from '@/components/event-detail'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
+import { DEFAULT_WORKSPACE_CURRENCY, DEFAULT_WORKSPACE_LOCALE } from '@/lib/workspace-settings'
 
 export default async function EventDetailPage({
   params,
@@ -73,7 +74,7 @@ export default async function EventDetailPage({
       .eq('id', user.id)
       .single(),
     supabase.from('organization_settings')
-      .select('project_descriptions_enabled, project_owners_enabled, project_cost_centers_enabled, project_categories_enabled, project_business_units_enabled, project_updates_enabled, project_incumbent_suppliers_enabled, savings_realization_enabled')
+      .select('project_descriptions_enabled, project_owners_enabled, project_cost_centers_enabled, project_categories_enabled, project_business_units_enabled, project_updates_enabled, project_incumbent_suppliers_enabled, savings_realization_enabled, currency_code, locale')
       .maybeSingle(),
   ])
 
@@ -118,6 +119,8 @@ export default async function EventDetailPage({
         projectUpdatesEnabled={settings?.project_updates_enabled ?? true}
         projectIncumbentSuppliersEnabled={settings?.project_incumbent_suppliers_enabled ?? true}
         savingsRealizationEnabled={settings?.savings_realization_enabled ?? false}
+        currencyCode={event.currency_code || settings?.currency_code || DEFAULT_WORKSPACE_CURRENCY}
+        locale={settings?.locale || DEFAULT_WORKSPACE_LOCALE}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { formatReportValue, reportColumnLabel, reportCsvMoney } from '../lib/report-format.ts'
+import { formatReportValue, reportColumnLabel, reportCsvCell, reportCsvMoney } from '../lib/report-format.ts'
 
 test('formats report money with the workspace currency and locale', () => {
   assert.equal(formatReportValue(1234.5, 'currency', undefined, 'EUR', 'en-GB'), '€1,234.50')
@@ -14,4 +14,7 @@ test('identifies the workspace currency in CSV money headers', () => {
   assert.equal(reportColumnLabel('Projects', 'number', 'EUR'), 'Projects')
   assert.equal(reportCsvMoney(1234.5), '1234.50')
   assert.equal(reportCsvMoney(-1234.5), '-1234.50')
+  assert.equal(reportCsvCell(-12.5, 'percent'), '"-12.5"')
+  assert.equal(reportCsvCell('-12.5', 'percent'), '"-12.5"')
+  assert.equal(reportCsvCell('=HYPERLINK("https://example.com")', 'text'), '"\'=HYPERLINK(""https://example.com"")"')
 })

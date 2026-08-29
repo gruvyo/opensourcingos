@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import Link from 'next/link'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import {
+  DEFAULT_WORKSPACE_CURRENCY,
+  DEFAULT_WORKSPACE_LOCALE,
+  workspaceFormatters,
+} from '@/lib/workspace-settings'
 import { realizationRollup, getFirst } from '@/lib/savings'
 import { Card } from '@/components/ui/card'
 import { TrendingUp, ArrowRight } from 'lucide-react'
@@ -45,7 +49,7 @@ export default async function RealizationPage() {
   const supabase = await createClient()
   const { data: settings, error: settingsError } = await supabase
     .from('organization_settings')
-    .select('savings_realization_enabled')
+    .select('savings_realization_enabled, currency_code, locale')
     .maybeSingle()
 
   if (!settings?.savings_realization_enabled) {
@@ -61,6 +65,11 @@ export default async function RealizationPage() {
       </div>
     )
   }
+
+  const { formatCurrency, formatDate } = workspaceFormatters(
+    settings.currency_code || DEFAULT_WORKSPACE_CURRENCY,
+    settings.locale || DEFAULT_WORKSPACE_LOCALE,
+  )
 
   const { data: periods, error: periodsError } = await fetchPortfolioRows(
     'Realization periods',

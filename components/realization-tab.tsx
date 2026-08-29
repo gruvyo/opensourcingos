@@ -6,7 +6,7 @@ import {
   TrendingUp, Plus, Trash2, AlertTriangle,
   ShieldCheck, Clock,
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 import { clsx } from 'clsx'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,7 @@ export function RealizationTab({
   eventId: string
   currentUserRole: string | null
 }) {
+  const { formatCurrency, formatDate } = useWorkspaceFormat()
   const [periods, setPeriods] = useState<RealizationPeriod[]>([])
   const [scheduleRows, setScheduleRows] = useState<ExecutedScheduleRow[]>([])
   const [loading, setLoading] = useState(true)

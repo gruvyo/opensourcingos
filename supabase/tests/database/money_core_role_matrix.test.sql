@@ -97,14 +97,16 @@ select ok(
   not has_table_privilege('authenticated', 'public.savings_periods', 'INSERT,DELETE')
   and not has_table_privilege('authenticated', 'public.baseline_lines', 'INSERT,DELETE')
   and not has_table_privilege('authenticated', 'public.realization_periods', 'INSERT')
-  and has_column_privilege('authenticated', 'public.savings_periods', 'final_amount', 'UPDATE')
+  and not has_any_column_privilege('authenticated', 'public.savings_calculations', 'INSERT')
+  and not has_any_column_privilege('authenticated', 'public.savings_calculations', 'UPDATE')
+  and not has_any_column_privilege('authenticated', 'public.savings_periods', 'UPDATE')
   and has_column_privilege('authenticated', 'public.realization_periods', 'actual_amount', 'UPDATE')
   and has_column_privilege('authenticated', 'public.realization_periods', 'realized_reduction_amount', 'UPDATE')
   and has_column_privilege('authenticated', 'public.realization_periods', 'realized_avoidance_amount', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.realization_periods', 'realized_savings', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.realization_periods', 'leakage_amount', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.realization_periods', 'realization_status', 'UPDATE'),
-  'RPC-owned creation/deletion and ordinary estimated/actual edits have exact privileges'
+  'RPC-owned estimated writes and ordinary actual edits have exact privileges'
 );
 
 select ok(

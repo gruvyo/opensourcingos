@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchPortfolioRows } from '@/lib/supabase/portfolio-query'
 import Link from 'next/link'
-import { formatCurrency, formatReduction, formatDate } from '@/lib/utils'
+import {
+  DEFAULT_WORKSPACE_CURRENCY,
+  DEFAULT_WORKSPACE_LOCALE,
+  DEFAULT_WORKSPACE_TIMEZONE,
+  workspaceFormatters,
+} from '@/lib/workspace-settings'
 import { portfolioRollup, reportedSavings, scheduleLifecycleRollup, getFirst, type SchedulePeriodRow } from '@/lib/savings'
 import { Calculator, ArrowRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -48,7 +53,7 @@ export default async function SavingsPage() {
         .order('period_number')
         .range(from, to)
     )),
-    supabase.from('organization_settings').select('timezone').maybeSingle(),
+    supabase.from('organization_settings').select('timezone, currency_code, locale').maybeSingle(),
   ])
 
   // A failed query here would render as "$0 savings", which is indistinguishable
@@ -65,11 +70,15 @@ export default async function SavingsPage() {
   const sourcingEvents = population.events
   const sourcingPeriodRows = population.periodRows
   const now = new Date()
+  const { formatCurrency, formatReduction, formatDate } = workspaceFormatters(
+    settings?.currency_code || DEFAULT_WORKSPACE_CURRENCY,
+    settings?.locale || DEFAULT_WORKSPACE_LOCALE,
+  )
 
   // Single source of truth for every headline/breakdown number.
   const rollup = portfolioRollup(calcs, sourcingEvents, {
     now,
-    timeZone: settings?.timezone || 'America/Chicago',
+    timeZone: settings?.timezone || DEFAULT_WORKSPACE_TIMEZONE,
   })
   const lifecycle = scheduleLifecycleRollup(
     calcs,

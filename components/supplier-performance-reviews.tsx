@@ -7,7 +7,7 @@ import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
-import { formatDate } from '@/lib/utils'
+import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 
 type Person = { full_name: string | null; email: string }
 export type SupplierPerformanceReview = {
@@ -45,6 +45,7 @@ function scoreTone(score: number): BadgeTone {
 }
 
 export function SupplierPerformanceReviews({ supplierId, reviews, canEdit, today }: { supplierId: string; reviews: SupplierPerformanceReview[]; canEdit: boolean; today: string }) {
+  const { formatDate } = useWorkspaceFormat()
   const [editor, setEditor] = useState<'new' | string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SupplierPerformanceReview | null>(null)
   const [deleteError, setDeleteError] = useState('')
