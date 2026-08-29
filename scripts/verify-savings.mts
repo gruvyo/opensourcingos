@@ -28,6 +28,7 @@ import {
   portfolioByYear,
   portfolioRollup,
   yearOverYear,
+  anchorsWithBaselineQuality,
   baselineQuality,
   chainWithBaselineQuality,
   scheduleLifecycleRollup,
@@ -674,6 +675,15 @@ section('16. Reclassifying a baseline never changes the Total')
     { opening: null, baseline: 1_000_000, final: 900_000 }, false)
   near('a soft baseline with no opening still books 100,000', noOpening.avoidance, 100_000)
   near('and the total survives', noOpening.total, 100_000)
+
+  const persistedSoft = anchorsWithBaselineQuality(
+    { opening: null, baseline: 1_000_000, final: 900_000 }, false)
+  eq('soft row persists no hard baseline', persistedSoft.baseline, null)
+  eq('soft row moves the reference to opening', persistedSoft.opening, 1_000_000)
+  const persistedExplicitOpening = anchorsWithBaselineQuality(
+    { opening: 950_000, baseline: 1_000_000, final: 900_000 }, false)
+  eq('soft row preserves an explicit opening ask', persistedExplicitOpening.opening, 950_000)
+  eq('soft row still persists no hard baseline with opening', persistedExplicitOpening.baseline, null)
 
   // Worked example from the brief: 1,200,000 / 1,000,000 / 900,000.
   const h = chainWithBaselineQuality({ opening: 1_200_000, baseline: 1_000_000, final: 900_000 }, true)

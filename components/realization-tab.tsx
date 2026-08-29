@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { syncRealizationPeriodsAtomically } from '@/lib/atomic-money-writers'
-import { hasCentPrecision } from '@/lib/money'
+import { hasCentPrecision, moneyInputChanged } from '@/lib/money'
 import type { Tables } from '@/lib/database.types'
 import { reductionFromActualSpend } from '@/lib/realization'
 
@@ -391,6 +391,7 @@ export function RealizationTab({
                         title={period.projected_reduction_amount === null ? 'Actual spend cannot derive reduction without an executed reduction comparator' : undefined}
                         onBlur={async (e) => {
                           const input = e.currentTarget
+                          if (!moneyInputChanged(input.value, period.actual_amount)) return
                           const saved = await updateActualAmount(period.id, input.value)
                           if (!saved) input.value = period.actual_amount == null ? '' : period.actual_amount.toFixed(2)
                         }}
@@ -407,6 +408,7 @@ export function RealizationTab({
                         disabled={busy || !canEdit}
                         onBlur={async event => {
                           const input = event.currentTarget
+                          if (!moneyInputChanged(input.value, period.realized_reduction_amount)) return
                           const saved = await updateRealizedLeg(period.id, 'reduction', input.value)
                           if (!saved) input.value = period.realized_reduction_amount == null ? '' : period.realized_reduction_amount.toFixed(2)
                         }}
@@ -423,6 +425,7 @@ export function RealizationTab({
                         disabled={busy || !canEdit}
                         onBlur={async event => {
                           const input = event.currentTarget
+                          if (!moneyInputChanged(input.value, period.realized_avoidance_amount)) return
                           const saved = await updateRealizedLeg(period.id, 'avoidance', input.value)
                           if (!saved) input.value = period.realized_avoidance_amount == null ? '' : period.realized_avoidance_amount.toFixed(2)
                         }}

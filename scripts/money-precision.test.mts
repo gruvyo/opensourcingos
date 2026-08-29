@@ -4,6 +4,7 @@ import {
   allocateMoney,
   fixedMoney,
   hasCentPrecision,
+  moneyInputChanged,
   moneyToCents,
   roundMoney,
 } from '../lib/money.ts'
@@ -14,6 +15,15 @@ test('money rounding matches PostgreSQL numeric half-away-from-zero behavior', (
   assert.equal(roundMoney(-1.005), -1.01)
   assert.equal(moneyToCents(999_999.995), 100_000_000)
   assert.equal(fixedMoney(12), '12.00')
+})
+
+test('unchanged realization inputs do not issue destructive blur writes', () => {
+  assert.equal(moneyInputChanged('', null), false)
+  assert.equal(moneyInputChanged('100.00', 100), false)
+  assert.equal(moneyInputChanged('100', 100), false)
+  assert.equal(moneyInputChanged('', 100), true)
+  assert.equal(moneyInputChanged('0', null), true)
+  assert.equal(moneyInputChanged('not-money', null), true)
 })
 
 test('deterministic residual allocation preserves the exact cent total', () => {

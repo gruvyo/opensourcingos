@@ -1588,7 +1588,7 @@ export type Database = {
           organization_id: string | null
           procurement_owner_id: string | null
           project_due_date: string | null
-          project_type: string | null
+          project_type: string
           recognition_end_date: string | null
           recognition_start_date: string | null
           savings_disposition: string | null
@@ -1626,7 +1626,7 @@ export type Database = {
           organization_id?: string | null
           procurement_owner_id?: string | null
           project_due_date?: string | null
-          project_type?: string | null
+          project_type?: string
           recognition_end_date?: string | null
           recognition_start_date?: string | null
           savings_disposition?: string | null
@@ -1664,7 +1664,7 @@ export type Database = {
           organization_id?: string | null
           procurement_owner_id?: string | null
           project_due_date?: string | null
-          project_type?: string | null
+          project_type?: string
           recognition_end_date?: string | null
           recognition_start_date?: string | null
           savings_disposition?: string | null
@@ -2422,6 +2422,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_baseline_line: {
+        Args: { p_baseline_id: string; p_line: Json }
+        Returns: string
+      }
       clone_org_data: {
         Args: { p_owner: string; p_source: string; p_target: string }
         Returns: number
@@ -2444,6 +2448,10 @@ export type Database = {
         Returns: undefined
       }
       current_org_id: { Args: never; Returns: string }
+      delete_baseline_line: {
+        Args: { p_baseline_line_id: string }
+        Returns: undefined
+      }
       derive_realization_status: {
         Args: {
           p_projected_avoidance: number

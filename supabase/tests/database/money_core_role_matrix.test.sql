@@ -89,12 +89,13 @@ select is(
    where has_table_privilege(
      'authenticated', format('public.%I', table_name), 'DELETE'
    )),
-  11,
-  'all direct money-core deletes except schedule replacement have an RLS-gated grant'
+  10,
+  'all direct money-core deletes except atomic schedule and baseline-line writers have an RLS-gated grant'
 );
 
 select ok(
   not has_table_privilege('authenticated', 'public.savings_periods', 'INSERT,DELETE')
+  and not has_table_privilege('authenticated', 'public.baseline_lines', 'INSERT,DELETE')
   and not has_table_privilege('authenticated', 'public.realization_periods', 'INSERT')
   and has_column_privilege('authenticated', 'public.savings_periods', 'final_amount', 'UPDATE')
   and has_column_privilege('authenticated', 'public.realization_periods', 'actual_amount', 'UPDATE')

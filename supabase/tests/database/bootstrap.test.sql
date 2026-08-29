@@ -3640,7 +3640,7 @@ select is(
       ]::text[]), 'UPDATE'::text
       union all
       select unnest(array[
-        'award_lines', 'awards', 'baseline_lines', 'baselines',
+        'award_lines', 'awards', 'baselines',
         'event_scope_lines', 'realization_periods',
         'savings_calculation_lines', 'savings_calculations',
         'sourcing_events',
@@ -3727,11 +3727,13 @@ select is(
         and has_function_privilege('authenticated', p.oid, 'EXECUTE')
     ), expected(signature) as (
       values
+        ('add_baseline_line(p_baseline_id uuid, p_line jsonb)'),
         ('complete_sourcing_project(p_event_id uuid, p_disposition text, p_reason text)'),
         ('confirm_business_equivalency(p_scope_line_id uuid, p_confirmed boolean)'),
         ('current_org_id()'),
         ('correct_savings_execution(p_calc_id uuid, p_note text, p_calculation jsonb, p_periods jsonb)'),
         ('derive_realization_status(p_projected_reduction numeric, p_projected_avoidance numeric, p_realized_reduction numeric, p_realized_avoidance numeric)'),
+        ('delete_baseline_line(p_baseline_line_id uuid)'),
         ('mark_savings_schedule_executed(p_savings_calculation_id uuid, p_execution_note text)'),
         ('replace_savings_schedule(p_savings_calculation_id uuid, p_schedule_start_month integer, p_schedule_start_year integer, p_schedule_period_type text, p_periods jsonb)'),
         ('reverse_savings_execution(p_calc_id uuid, p_note text, p_disposition_action text)'),
@@ -3774,6 +3776,7 @@ select ok(
   (select bool_and(p.prosecdef and array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public%')
    from pg_catalog.pg_proc p
    where p.oid in (
+     'public.add_baseline_line(uuid,jsonb)'::regprocedure,
      'public.select_baseline(uuid)'::regprocedure,
      'public.complete_sourcing_project(uuid,text,text)'::regprocedure,
      'public.set_offer_role(uuid,text)'::regprocedure,
@@ -3784,7 +3787,8 @@ select ok(
      'public.set_hard_reduction_override(uuid,boolean,text)'::regprocedure,
      'public.confirm_business_equivalency(uuid,boolean)'::regprocedure,
      'public.set_finance_validation(uuid,boolean)'::regprocedure,
-     'public.sync_realization_periods(uuid)'::regprocedure
+     'public.sync_realization_periods(uuid)'::regprocedure,
+     'public.delete_baseline_line(uuid)'::regprocedure
    )),
   'money-writer RPCs use definer rights with a fixed search path'
 );
@@ -3819,6 +3823,8 @@ select ok(
   and not has_column_privilege('authenticated', 'public.supplier_offer_lines', 'updated_by', 'UPDATE')
   and not has_table_privilege('authenticated', 'public.savings_periods', 'INSERT')
   and not has_table_privilege('authenticated', 'public.savings_periods', 'DELETE')
+  and not has_table_privilege('authenticated', 'public.baseline_lines', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.baseline_lines', 'DELETE')
   and not has_table_privilege('authenticated', 'public.realization_periods', 'INSERT')
   and has_column_privilege('authenticated', 'public.baselines', 'baseline_total_amount', 'UPDATE')
   and has_column_privilege('authenticated', 'public.supplier_offers', 'offer_total_amount', 'UPDATE')

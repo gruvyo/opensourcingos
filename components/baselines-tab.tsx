@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { selectBaselineAtomically } from '@/lib/atomic-money-writers'
+import {
+  addBaselineLineAtomically,
+  deleteBaselineLineAtomically,
+  selectBaselineAtomically,
+} from '@/lib/atomic-money-writers'
 import {
   Plus, Star, Trash2, ChevronDown, Pencil,
   ChevronRight, Shield, Calculator, ShieldCheck, ShieldAlert } from 'lucide-react'
@@ -467,7 +471,6 @@ export function BaselinesTab({ eventId, scopeLines, currentUserRole }: { eventId
                       <BaselineLinesTable
                         key={`${baseline.id}:${lines.map(line => line.id).join(',')}`}
                         baselineId={baseline.id}
-                        eventId={eventId}
                         scopeLines={scopeLines}
                         lines={lines}
                         onLinesChanged={freshLines => handleBaselineLinesChanged(baseline.id, freshLines)}
@@ -771,9 +774,8 @@ function AddBaselineForm({ eventId, isFirstBaseline, existing, onSaved, onCancel
 // ============================================
 // Baseline Lines Table (with calculations)
 // ============================================
-function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLines, onLinesChanged, isLocked, canEdit, canDelete }: {
+function BaselineLinesTable({ baselineId, scopeLines, lines: initialLines, onLinesChanged, isLocked, canEdit, canDelete }: {
   baselineId: string
-  eventId: string
   scopeLines: ScopeLine[]
   lines: BaselineLine[]
   onLinesChanged: (lines: BaselineLine[]) => void
@@ -806,14 +808,9 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     return (extended * 12) / termMonths
   }
 
-  // Re-query baseline_lines (same shape as the parent's fetchBaselineLines) and total
-  // from THOSE rows, not from the `lines` React state. `lines` is only ever as fresh as
-  // the last render — reading it right after an insert/delete `await` chain can still see
-  // the pre-update value, which used to total (and WRITE, as the baseline total) a stale
-  // array: the first line added wrote a total of 0, and a delete left the removed amount
-  // in. Two rapid clicks raced the same way. Always total off what the database actually
-  // has, and refresh local state from the same fetch so the two can never disagree.
-  const refreshLinesAndTotal = async () => {
+  // The mutation RPC has already committed the line and parent total together.
+  // This read refreshes presentation state only; it never writes money.
+  const refreshLines = async () => {
     const { data: freshLines, error: fetchError } = await supabase
       .from('baseline_lines')
       .select(`
@@ -832,7 +829,6 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     const freshRows = resolved.rows
     setLines(freshRows)
     onLinesChanged(freshRows)
-    await updateBaselineTotal(freshRows)
   }
 
   const handleAddLine = async (e: React.FormEvent) => {
@@ -847,23 +843,11 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
     const recurring = parseFloat(newLine.baseline_recurring_amount) || extended
     const oneTime = parseFloat(newLine.baseline_one_time_amount) || 0
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user!.id)
-      .single()
-
-    const lineNumber = lines.length + 1
-
-    const { data, error: insertError } = await supabase
-      .from('baseline_lines')
-      .insert({
-        organization_id: profile?.organization_id,
-        baseline_id: baselineId,
-        event_id: eventId,
+    const { error: insertError } = await addBaselineLineAtomically(
+      supabase,
+      baselineId,
+      {
         scope_line_id: newLine.scope_line_id || null,
-        line_number: lineNumber,
         baseline_unit_price: unitPrice,
         baseline_quantity: qty,
         baseline_extended_amount: extended,
@@ -874,17 +858,11 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
         normalized_quantity: qty,
         normalized_unit_price: unitPrice,
         normalized_extended_amount: extended,
-      })
-      .select(`
-        *,
-        scope_line:event_scope_lines(item_service_name, uom)
-      `)
-      .single()
+      },
+    )
 
-    // This used to be gated on `if (!error && data)` with no else branch — the error
-    // was checked but never shown anywhere, so a rejected insert just silently did nothing.
-    if (insertError || !data) {
-      setError(insertError?.message || 'Could not add the line.')
+    if (insertError) {
+      setError(insertError.message)
       return
     }
 
@@ -893,21 +871,14 @@ function BaselineLinesTable({ baselineId, eventId, scopeLines, lines: initialLin
       baseline_term_months: '12', baseline_recurring_amount: '', baseline_one_time_amount: '',
     })
     setShowAddLine(false)
-    await refreshLinesAndTotal()
+    await refreshLines()
   }
 
   const handleDeleteLine = async (lineId: string) => {
     setError(null)
-    const { error: deleteError } = await supabase.from('baseline_lines').delete().eq('id', lineId)
+    const { error: deleteError } = await deleteBaselineLineAtomically(supabase, lineId)
     if (deleteError) { setError(deleteError.message); return }
-    await refreshLinesAndTotal()
-  }
-
-  const updateBaselineTotal = async (currentLines: BaselineLine[]) => {
-    const total = currentLines.reduce((sum, l) => sum + (l.baseline_extended_amount || 0), 0)
-    // MONEY write — this total is the minuend of every savings calculation downstream.
-    const { error: updateError } = await supabase.from('baselines').update({ baseline_total_amount: total }).eq('id', baselineId)
-    if (updateError) setError(updateError.message)
+    await refreshLines()
   }
 
   const labelClass = 'block text-xs font-medium text-[var(--text-3)] mb-1'

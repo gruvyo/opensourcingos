@@ -8,7 +8,7 @@ import { CalendarRange, AlertCircle, Pencil, RotateCcw, Check, X, BadgeCheck } f
 import { formatCurrency, formatReduction as money } from '@/lib/utils'
 import { roundMoney } from '@/lib/money'
 import {
-  chainSavings, baselineQuality,
+  anchorsWithBaselineQuality, chainSavings, baselineQuality,
   termRates, generateSchedule, scheduleTotals, scheduleByYear,
   toSchedulePeriods, defaultPeriodCount, periodMonths, monthName, addMonths,
   reportableSavingsPct,
@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input, Select } from '@/components/ui/input'
 import { validateFinalAnchor } from '@/lib/final-anchor'
-import { resolveLoadedRows } from '@/lib/load-state'
 import { localDateKey } from '@/lib/date-key'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) }))
@@ -309,20 +308,27 @@ export function ScheduleTab({
     setFinalError(null)
     setEditingId(r.id)
     setDraft({
-      baseline: r.baseline_amount === null || r.baseline_amount === undefined ? '' : String(r.baseline_amount),
-      opening: r.opening_amount === null || r.opening_amount === undefined ? '' : String(r.opening_amount),
+      baseline: quality.isHard || r.baseline_amount == null ? String(r.baseline_amount ?? '') : '',
+      opening: String(r.opening_amount ?? (quality.isHard ? '' : r.baseline_amount ?? '')),
       final: r.final_amount === null || r.final_amount === undefined ? '' : String(r.final_amount),
     })
   }
 
   const draftFinal = validateFinalAnchor(draft.final, { zeroConfirmed: true })
-  const draftChain = chainSavings({
-    baseline: toAnchor(draft.baseline),
-    opening: toAnchor(draft.opening),
+  const typedDraftBaseline = toAnchor(draft.baseline)
+  const typedDraftOpening = toAnchor(draft.opening)
+  const draftAnchors = anchorsWithBaselineQuality({
+    baseline: typedDraftBaseline,
+    opening: typedDraftOpening,
     final: draftFinal.status === 'valid' ? draftFinal.value : null,
-  })
+  }, quality.isHard)
+  const draftChain = chainSavings(draftAnchors)
 
   const saveRow = async (r: SavedScheduleRow, zeroConfirmed = false) => {
+    if (!calc) {
+      setError('Save the savings calculation before editing its schedule.')
+      return
+    }
     const finalValidation = validateFinalAnchor(draft.final, { zeroConfirmed })
     if (finalValidation.status === 'error') {
       setFinalError(finalValidation.message)
@@ -336,40 +342,40 @@ export function ScheduleTab({
     const finalAmount = finalValidation.value
     setFinalError(null)
 
-    if (correctionMode) {
-      setRows(current => current.map(row => row.id === r.id ? {
-        ...row,
-        baseline_amount: toAnchor(draft.baseline),
-        opening_amount: toAnchor(draft.opening),
-        final_amount: finalAmount,
-        cost_reduction_amount: draftChain.reduction === null ? null : roundMoney(draftChain.reduction),
-        cost_avoidance_amount: roundMoney(draftChain.avoidance),
-        total_savings_amount: roundMoney(draftChain.total),
-        is_edited: true,
-      } : row))
-      setEditingId(null)
-      return
-    }
-
-    setBusy(true); setError(null)
-    const res = await supabase.from('savings_periods').update({
-      baseline_amount: toAnchor(draft.baseline),
-      opening_amount: toAnchor(draft.opening),
+    const editedRow: SavedScheduleRow = {
+      ...r,
+      baseline_amount: draftAnchors.baseline == null ? null : Number(draftAnchors.baseline),
+      opening_amount: draftAnchors.opening == null ? null : Number(draftAnchors.opening),
       final_amount: finalAmount,
       cost_reduction_amount: draftChain.reduction === null ? null : roundMoney(draftChain.reduction),
       cost_avoidance_amount: roundMoney(draftChain.avoidance),
       total_savings_amount: roundMoney(draftChain.total),
       is_edited: true,
-    }).eq('id', r.id)
+    }
+
+    if (correctionMode) {
+      setRows(current => current.map(row => row.id === r.id ? editedRow : row))
+      setEditingId(null)
+      return
+    }
+
+    setBusy(true); setError(null)
+    const nextRows = rows.map(row => row.id === r.id ? editedRow : row)
+    const res = await replaceSavingsScheduleAtomically(
+      supabase, calc.id, startMonth, startYear, periodType, nextRows.map(scheduleWrite),
+    )
     setBusy(false)
     if (res.error) { setError(res.error.message); return }
     setEditingId(null)
     await load()
-    await republish()
   }
 
   /** Put one hand-edited row back to what the generator says it should be. */
   const resetRow = async (r: SavedScheduleRow) => {
+    if (!calc) {
+      setError('Save the savings calculation before editing its schedule.')
+      return
+    }
     const g = preview[Number(r.period_number) - 1]
     if (!g) { setError('That period is outside the current schedule settings — regenerate instead.'); return }
     if (correctionMode) {
@@ -387,38 +393,23 @@ export function ScheduleTab({
     }
 
     setBusy(true); setError(null)
-    const res = await supabase.from('savings_periods').update({
-      baseline_amount: g.baseline, opening_amount: g.opening, final_amount: g.final,
-      cost_reduction_amount: g.reduction, cost_avoidance_amount: g.avoidance,
-      total_savings_amount: g.total, is_edited: false,
-    }).eq('id', r.id)
+    const reset: SavedScheduleRow = {
+      ...r,
+      baseline_amount: g.baseline,
+      opening_amount: g.opening,
+      final_amount: g.final,
+      cost_reduction_amount: g.reduction,
+      cost_avoidance_amount: g.avoidance,
+      total_savings_amount: g.total,
+      is_edited: false,
+    }
+    const nextRows = rows.map(row => row.id === r.id ? reset : row)
+    const res = await replaceSavingsScheduleAtomically(
+      supabase, calc.id, startMonth, startYear, periodType, nextRows.map(scheduleWrite),
+    )
     setBusy(false)
     if (res.error) { setError(res.error.message); return }
     await load()
-    await republish()
-  }
-
-  /** After a row edit the published figure is stale — rewrite it from the rows. */
-  const republish = async () => {
-    if (!calc) return
-    const result = await supabase.from('savings_periods').select('*')
-      .eq('savings_calculation_id', calc.id).order('period_number', { ascending: true })
-    const resolved = resolveLoadedRows<SavedScheduleRow>('The saved schedule', {
-      data: result.data,
-      error: result.error,
-    })
-    if (resolved.status === 'error') {
-      setError(`${resolved.message} The edited row was saved, but published totals were not rewritten; try the save again before relying on dashboard figures.`)
-      return
-    }
-    const current = toSchedulePeriods(resolved.rows)
-    if (!current.length) {
-      setError('The edited row was saved, but the schedule reload returned no periods, so published totals were not rewritten. Reload the page before continuing.')
-      return
-    }
-    const res = await supabase.from('savings_calculations')
-      .update(publishable(current, startMonth, startYear, dealMonths)).eq('id', calc.id)
-    if (res.error) setError(res.error.message)
   }
 
   const executeSchedule = async () => {
@@ -887,7 +878,9 @@ export function ScheduleTab({
                             {editing ? (
                               <>
                                 <td className="py-1 pr-3">
-                                  <Input aria-label={`Baseline for ${monthName(r.period_month)} ${r.period_year}`} type="number" step="0.01" value={draft.baseline} placeholder="none"
+                                  <Input aria-label={`Baseline for ${monthName(r.period_month)} ${r.period_year}`} type="number" step="0.01" value={draft.baseline} placeholder={quality.isHard ? 'none' : 'soft baseline'}
+                                    disabled={!quality.isHard}
+                                    title={quality.isHard ? undefined : 'Soft baselines cannot book hard cost reduction; edit Opening instead.'}
                                     onChange={e => setDraft(d => ({ ...d, baseline: e.target.value }))}
                                     className="px-2 py-1 text-right text-xs" />
                                 </td>
@@ -1049,6 +1042,24 @@ export function ScheduleTab({
 function lastPeriodLabel(rows: SchedulePeriod[]): string {
   const last = rows[rows.length - 1]
   return last ? `${monthName(last.month)} ${last.year}` : '—'
+}
+
+/** Exact browser-to-RPC projection for whole-schedule atomic replacement. */
+function scheduleWrite(row: SavedScheduleRow) {
+  return {
+    period_number: Number(row.period_number),
+    period_month: Number(row.period_month),
+    period_year: Number(row.period_year),
+    period_months: Number(row.period_months),
+    baseline_amount: row.baseline_amount == null ? null : Number(row.baseline_amount),
+    opening_amount: row.opening_amount == null ? null : Number(row.opening_amount),
+    final_amount: Number(row.final_amount),
+    cost_reduction_amount: row.cost_reduction_amount == null ? null : Number(row.cost_reduction_amount),
+    cost_avoidance_amount: Number(row.cost_avoidance_amount),
+    total_savings_amount: Number(row.total_savings_amount),
+    is_edited: Boolean(row.is_edited),
+    notes: row.notes,
+  }
 }
 
 /**
