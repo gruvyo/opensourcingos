@@ -37,6 +37,108 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 
+CREATE OR REPLACE FUNCTION "public"."add_baseline_line"("p_baseline_id" "uuid", "p_line" "jsonb") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v_user uuid := auth.uid();
+  v_org uuid;
+  v_role text;
+  v_event uuid;
+  v_lock_status text;
+  v_scope_line uuid;
+  v_line_id uuid;
+  v_line_number integer;
+begin
+  if v_user is null then raise exception 'authentication required'; end if;
+  if jsonb_typeof(p_line) is distinct from 'object' then
+    raise exception 'baseline line must be a JSON object';
+  end if;
+
+  if exists (
+    select 1 from jsonb_object_keys(p_line) as field(name)
+    where field.name not in (
+      'scope_line_id', 'baseline_unit_price', 'baseline_quantity',
+      'baseline_extended_amount', 'baseline_recurring_amount',
+      'baseline_one_time_amount', 'baseline_term_months',
+      'annualized_baseline_amount', 'normalized_quantity',
+      'normalized_unit_price', 'normalized_extended_amount'
+    )
+  ) then
+    raise exception 'baseline line contains unsupported fields';
+  end if;
+
+  select organization_id, role into v_org, v_role
+  from public.profiles where id = v_user;
+  if v_org is null then raise exception 'workspace membership required'; end if;
+  if v_role not in ('admin', 'procurement_user') then
+    raise exception 'administrator or procurement role required';
+  end if;
+
+  select event_id, baseline_lock_status into v_event, v_lock_status
+  from public.baselines
+  where id = p_baseline_id and organization_id = v_org
+  for update;
+  if v_event is null then raise exception 'baseline not found'; end if;
+  if v_lock_status is distinct from 'Draft' then
+    raise exception 'locked baselines cannot be edited';
+  end if;
+
+  v_scope_line := nullif(p_line->>'scope_line_id', '')::uuid;
+  if v_scope_line is not null and not exists (
+    select 1 from public.event_scope_lines
+    where id = v_scope_line
+      and event_id = v_event
+      and organization_id = v_org
+  ) then
+    raise exception 'scope line not found';
+  end if;
+
+  select coalesce(max(line_number), 0) + 1 into v_line_number
+  from public.baseline_lines
+  where baseline_id = p_baseline_id and organization_id = v_org;
+
+  insert into public.baseline_lines (
+    organization_id, baseline_id, event_id, scope_line_id, line_number,
+    baseline_unit_price, baseline_quantity, baseline_extended_amount,
+    baseline_recurring_amount, baseline_one_time_amount,
+    baseline_term_months, annualized_baseline_amount,
+    normalized_quantity, normalized_unit_price, normalized_extended_amount,
+    created_by, updated_by
+  ) values (
+    v_org, p_baseline_id, v_event, v_scope_line, v_line_number,
+    coalesce((p_line->>'baseline_unit_price')::numeric, 0),
+    coalesce((p_line->>'baseline_quantity')::numeric, 0),
+    coalesce((p_line->>'baseline_extended_amount')::numeric, 0),
+    coalesce((p_line->>'baseline_recurring_amount')::numeric, 0),
+    coalesce((p_line->>'baseline_one_time_amount')::numeric, 0),
+    coalesce((p_line->>'baseline_term_months')::numeric, 12),
+    coalesce((p_line->>'annualized_baseline_amount')::numeric, 0),
+    coalesce((p_line->>'normalized_quantity')::numeric, 0),
+    coalesce((p_line->>'normalized_unit_price')::numeric, 0),
+    coalesce((p_line->>'normalized_extended_amount')::numeric, 0),
+    v_user, v_user
+  ) returning id into v_line_id;
+
+  update public.baselines
+  set baseline_total_amount = (
+        select coalesce(sum(baseline_extended_amount), 0)
+        from public.baseline_lines
+        where baseline_id = p_baseline_id and organization_id = v_org
+      ),
+      updated_by = v_user,
+      updated_at = now()
+  where id = p_baseline_id and organization_id = v_org;
+
+  return v_line_id;
+end
+$$;
+
+
+ALTER FUNCTION "public"."add_baseline_line"("p_baseline_id" "uuid", "p_line" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."capture_workspace_audit"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog', 'public'
@@ -925,6 +1027,62 @@ $$;
 
 
 ALTER FUNCTION "public"."current_org_id"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."delete_baseline_line"("p_baseline_line_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v_user uuid := auth.uid();
+  v_org uuid;
+  v_role text;
+  v_baseline uuid;
+  v_lock_status text;
+begin
+  if v_user is null then raise exception 'authentication required'; end if;
+
+  select organization_id, role into v_org, v_role
+  from public.profiles where id = v_user;
+  if v_org is null then raise exception 'workspace membership required'; end if;
+  if v_role not in ('admin', 'procurement_user') then
+    raise exception 'administrator or procurement role required';
+  end if;
+
+  select baseline_id into v_baseline
+  from public.baseline_lines
+  where id = p_baseline_line_id and organization_id = v_org;
+  if v_baseline is null then raise exception 'baseline line not found'; end if;
+
+  select baseline_lock_status into v_lock_status
+  from public.baselines
+  where id = v_baseline and organization_id = v_org
+  for update;
+  if not found then raise exception 'baseline line not found'; end if;
+  if v_lock_status is distinct from 'Draft' then
+    raise exception 'locked baselines cannot be edited';
+  end if;
+
+  delete from public.baseline_lines
+  where id = p_baseline_line_id
+    and baseline_id = v_baseline
+    and organization_id = v_org;
+  if not found then raise exception 'baseline line not found'; end if;
+
+  update public.baselines
+  set baseline_total_amount = (
+        select coalesce(sum(baseline_extended_amount), 0)
+        from public.baseline_lines
+        where baseline_id = v_baseline and organization_id = v_org
+      ),
+      updated_by = v_user,
+      updated_at = now()
+  where id = v_baseline and organization_id = v_org;
+end
+$$;
+
+
+ALTER FUNCTION "public"."delete_baseline_line"("p_baseline_line_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."derive_realization_period_fields"() RETURNS "trigger"
@@ -4425,7 +4583,7 @@ CREATE TABLE IF NOT EXISTS "public"."sourcing_events" (
     "created_by" "uuid",
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "updated_by" "uuid",
-    "project_type" "text" DEFAULT 'Sourcing'::"text",
+    "project_type" "text" DEFAULT 'Sourcing'::"text" NOT NULL,
     "buyer_name" "text",
     "notes" "text",
     "project_due_date" "date",
@@ -6745,6 +6903,12 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."add_baseline_line"("p_baseline_id" "uuid", "p_line" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."add_baseline_line"("p_baseline_id" "uuid", "p_line" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."add_baseline_line"("p_baseline_id" "uuid", "p_line" "jsonb") TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."capture_workspace_audit"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."capture_workspace_audit"() TO "service_role";
 
@@ -6781,6 +6945,12 @@ GRANT ALL ON FUNCTION "public"."correct_savings_execution"("p_calc_id" "uuid", "
 REVOKE ALL ON FUNCTION "public"."current_org_id"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."current_org_id"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."current_org_id"() TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."delete_baseline_line"("p_baseline_line_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."delete_baseline_line"("p_baseline_line_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."delete_baseline_line"("p_baseline_line_id" "uuid") TO "authenticated";
 
 
 
@@ -7152,87 +7322,71 @@ GRANT INSERT("award_notes"),UPDATE("award_notes") ON TABLE "public"."awards" TO 
 
 
 GRANT ALL ON TABLE "public"."baseline_lines" TO "service_role";
-GRANT SELECT,DELETE ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT SELECT ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("id") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("scope_line_id") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("organization_id") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("line_number") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("baseline_id") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("baseline_unit_price") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("event_id") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("baseline_quantity") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("scope_line_id"),UPDATE("scope_line_id") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("baseline_extended_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("line_number"),UPDATE("line_number") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("baseline_recurring_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("baseline_unit_price"),UPDATE("baseline_unit_price") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("baseline_one_time_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("baseline_quantity"),UPDATE("baseline_quantity") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("baseline_term_months") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("baseline_extended_amount"),UPDATE("baseline_extended_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("annualized_baseline_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("baseline_recurring_amount"),UPDATE("baseline_recurring_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("normalized_quantity") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("baseline_one_time_amount"),UPDATE("baseline_one_time_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("normalized_unit_price") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("baseline_term_months"),UPDATE("baseline_term_months") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("normalized_extended_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("annualized_baseline_amount"),UPDATE("annualized_baseline_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("tax_amount_included") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("normalized_quantity"),UPDATE("normalized_quantity") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("freight_amount_included") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("normalized_unit_price"),UPDATE("normalized_unit_price") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("source_document_id") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
-GRANT INSERT("normalized_extended_amount"),UPDATE("normalized_extended_amount") ON TABLE "public"."baseline_lines" TO "authenticated";
-
-
-
-GRANT INSERT("tax_amount_included"),UPDATE("tax_amount_included") ON TABLE "public"."baseline_lines" TO "authenticated";
-
-
-
-GRANT INSERT("freight_amount_included"),UPDATE("freight_amount_included") ON TABLE "public"."baseline_lines" TO "authenticated";
-
-
-
-GRANT INSERT("source_document_id"),UPDATE("source_document_id") ON TABLE "public"."baseline_lines" TO "authenticated";
-
-
-
-GRANT INSERT("notes"),UPDATE("notes") ON TABLE "public"."baseline_lines" TO "authenticated";
+GRANT UPDATE("notes") ON TABLE "public"."baseline_lines" TO "authenticated";
 
 
 
