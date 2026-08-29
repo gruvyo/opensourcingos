@@ -2448,6 +2448,10 @@ export type Database = {
         Returns: undefined
       }
       current_org_id: { Args: never; Returns: string }
+      delete_baseline_line: {
+        Args: { p_baseline_line_id: string }
+        Returns: undefined
+      }
       derive_realization_status: {
         Args: {
           p_projected_avoidance: number
@@ -2456,10 +2460,6 @@ export type Database = {
           p_realized_reduction: number
         }
         Returns: string
-      }
-      delete_baseline_line: {
-        Args: { p_baseline_line_id: string }
-        Returns: undefined
       }
       mark_savings_schedule_executed: {
         Args: { p_execution_note?: string; p_savings_calculation_id: string }
