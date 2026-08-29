@@ -120,8 +120,8 @@ select throws_ok(
        where id = 'f1000000-0000-4000-8000-000000000001'
      ) and choice_type = 'event_type' and project_type = 'Sourcing'
        and label = 'Complete' $$,
-  '42501', 'that label is reserved for the guarded completion status',
-  'an ordinary option cannot enter the guarded scope without changing its label'
+  '23514', 'Project choice scope cannot be changed',
+  'the pre-existing scope guard independently blocks a scope-transfer bypass'
 );
 
 select ok(
