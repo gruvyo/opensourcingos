@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { clsx } from 'clsx'
 import { useWorkspaceFormat } from '@/components/workspace-format-provider'
@@ -51,8 +53,10 @@ export function FiscalYearPanel({
           </p>
         </div>
 
-        {/* Server-rendered filter: plain links, so a fiscal year is a URL you
-            can bookmark or paste into an email, and no client JS is needed. */}
+        {/* The filter is plain links, not click handlers, so a fiscal year is a
+            URL you can bookmark or paste into an email. This file is a client
+            component only because it reads workspace currency formatting from
+            context; the navigation itself needs no client JS. */}
         <nav aria-label="Filter by fiscal year" className="flex flex-wrap gap-1">
           <FilterPill href={link(null)} active={selectedYear === null} label="All years" />
           {data.years.map(y => (
