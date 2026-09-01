@@ -52,7 +52,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "@supabase/ssr": "^0.12.3",
-    "@supabase/supabase-js": "^2.110.7",
+    "@supabase/supabase-js": "^2.112.4",
     "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.25.0",
