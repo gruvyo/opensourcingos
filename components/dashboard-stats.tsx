@@ -1,3 +1,5 @@
+'use client'
+
 import { useWorkspaceFormat } from '@/components/workspace-format-provider'
 import { Card } from '@/components/ui/card'
 import { ArrowDownRight, ArrowUpRight, CircleDollarSign, Gauge, CalendarCheck } from 'lucide-react'

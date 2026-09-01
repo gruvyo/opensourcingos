@@ -28,6 +28,7 @@
     "test:terminal-status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/terminal-status.test.mts",
     "test:realization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/realization.test.mts",
     "test:csv": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/csv.test.mts",
+    "test:client-hook-boundary": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/client-hook-boundary.test.mts",
     "test:dependency-audit": "node --test scripts/dependency-audit.test.mjs",
     "test:env-gitignore": "node --test scripts/env-gitignore.test.mjs",
     "test:money-core-role-ui": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/money-core-role-ui.test.mts",
