@@ -41,7 +41,7 @@ jobs:
         run: npm run db:schema
 
       - name: Upload generated database artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: public-schema-snapshot
           path: |
