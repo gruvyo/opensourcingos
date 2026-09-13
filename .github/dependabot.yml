@@ -5,6 +5,18 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+    ignore:
+      # Remove when eslint-config-next's React plugin supports ESLint 10.
+      # PR #152 fails loading react/display-name: getFilename is not a function.
+      - dependency-name: eslint
+        versions: ['>=10.0.0 <11.0.0']
   - package-ecosystem: github-actions
     directory: /
     schedule:
