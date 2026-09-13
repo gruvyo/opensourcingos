@@ -43,7 +43,7 @@ Before submitting a pull request, run:
 ```bash
 npm run verify
 npm run lint
-npx tsc --noEmit
+npm run typecheck
 npm run test:env
 npm run test:portfolio-queries
 ```
