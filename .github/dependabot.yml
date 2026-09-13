@@ -12,6 +12,16 @@ updates:
           - react-dom
           - '@types/react'
           - '@types/react-dom'
+      next:
+        patterns:
+          - next
+          - eslint-config-next
+      routine-updates:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
     ignore:
       # Remove when eslint-config-next's React plugin supports ESLint 10.
       # PR #152 fails loading react/display-name: getFilename is not a function.
