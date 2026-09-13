@@ -16,6 +16,10 @@ updates:
         patterns:
           - next
           - eslint-config-next
+      typescript:
+        patterns:
+          - typescript
+          - '@typescript/native'
       routine-updates:
         patterns:
           - '*'

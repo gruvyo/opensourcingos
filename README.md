@@ -104,6 +104,13 @@ production service or a system of record for confidential procurement data.
 - Recharts
 - Vercel deployment
 
+Type checking uses TypeScript 7 through the `@typescript/native` npm alias.
+ESLint and Next.js use the TypeScript 6 API through the `typescript` alias for
+`@typescript/typescript6`, following [Microsoft's compatibility guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0).
+Use `npm run typecheck`: it calls the native compiler directly because the
+compatibility package also installs an older `tsc` executable. Keep both aliases
+when updating the toolchain; replacing the API alias with TypeScript 7 breaks lint.
+
 ## Run the application locally
 
 ### Requirements
