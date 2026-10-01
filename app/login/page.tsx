@@ -110,12 +110,10 @@ function LoginPageContent() {
           </div>
         </Card>
 
-        {/* Google shows an "unverified app" warning for demos like this one.
-            Saying so up front stops it reading as something being wrong. */}
         <p className="mt-4 text-center text-xs text-[var(--text-3)]">
-          Google may warn that this app is unverified — expected while it is in preview.
-          Choose <span className="font-medium">Advanced</span> →{' '}
-          <span className="font-medium">Go to OpenSourcingOS</span> to continue.
+          Google may show an unverified-app warning while this demo is in preview.
+          You can return here if you prefer not to continue. Read our{' '}
+          <a href="/privacy" className="font-medium underline underline-offset-2 hover:text-[var(--brand)]">privacy notice</a> before signing in.
         </p>
 
         <nav className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs text-[var(--text-3)]" aria-label="Project and support links">
@@ -140,6 +138,13 @@ function LoginPageContent() {
             className="transition-colors hover:text-[var(--brand)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
           >
             Contact us
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href="/privacy"
+            className="transition-colors hover:text-[var(--brand)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+          >
+            Privacy
           </a>
         </nav>
       </div>

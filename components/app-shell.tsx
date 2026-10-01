@@ -5,7 +5,7 @@ import { AppLayout } from './app-layout'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const hideLayout = pathname === '/' || pathname === '/login'
+  const hideLayout = pathname === '/' || pathname === '/login' || pathname === '/privacy'
 
   if (hideLayout) {
     return <>{children}</>
