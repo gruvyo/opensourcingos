@@ -82,7 +82,7 @@ Reduction requires a baseline grounded in the organization's own spend unless
 an explicit override is recorded.
 
 All screens use [`lib/savings/index.ts`](lib/savings/index.ts) as the single
-source of truth. The executable methodology suite currently covers 356 checks.
+source of truth. Run `npm run verify` to check the executable methodology suite.
 
 ## Try the demo
 
