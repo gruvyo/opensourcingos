@@ -163,7 +163,9 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-slate-200 px-5 py-8 text-center text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
-        OpenSourcingOS · Open-source procurement value tracking
+        <span>OpenSourcingOS · Open-source procurement value tracking</span>
+        <span aria-hidden="true" className="mx-2">·</span>
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-slate-800 dark:hover:text-white">Privacy</Link>
       </footer>
     </main>
   )

@@ -181,6 +181,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <div className="mt-3 rounded-lg border border-[var(--nav-border)] bg-white/[0.04] px-3 py-2 text-xs text-slate-500">
           Public beta · Workspace isolated
         </div>
+        <Link href="/privacy" onClick={onClose} className="mt-2 block px-3 text-xs text-slate-400 underline underline-offset-2 hover:text-white">
+          Privacy notice
+        </Link>
       </div>
     </>
   )

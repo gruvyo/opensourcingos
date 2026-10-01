@@ -115,7 +115,7 @@ when updating the toolchain; replacing the API alias with TypeScript 7 breaks li
 
 ### Requirements
 
-- Node.js 20.9 or newer
+- Node.js 24 (matches CI and the hosted Vercel runtime)
 - npm
 - Supabase CLI 2.110.0
 - Docker Desktop or Podman for the local database
