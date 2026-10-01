@@ -27,6 +27,9 @@ updates:
           - minor
           - patch
     ignore:
+      # Keep Node's type definitions aligned with the Node 22 CI/runtime major.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
       # Remove when eslint-config-next's React plugin supports ESLint 10.
       # PR #152 fails loading react/display-name: getFilename is not a function.
       - dependency-name: eslint
